@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents.json",
+  "title": "Any Extent",
+  "description": "A discriminated union of all supported columnar extent types.",
+  "oneOf": [
+    { "$ref": "extent/times.json" },
+    { "$ref": "extent/time_interval.json" },
+    { "$ref": "extent/time_frequency_box.json" }
+  ]
+}
+

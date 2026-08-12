@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bopp-annotation.json",
+  "title": "BOPP Annotation",
+  "type": "object",
+  "properties": {
+    "target": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9]+:.*$"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+      "default": []
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "annotator": { "type": "string" },
+        "tool": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "required": ["annotator", "tool", "version"]
+    },
+    
+    "extent": { 
+      "description": "The parallel array of time/space boundaries (e.g., time_interval, point)",
+      "$ref": "extents.json" 
+    },
+    "payload": { 
+      "description": "The parallel array of values (e.g., beat, chord)",
+      "$ref": "payloads.json" 
+    },
+    "confidence": { 
+      "description": "Optional parallel array of likelihoods or votes",
+      "$ref": "confidences.json" 
+    }
+  },
+  "required": ["target", "metadata", "extent", "payload"]
+}

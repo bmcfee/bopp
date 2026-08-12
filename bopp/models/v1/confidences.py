@@ -1,0 +1,17 @@
+# AUTOMATICALLY GENERATED. DO NOT EDIT
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from msgspec import Meta
+
+from .confidence import likelihood
+
+type AnyConfidence = Annotated[
+    likelihood.LikelihoodConfidence,
+    Meta(
+        description="A discriminated union of all supported columnar confidence types.",
+        title="Any Confidence",
+    ),
+]

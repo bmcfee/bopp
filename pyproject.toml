@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bopp"
+version = "0.1.0"
+description = "Bounded Observation Payload Protocol"
+dependencies = [
+    "msgspec>=0.18.0",
+    "pyyaml"          # For the CSV header parsing
+]
+
+# --- pyproject.toml ---
+
+[tool.hatch.build.targets.wheel]
+packages = ["bopp"]
+
+[tool.hatch.envs.codegen]
+# Isolate the generator dependencies from your main app
+dependencies = [
+  "datamodel-code-generator>=0.25.0" 
+]
+
+[tool.hatch.envs.codegen.scripts]
+# A script to wipe the old compiled models before generating new ones
+clean = "rm -rf bopp/models/v1/*"
+
+# The main generation script
+compile = """
+datamodel-codegen \\
+  --input schemas/v1/ \\
+  --input-file-type jsonschema \\
+  --base-class bopp.base.BoppBase \\
+  --output bopp/models/v1/ \\
+  --output-model-type msgspec.Struct \\
+  --formatters ruff-check ruff-format \\
+  --target-python-version 3.12 \\
+  --use-union-operator \\
+  --disable-timestamp \\
+  --custom-file-header "# AUTOMATICALLY GENERATED. DO NOT EDIT" \\
+  --use-schema-description
+"""
+
+# A convenience script to do both
+build = ["clean", "compile"]

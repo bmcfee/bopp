@@ -1,0 +1,10 @@
+
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "confidences.json",
+  "title": "Any Confidence",
+  "description": "A discriminated union of all supported columnar confidence types.",
+  "oneOf": [
+    { "$ref": "confidence/likelihood.json" },
+  ]
+}

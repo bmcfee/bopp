@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/times.json",
+  "title": "Timestamps",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "timestamps"
+    },
+    "coordinates": {
+      "type": "array",
+      "description": "An N array of time values.",
+      "items": {
+        "type": "array",
+        "items": [
+          { "type": "number", "minimum": 0.0, "description": "Time" }
+        ]
+      }
+    }
+  },
+  "required": ["extent_type", "coordinates"]
+}

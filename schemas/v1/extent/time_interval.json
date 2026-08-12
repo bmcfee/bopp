@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/time_interval.json",
+  "title": "Time Interval Extent",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "time_interval"
+    },
+    "coordinates": {
+      "type": "array",
+      "description": "An N x 2 array of time intervals. Each inner array is [start_time, duration] in seconds.",
+      "items": {
+        "type": "array",
+        "items": [
+          { "type": "number", "minimum": 0.0, "description": "Time" },
+          { "type": "number", "minimum": 0.0, "description": "Duration" }
+        ],
+        "minItems": 2,
+        "maxItems": 2
+      }
+    }
+  },
+  "required": ["extent_type", "coordinates"]
+}

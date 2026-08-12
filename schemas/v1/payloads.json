@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payloads.json",
+  "title": "Any Payload",
+  "description": "A discriminated union of all supported columnar payload types.",
+  "oneOf": [
+    { "$ref": "payload/beat.json" },
+    { "$ref": "payload/chord.json" }
+  ]
+}

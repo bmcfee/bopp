@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/beat.json",
+  "title": "Beat Position Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "beat"
+    },
+    "value": {
+      "type": "array",
+      "description": "The metric position of the beat within the measure (e.g., 1 for downbeat, 2, 3, 4).",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "required": ["payload_type", "value"]
+}

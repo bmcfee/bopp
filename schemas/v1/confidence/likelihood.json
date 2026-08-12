@@ -1,0 +1,22 @@
+
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "confidence/likelihood.json",
+  "title": "Likelihood Confidence",
+  "type": "object",
+  "properties": {
+    "confidence_type": {
+      "const": "likelihood"
+    },
+    "confidence": {
+      "type": "array",
+      "description": "The likeilhood (probability) of each observation",
+      "items": {
+        "type": "float",
+        "minimum": 0,
+        "maximum": 1
+      }
+    }
+  },
+  "required": ["payload_type", "confidence"]
+}
