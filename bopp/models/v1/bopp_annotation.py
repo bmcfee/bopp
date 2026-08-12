@@ -5,14 +5,14 @@ from __future__ import annotations
 from typing import Annotated
 
 from bopp.base import BoppBase
-from msgspec import UNSET, Meta, UnsetType, field
+from msgspec import UNSET, Meta, Struct, UnsetType, field
 
 from . import confidences, extents, payloads
 
 type Dependency = Annotated[str, Meta(pattern="^sha256:[a-f0-9]{64}$")]
 
 
-class Metadata(BoppBase):
+class Metadata(Struct):
     annotator: str
     tool: str
     version: str

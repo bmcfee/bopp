@@ -7,6 +7,9 @@
     { "$ref": "extent/times.json" },
     { "$ref": "extent/time_interval.json" },
     { "$ref": "extent/time_frequency_box.json" }
-  ]
+  ],
+  "discriminator": {
+    "propertyName": "extent_type"
+  }
 }
 

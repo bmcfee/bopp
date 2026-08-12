@@ -12,11 +12,11 @@
       "type": "array",
       "description": "The likeilhood (probability) of each observation",
       "items": {
-        "type": "float",
+        "type": "number",
         "minimum": 0,
         "maximum": 1
       }
     }
   },
-  "required": ["payload_type", "confidence"]
+  "required": ["confidence_type", "confidence"]
 }

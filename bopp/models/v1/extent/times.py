@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
-from bopp.base import BoppBase
-from msgspec import Meta
+from msgspec import Meta, Struct
 
-type Coordinate = Annotated[float, Meta(description="Time", ge=0.0)]
+type Coordinate = Annotated[float, Meta(ge=0.0)]
 
 
-class Timestamps(BoppBase):
-    extent_type: Literal["timestamps"]
+class Timestamps(Struct, tag_field="extent_type", tag="timestamps"):
     coordinates: Annotated[
-        list[list[Coordinate]], Meta(description="An N array of time values.")
+        list[Coordinate], Meta(description="An N array of time values.")
     ]

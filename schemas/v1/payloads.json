@@ -6,5 +6,8 @@
   "oneOf": [
     { "$ref": "payload/beat.json" },
     { "$ref": "payload/chord.json" }
-  ]
+  ],
+  "discriminator": {
+    "propertyName": "payload_type"
+  }
 }

@@ -11,10 +11,8 @@
       "type": "array",
       "description": "An N array of time values.",
       "items": {
-        "type": "array",
-        "items": [
-          { "type": "number", "minimum": 0.0, "description": "Time" }
-        ]
+        "type": "number",
+        "minimum": 0.0
       }
     }
   },

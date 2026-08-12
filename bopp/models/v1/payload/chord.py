@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
-from bopp.base import BoppBase
-from msgspec import UNSET, Meta, UnsetType
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type ValueItem = Annotated[
     str,
@@ -15,8 +14,7 @@ type ValueItem = Annotated[
 ]
 
 
-class ChordPayload(BoppBase):
-    payload_type: Literal["chord"]
+class ChordPayload(Struct, tag_field="payload_type", tag="chord"):
     value: (
         Annotated[
             list[ValueItem],

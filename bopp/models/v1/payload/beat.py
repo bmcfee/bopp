@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
-from bopp.base import BoppBase
-from msgspec import Meta
+from msgspec import Meta, Struct
 
 type ValueItem = Annotated[int, Meta(ge=1)]
 
 
-class BeatPositionPayload(BoppBase):
-    payload_type: Literal["beat"]
+class BeatPositionPayload(Struct, tag_field="payload_type", tag="beat"):
     value: Annotated[
         list[ValueItem],
         Meta(

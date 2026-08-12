@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
-from bopp.base import BoppBase
-from msgspec import Meta
+from msgspec import Meta, Struct
 
 type Coordinate1Item = Annotated[float, Meta(description="Time", ge=0.0)]
 
@@ -18,8 +17,7 @@ type Coordinate = Annotated[
 ]
 
 
-class TimeIntervalExtent(BoppBase):
-    extent_type: Literal["time_interval"]
+class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
     coordinates: Annotated[
         list[Coordinate],
         Meta(

@@ -1,6 +1,6 @@
 import msgspec
 
-class StrictDenseStruct(msgspec.Struct):
+class BoppBase(msgspec.Struct):
     """
     A base class for BOPP models. Dynamically validates parallel columnar 
     arrays on the root Annotation node, safely ignoring sub-models.
@@ -20,8 +20,9 @@ class StrictDenseStruct(msgspec.Struct):
                 f"but Payload contains {payload_len} items."
             )
             
-        if hasattr(self, "confidence") and self.confidence is not None:
-            conf_len = self._get_column_length(self.confidence, "Confidence")
+        confidence_field = getattr(self, "confidence", msgspec.UNSET)
+        if confidence_field is not msgspec.UNSET and confidence_field is not None:
+            conf_len = self._get_column_length(confidence_field, "Confidence")
             if conf_len != extent_len:
                 raise ValueError(
                     f"Length mismatch: Extent contains {extent_len} items, "

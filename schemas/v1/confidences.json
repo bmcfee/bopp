@@ -5,6 +5,9 @@
   "title": "Any Confidence",
   "description": "A discriminated union of all supported columnar confidence types.",
   "oneOf": [
-    { "$ref": "confidence/likelihood.json" },
-  ]
+    { "$ref": "confidence/likelihood.json" }
+  ],
+  "discriminator": {
+    "propertyName": "confidence_type"
+  }
 }

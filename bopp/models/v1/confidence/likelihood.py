@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
-from bopp.base import BoppBase
-from msgspec import UNSET, Meta, UnsetType
+from msgspec import Meta, Struct
 
-type ConfidenceItem = Annotated[Any, Meta(ge=0, le=1)]
+type ConfidenceItem = Annotated[float, Meta(ge=0.0, le=1.0)]
 
 
-class LikelihoodConfidence(BoppBase):
+class LikelihoodConfidence(Struct):
+    confidence_type: Literal["likelihood"]
     confidence: Annotated[
         list[ConfidenceItem],
         Meta(description="The likeilhood (probability) of each observation"),
     ]
-    confidence_type: Literal["likelihood"] | UnsetType = UNSET
