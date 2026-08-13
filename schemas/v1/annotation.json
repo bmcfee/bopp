@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "bopp-annotation.json",
-  "title": "BOPP Annotation",
+  "$id": "annotation.json",
+  "title": "Annotation",
   "type": "object",
   "properties": {
     "target": {
@@ -14,15 +14,9 @@
       "default": []
     },
     "metadata": {
-      "type": "object",
-      "properties": {
-        "annotator": { "type": "string" },
-        "tool": { "type": "string" },
-        "version": { "type": "string" }
-      },
-      "required": ["annotator", "tool", "version"]
+        "description": "The metadata describing the annotation",
+        "$ref": "metadata.json"
     },
-    
     "extent": { 
       "description": "The parallel array of time/space boundaries (e.g., time_interval, point)",
       "$ref": "extents.json" 
@@ -36,5 +30,5 @@
       "$ref": "confidences.json" 
     }
   },
-  "required": ["target", "metadata", "extent", "payload"]
+  "required": ["target", "extent", "payload"]
 }

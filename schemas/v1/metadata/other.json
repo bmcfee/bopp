@@ -1,0 +1,17 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "metadata/other.json",
+    "title": "Annotation Metadata [other]",
+    "description": "Metadata for annotations from unknown sources",
+    "type": "object",
+    "properties": {
+        "metadata_type": {
+            "const": "other"
+        },
+        "notes": {
+            "type": "string",
+            "description": "Notes or comments about the annotation."
+        }
+    },
+    "required": ["metadata_type", "notes"]
+}

@@ -1,0 +1,21 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "metadata/human.json",
+    "title": "Human Annotation Metadata",
+    "description": "Metadata for annotations created by human annotators.",
+    "type": "object",
+    "properties": {
+        "metadata_type": {
+            "const": "human"
+        },
+        "annotator_id": {
+            "type": "string",
+            "description": "A unique identifier for the human annotator."
+        },
+        "tool": {
+            "type": "string",
+            "description": "The tool or software used by the annotator."
+        }
+    },
+    "required": ["metadata_type", "annotator_id", "tool"]
+}

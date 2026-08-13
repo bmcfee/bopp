@@ -1,0 +1,25 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "metadata/algorithm.json",
+    "title": "Algorithm Annotation Metadata",
+    "description": "Metadata for annotations created by algorithms or models.",
+    "type": "object",
+    "properties": {
+        "metadata_type": {
+            "const": "algorithm"
+        },
+        "algorithm_id": {
+            "type": "string",
+            "description": "A unique identifier for the algorithm."
+        },
+        "version": {
+            "type": "string",
+            "description": "The version number of the algorithm."
+        },
+        "parameters": {
+            "type": "object",
+            "description": "A object containing the parameters used by the algorithm."
+        }
+    },
+    "required": ["metadata_type", "algorithm_id", "version", "parameters"]
+}

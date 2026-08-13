@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "metadata/crowd.json",
+    "title": "Crowd-sourced Annotation Metadata",
+    "description": "Metadata for annotations created by crowdsourcing.",
+    "type": "object",
+    "properties": {
+        "metadata_type": {
+            "const": "crowd"
+        },
+        "platform": {
+            "type": "string",
+            "description": "The platform or service used for crowdsourcing the annotations."
+        },
+        "num_annotators": {
+            "type": "integer",
+            "description": "The number of annotators contributing to this annotation.",
+            "minimum": 1
+        },
+        "consensus": {
+            "type": "string",
+            "description": "The method used to reach consensus among annotators (e.g., majority vote, expert review)."
+        }
+    },
+    "required": ["metadata_type", "platform", "num_annotators", "consensus"]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "metadata.json",
+  "title": "Annotation metadata",
+  "description": "A discriminated union of all supported metadata types.",
+  "oneOf": [
+    { "$ref": "metadata/human.json" },
+    { "$ref": "metadata/algorithm.json" },
+    { "$ref": "metadata/crowd.json" },
+    { "$ref": "metadata/sensor.json" },
+    { "$ref": "metadata/derived.json" },
+    { "$ref": "metadata/other.json" }
+  ],
+  "discriminator": {
+    "propertyName": "metadata_type"
+  }
+}

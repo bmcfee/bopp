@@ -1,0 +1,22 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "metadata/derived.json",
+    "title": "Derived Annotation Metadata",
+    "description": "Metadata for annotations derived from other annotations.",
+    "type": "object",
+    "properties": {
+        "metadata_type": {
+            "const": "derived"
+        },
+        "source_ids": {
+            "type": "array",
+            "description": "The ids of source annotations for this derived annotation.",
+            "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9]+:.*$"
+            },
+            "minItems": 1
+        }
+    },
+    "required": ["metadata_type", "source_ids"]
+}

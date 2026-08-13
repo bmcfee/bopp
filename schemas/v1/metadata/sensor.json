@@ -1,0 +1,21 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "metadata/sensor.json",
+    "title": "Sensor Annotation Metadata",
+    "description": "Metadata for annotations created by sensors or hardware.",
+    "type": "object",
+    "properties": {
+        "metadata_type": {
+            "const": "sensor"
+        },
+        "device": {
+            "type": "string",
+            "description": "A unique identifier for the sensor."
+        },
+        "settings": {
+            "type": "object",
+            "description": "A object containing the settings of the device."
+        }
+    },
+    "required": ["metadata_type", "device", "settings"]
+}
