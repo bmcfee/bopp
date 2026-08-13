@@ -1,17 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "annotation.json",
+  "$id": "v1/annotation.json",
   "title": "Annotation",
   "type": "object",
   "properties": {
-    "target": {
+    "media_id": {
       "type": "string",
       "pattern": "^[a-zA-Z0-9]+:.*$"
     },
-    "dependencies": {
-      "type": "array",
-      "items": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
-      "default": []
+    "bopp_version": {
+      "type": "string",
+      "pattern": "^1\\.\\d+\\.\\d+$",
+      "description": "The Semantic Version of the BOPP schema (e.g., 1.0.0)"
     },
     "metadata": {
         "description": "The metadata describing the annotation",
@@ -30,5 +30,5 @@
       "$ref": "confidences.json" 
     }
   },
-  "required": ["target", "extent", "payload"]
+  "required": ["media_id", "extent", "payload"]
 }
