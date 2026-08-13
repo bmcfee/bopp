@@ -6,10 +6,40 @@ from typing import Annotated
 
 from msgspec import Meta
 
-from .payload import beat, chord
+from .payload import (
+    beat,
+    chord,
+    key_mode,
+    mood_thayer,
+    note_hz,
+    note_midi,
+    onset,
+    pattern_jku,
+    pitch_class,
+    pitch_contour_hz,
+    pitch_midi,
+    segment_multi,
+    segment_open,
+    tag_open,
+    tempo,
+)
 
 type AnyPayload = Annotated[
-    beat.BeatPositionPayload | chord.ChordPayload,
+    beat.BeatPositionPayload
+    | chord.ChordPayload
+    | key_mode.KeyModePayload
+    | mood_thayer.MoodThayerPayload
+    | note_hz.NoteHzPayload
+    | note_midi.NoteMidiPayload
+    | onset.OnsetPayload
+    | pattern_jku.PatternJkuPayload
+    | pitch_class.PitchClassPayload
+    | pitch_contour_hz.PitchContourPayload
+    | pitch_midi.PitchMidiPayload
+    | segment_multi.MultiSegmentPayload
+    | segment_open.SegmentOpenPayload
+    | tag_open.TagOpenPayload
+    | tempo.TempoPayload,
     Meta(
         description="A discriminated union of all supported columnar payload types.",
         title="Any Payload",

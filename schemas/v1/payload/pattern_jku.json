@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/pattern_jku.json",
+  "title": "Pattern_Jku Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "pattern_jku"
+    },
+    "values": {
+      "type": "array",
+      "description": "Pattern (MIDI pitch), including staff height, voice number, occurrence id, and pattern id",
+      "items": {
+        "type": "object",
+        "properties": {
+          "midi_pitch": {
+            "type": "number"
+          },
+          "morph_pitch": {
+            "type": "number"
+          },
+          "staff": {
+            "type": "number"
+          },
+          "pattern_id": {
+            "type": "number",
+            "minimum": 1
+          },
+          "occurrence_id": {
+            "type": "number",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "midi_pitch",
+          "morph_pitch",
+          "staff",
+          "pattern_id",
+          "occurrence_id"
+        ]
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/segment_open.json",
+  "title": "Segment_Open Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "segment_open"
+    },
+    "values": {
+      "type": "array",
+      "description": "Open vocabulary segment labels",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

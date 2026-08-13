@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/mood_thayer.json",
+  "title": "Mood_Thayer Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "mood_thayer"
+    },
+    "values": {
+      "type": "array",
+      "description": "Thayer mood model: (valence, arousal)",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        },
+        "minItems": 2,
+        "maxItems": 2
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/pitch_contour.json",
+  "title": "Pitch_Contour Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "pitch_contour"
+    },
+    "values": {
+      "type": "array",
+      "description": "Pitch contours: (index, frequency, voicing)",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

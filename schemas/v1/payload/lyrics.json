@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/lyrics.json",
+  "title": "Lyrics Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "lyrics"
+    },
+    "values": {
+      "type": "array",
+      "description": "Open strings for lyrics annotations",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

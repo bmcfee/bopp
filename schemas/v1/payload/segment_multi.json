@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/multi_segment.json",
+  "title": "Multi_Segment Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "multi_segment"
+    },
+    "values": {
+      "type": "array",
+      "description": "Multi-level segmentation: (label, level)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "label",
+          "level"
+        ]
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

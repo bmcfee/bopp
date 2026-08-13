@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/onset.json",
+  "title": "Onset Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "onset"
+    },
+    "values": {
+      "type": "array",
+      "description": "Onset event markers",
+      "items": {}
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

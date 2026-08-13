@@ -5,7 +5,20 @@
   "description": "A discriminated union of all supported columnar payload types.",
   "oneOf": [
     { "$ref": "payload/beat.json" },
-    { "$ref": "payload/chord.json" }
+    { "$ref": "payload/chord.json" },
+    { "$ref": "payload/key_mode.json" },
+    { "$ref": "payload/mood_thayer.json" },
+    { "$ref": "payload/note_hz.json" },
+    { "$ref": "payload/note_midi.json" },
+    { "$ref": "payload/onset.json" },
+    { "$ref": "payload/pattern_jku.json" },
+    { "$ref": "payload/pitch_class.json" },
+    { "$ref": "payload/pitch_contour_hz.json" },
+    { "$ref": "payload/pitch_midi.json" },
+    { "$ref": "payload/segment_multi.json" },
+    { "$ref": "payload/segment_open.json" },
+    { "$ref": "payload/tag_open.json" },
+    { "$ref": "payload/tempo.json" }
   ],
   "discriminator": {
     "propertyName": "payload_type"

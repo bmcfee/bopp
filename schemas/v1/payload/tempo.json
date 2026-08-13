@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/tempo.json",
+  "title": "Tempo Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "tempo"
+    },
+    "values": {
+      "type": "array",
+      "description": "Tempo measurements, in beats per minute (BPM)",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

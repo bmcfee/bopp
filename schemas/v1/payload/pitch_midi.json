@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/pitch_midi.json",
+  "title": "Pitch_Midi Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "pitch_midi"
+    },
+    "values": {
+      "type": "array",
+      "description": "[DEPRECATED] Pitch in (fractional) MIDI note numbers",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

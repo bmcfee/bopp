@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "chord"
     },
-    "value": {
+    "values": {
         "type": "array",
         "description": "A musical chord string in extended Harte notation.",
         "items": {

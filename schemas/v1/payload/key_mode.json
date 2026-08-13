@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/key_mode.json",
+  "title": "Key_Mode Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "key_mode"
+    },
+    "values": {
+      "type": "array",
+      "description": "Key and optional mode (major/minor or Greek modes)",
+      "items": {
+        "type": "string",
+        "pattern": "^N|([A-G][b#]?)(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?$"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

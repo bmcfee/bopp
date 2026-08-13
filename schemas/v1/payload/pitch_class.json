@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/pitch_class.json",
+  "title": "Pitch_Class Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "pitch_class"
+    },
+    "values": {
+      "type": "array",
+      "description": "Pitch class in (tonic, pitch class) format",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tonic": {
+            "type": "string",
+            "pattern": "^[A-G][b#]?$"
+          },
+          "pitch": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tonic",
+          "pitch"
+        ]
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/note_hz.json",
+  "title": "Note_Hz Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "note_hz"
+    },
+    "values": {
+      "type": "array",
+      "description": "Note pitches in Hz",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}

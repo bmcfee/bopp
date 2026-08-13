@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "beat"
     },
-    "value": {
+    "values": {
       "type": "array",
       "description": "The metric position of the beat within the measure (e.g., 1 for downbeat, 2, 3, 4).",
       "items": {
@@ -16,5 +16,5 @@
       }
     }
   },
-  "required": ["payload_type", "value"]
+  "required": ["payload_type", "values"]
 }

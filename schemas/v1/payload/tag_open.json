@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/tag_open.json",
+  "title": "Tag_Open Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "tag_open"
+    },
+    "values": {
+      "type": "array",
+      "description": "Open tag vocabularies allow all strings",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "values"
+  ]
+}
