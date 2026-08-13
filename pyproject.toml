@@ -38,7 +38,7 @@ datamodel-codegen \\
   --target-python-version 3.12 \\
   --use-union-operator \\
   --disable-timestamp \\
-  --custom-file-header "# AUTOMATICALLY GENERATED. DO NOT EDIT" \\
+  --enable-generated-header-marker \\
   --use-schema-description
 """
 
