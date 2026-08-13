@@ -1,19 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "confidence/likelihood.json",
-  "title": "Likelihood Confidence",
+  "$id": "confidence/variance.json",
+  "title": "Variance Confidence",
   "type": "object",
   "properties": {
     "confidence_type": {
-      "const": "likelihood"
+      "const": "variance"
     },
     "confidence": {
       "type": "array",
-      "description": "The likeilhood (probability) of each observation",
+      "description": "The variance of each observation",
       "items": {
         "type": "number",
-        "minimum": 0,
-        "maximum": 1
+        "minimum": 0
       }
     }
   },

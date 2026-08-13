@@ -3,15 +3,14 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from msgspec import Meta, Struct
 
 type ConfidenceItem = Annotated[float, Meta(ge=0.0, le=1.0)]
 
 
-class LikelihoodConfidence(Struct):
-    confidence_type: Literal["likelihood"]
+class LikelihoodConfidence(Struct, tag_field="confidence_type", tag="likelihood"):
     confidence: Annotated[
         list[ConfidenceItem],
         Meta(description="The likeilhood (probability) of each observation"),
