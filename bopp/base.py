@@ -1,5 +1,6 @@
 import msgspec
 
+
 class BoppBase(msgspec.Struct):
     """
     A base class for BOPP models. Dynamically validates parallel columnar 
