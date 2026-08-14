@@ -8,7 +8,7 @@
       "const": "timestamps"
     },
     "coordinates": {
-      "$ref": "../core.json#/$defs/ColumnarBuffer",
+      "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "An N array of time values.",
       "items": {
         "type": "number",

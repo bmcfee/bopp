@@ -8,7 +8,7 @@
       "const": "beat"
     },
     "values": {
-      "$ref": "../core.json#/$defs/ColumnarBuffer",
+      "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "The metric position of the beat within the measure (e.g., 1 for downbeat, 2, 3, 4).",
       "items": {
         "type": "integer",

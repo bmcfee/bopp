@@ -8,7 +8,7 @@
       "const": "pattern_jku"
     },
     "values": {
-      "$ref": "../core.json#/$defs/ColumnarBuffer",
+      "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "Pattern (MIDI pitch), including staff height, voice number, occurrence id, and pattern id",
       "items": {
         "type": "object",

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1/core.json",
+  "title": "BOPP Core Primitives",
+  "$defs": {
+    "Float32Buffer": {
+      "type": "array",
+      "x-python-type": "typing.Annotated[pyarrow.Array, 'float32']",
+      "items": { "type": "number", "format": "float" },
+      "description": "A dense columnar array buffer of 32-bit floats."
+    },
+    "GenericBuffer": {
+      "type": "array",
+      "x-python-type": "pyarrow.Array",
+      "description": "A dense columnar array buffer. Instantiated as pyarrow.Array."
+    }
+  }
+}

@@ -8,7 +8,7 @@
       "const": "tag_open"
     },
     "values": {
-      "$ref": "../core.json#/$defs/ColumnarBuffer",
+      "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "Open tag vocabularies allow all strings",
       "items": {
         "type": "string"

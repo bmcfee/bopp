@@ -8,7 +8,7 @@
       "const": "TimeFrequencyBox"
     },
     "coordinates": {
-      "$ref": "../core.json#/$defs/ColumnarBuffer",
+      "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "An N x 4 array of time-frequency bounding bxoes. Each inner array is [start_time, duration] in seconds.",
       "items": {
         "type": "array",

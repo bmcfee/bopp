@@ -8,7 +8,7 @@
       "const": "segment_open"
     },
     "values": {
-      "$ref": "../core.json#/$defs/ColumnarBuffer",
+      "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "Open vocabulary segment labels",
       "items": {
         "type": "string"

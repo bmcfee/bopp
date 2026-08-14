@@ -8,7 +8,7 @@
       "const": "note_midi"
     },
     "values": {
-      "$ref": "../core.json#/$defs/ColumnarBuffer",
+      "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "Note pitches in (fractional) MIDI note numbers",
       "items": {
         "type": "number"
