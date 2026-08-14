@@ -6,14 +6,10 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-
-class Value(Struct):
-    label: str
-    level: Annotated[int, Meta(ge=0)]
+from pyarrow import Array
 
 
 class MultiSegmentPayload(Struct, tag_field="payload_type", tag="multi_segment"):
     values: Annotated[
-        list[Value], Meta(description="Multi-level segmentation: (label, level)")
+        Array, Meta(description="Multi-level segmentation: (label, level)")
     ]

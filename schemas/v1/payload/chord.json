@@ -8,7 +8,7 @@
       "const": "chord"
     },
     "values": {
-        "type": "array",
+        "$ref": "../core.json#/$defs/ColumnarBuffer",
         "description": "A musical chord string in extended Harte notation.",
         "items": {
           "type": "string",

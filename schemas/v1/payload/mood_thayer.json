@@ -8,7 +8,7 @@
       "const": "mood_thayer"
     },
     "values": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "Thayer mood model: (valence, arousal)",
       "items": {
         "type": "array",

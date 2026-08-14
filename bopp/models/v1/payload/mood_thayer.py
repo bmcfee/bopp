@@ -6,11 +6,8 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-type Value = Annotated[list[float], Meta(max_length=2, min_length=2)]
+from pyarrow import Array
 
 
 class MoodThayerPayload(Struct, tag_field="payload_type", tag="mood_thayer"):
-    values: Annotated[
-        list[Value], Meta(description="Thayer mood model: (valence, arousal)")
-    ]
+    values: Annotated[Array, Meta(description="Thayer mood model: (valence, arousal)")]

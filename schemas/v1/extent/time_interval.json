@@ -8,7 +8,7 @@
       "const": "time_interval"
     },
     "coordinates": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "An N x 2 array of time intervals. Each inner array is [start_time, duration] in seconds.",
       "items": {
         "type": "array",

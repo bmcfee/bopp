@@ -1,4 +1,5 @@
 import msgspec
+import pyarrow as pa
 
 
 class BoppBase(msgspec.Struct):
@@ -41,7 +42,7 @@ class BoppBase(msgspec.Struct):
             val = getattr(facet_struct, field.name)
             
             # Find the first field that is a list and return its length
-            if isinstance(val, list):
+            if isinstance(val, pa.Array):
                 return len(val)
                 
         # Fallback if no array is found (catches malformed schemas)

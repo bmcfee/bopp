@@ -6,11 +6,8 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-type Coordinate = Annotated[float, Meta(ge=0.0)]
+from pyarrow import Array
 
 
 class Timestamps(Struct, tag_field="extent_type", tag="timestamps"):
-    coordinates: Annotated[
-        list[Coordinate], Meta(description="An N array of time values.")
-    ]
+    coordinates: Annotated[Array, Meta(description="An N array of time values.")]

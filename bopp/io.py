@@ -3,12 +3,42 @@
 import ast
 import msgspec
 import pandas as pd
+import pyarrow as pa
 import yaml
 
 from .util import extract_header, to_dataframe
 from pathlib import Path
 
 from bopp.models.v1.annotation import Annotation
+
+from typing import Any
+
+
+def decode_arrow(type_hint, value):
+    """
+    Intercepts the msgspec parser to build native Arrow arrays 
+    instead of standard Python lists.
+    """
+    if type_hint is pa.Array:
+        # Convert the raw parsed list directly into a contiguous Arrow buffer
+        return pa.array(value)
+        
+    raise TypeError(f"Type {type_hint} is not supported")
+
+
+def encode_arrow(obj: Any) -> Any:
+    """
+    Intercepts PyArrow arrays during serialization and converts 
+    them back to standard Python lists for Msgpack/JSON.
+    """
+    # Catch both contiguous Arrays and ChunkedArrays natively
+    if isinstance(obj, (pa.Array, pa.ChunkedArray)):
+        return obj.to_pylist()
+    
+    # msgspec requires you to raise a NotImplementedError if the hook 
+    # receives an object it doesn't know how to handle.
+    raise NotImplementedError(f"Object of type {type(obj)} is not supported")
+
 
 def to_csv(ann: Annotation, filepath: str | Path) -> None:
     """Writes metadata as YAML frontmatter, followed by the DataFrame."""
@@ -39,13 +69,13 @@ def load_bopp_json(filepath: str) -> Annotation:
     with open(filepath, "rb") as f:
         data = f.read()
 
-    return msgspec.json.decode(data, type=Annotation)
+    return msgspec.json.decode(data, type=Annotation, dec_hook=decode_arrow)
 
 
 def save_bopp_json(annotation: Annotation, filepath: str) -> None:
     """Serializes a Annotation instance directly into a JSON file."""
     # msgspec encodes structs natively without needing conversion dicts
-    json_data = msgspec.json.encode(annotation)
+    json_data = msgspec.json.encode(annotation, enc_hook=encode_arrow)
     
     with open(filepath, "wb") as f:
         f.write(json_data)
@@ -60,7 +90,7 @@ def save_bopp_msgpack(annotation: Annotation, filepath: str) -> None:
     Serializes a Annotation instance directly into a binary msgpack file.
     """
     # msgspec encodes structs natively without needing conversion dicts
-    binary_data = msgspec.msgpack.encode(annotation)
+    binary_data = msgspec.msgpack.encode(annotation, enc_hook=encode_arrow)
     
     with open(filepath, "wb") as f:
         f.write(binary_data)
@@ -79,7 +109,7 @@ def load_bopp_msgpack(filepath: str) -> Annotation:
         binary_data = f.read()
         
     # Decode and instantly validate against the Annotation schema
-    return msgspec.msgpack.decode(binary_data, type=Annotation)
+    return msgspec.msgpack.decode(binary_data, type=Annotation, dec_hook=decode_arrow)
 
 
 def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:

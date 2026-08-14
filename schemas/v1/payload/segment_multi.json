@@ -8,7 +8,7 @@
       "const": "multi_segment"
     },
     "values": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "Multi-level segmentation: (label, level)",
       "items": {
         "type": "object",

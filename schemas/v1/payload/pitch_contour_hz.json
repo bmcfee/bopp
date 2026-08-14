@@ -8,7 +8,7 @@
       "const": "pitch_contour"
     },
     "values": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "Pitch contours: (index, frequency, voicing)",
       "items": {
         "type": "object"

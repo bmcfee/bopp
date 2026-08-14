@@ -6,10 +6,9 @@ from __future__ import annotations
 from typing import Annotated, Literal
 
 from msgspec import Meta, Struct
+from pyarrow import Array
 
 
 class LyricsPayload(Struct):
     payload_type: Literal["lyrics"]
-    values: Annotated[
-        list[str], Meta(description="Open strings for lyrics annotations")
-    ]
+    values: Annotated[Array, Meta(description="Open strings for lyrics annotations")]

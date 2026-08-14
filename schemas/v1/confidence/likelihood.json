@@ -8,7 +8,7 @@
       "const": "likelihood"
     },
     "confidence": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "The likeilhood (probability) of each observation",
       "items": {
         "type": "number",

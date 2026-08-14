@@ -8,7 +8,7 @@
       "const": "variance"
     },
     "confidence": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "The variance of each observation",
       "items": {
         "type": "number",

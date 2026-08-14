@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from msgspec import Meta, Struct
+from pyarrow import Array
 
 
 class OnsetPayload(Struct, tag_field="payload_type", tag="onset"):
-    values: Annotated[list[Any], Meta(description="Onset event markers")]
+    values: Annotated[Array, Meta(description="Onset event markers")]

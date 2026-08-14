@@ -6,9 +6,8 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-type Value = Annotated[float, Meta(ge=0.0)]
+from pyarrow import Array
 
 
 class NoteHzPayload(Struct, tag_field="payload_type", tag="note_hz"):
-    values: Annotated[list[Value], Meta(description="Note pitches in Hz")]
+    values: Annotated[Array, Meta(description="Note pitches in Hz")]

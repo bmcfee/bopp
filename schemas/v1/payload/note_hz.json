@@ -8,7 +8,7 @@
       "const": "note_hz"
     },
     "values": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "Note pitches in Hz",
       "items": {
         "type": "number",

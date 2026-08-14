@@ -6,13 +6,12 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-type Value = Annotated[int, Meta(ge=1)]
+from pyarrow import Array
 
 
 class BeatPositionPayload(Struct, tag_field="payload_type", tag="beat"):
     values: Annotated[
-        list[Value],
+        Array,
         Meta(
             description="The metric position of the beat within the measure (e.g., 1 for downbeat, 2, 3, 4)."
         ),

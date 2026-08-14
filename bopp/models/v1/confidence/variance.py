@@ -6,11 +6,8 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-type ConfidenceItem = Annotated[float, Meta(ge=0.0)]
+from pyarrow import Array
 
 
 class VarianceConfidence(Struct, tag_field="confidence_type", tag="variance"):
-    confidence: Annotated[
-        list[ConfidenceItem], Meta(description="The variance of each observation")
-    ]
+    confidence: Annotated[Array, Meta(description="The variance of each observation")]

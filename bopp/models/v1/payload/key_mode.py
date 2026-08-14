@@ -6,17 +6,10 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-type Value = Annotated[
-    str,
-    Meta(
-        pattern="^N|([A-G][b#]?)(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?$"
-    ),
-]
+from pyarrow import Array
 
 
 class KeyModePayload(Struct, tag_field="payload_type", tag="key_mode"):
     values: Annotated[
-        list[Value],
-        Meta(description="Key and optional mode (major/minor or Greek modes)"),
+        Array, Meta(description="Key and optional mode (major/minor or Greek modes)")
     ]

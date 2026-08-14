@@ -6,14 +6,10 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-
-
-class Value(Struct):
-    tonic: Annotated[str, Meta(pattern="^[A-G][b#]?$")]
-    pitch: int
+from pyarrow import Array
 
 
 class PitchClassPayload(Struct, tag_field="payload_type", tag="pitch_class"):
     values: Annotated[
-        list[Value], Meta(description="Pitch class in (tonic, pitch class) format")
+        Array, Meta(description="Pitch class in (tonic, pitch class) format")
     ]

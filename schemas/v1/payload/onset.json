@@ -8,7 +8,7 @@
       "const": "onset"
     },
     "values": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "Onset event markers",
       "items": {}
     }

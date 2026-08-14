@@ -8,7 +8,7 @@
       "const": "lyrics"
     },
     "values": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "Open strings for lyrics annotations",
       "items": {
         "type": "string"

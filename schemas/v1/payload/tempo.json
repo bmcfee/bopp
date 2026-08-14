@@ -8,7 +8,7 @@
       "const": "tempo"
     },
     "values": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/ColumnarBuffer",
       "description": "Tempo measurements, in beats per minute (BPM)",
       "items": {
         "type": "number",

@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from msgspec import Meta, Struct
+from pyarrow import Array
 
 
 class PitchContourPayload(Struct, tag_field="payload_type", tag="pitch_contour"):
     values: Annotated[
-        list[dict[str, Any]],
-        Meta(description="Pitch contours: (index, frequency, voicing)"),
+        Array, Meta(description="Pitch contours: (index, frequency, voicing)")
     ]

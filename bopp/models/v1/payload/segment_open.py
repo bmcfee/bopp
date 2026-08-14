@@ -6,7 +6,8 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
+from pyarrow import Array
 
 
 class SegmentOpenPayload(Struct, tag_field="payload_type", tag="segment_open"):
-    values: Annotated[list[str], Meta(description="Open vocabulary segment labels")]
+    values: Annotated[Array, Meta(description="Open vocabulary segment labels")]
