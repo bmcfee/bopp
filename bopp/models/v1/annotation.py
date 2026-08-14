@@ -5,13 +5,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp.base import BoppBase
 
 from . import confidences, extents, payloads
 from . import metadata as metadata_1
 
 
-class Annotation(Struct):
+class Annotation(BoppBase):
     media_id: Annotated[str, Meta(pattern="^[a-zA-Z0-9]+:.*$")]
     extent: Annotated[
         extents.AnyExtent,

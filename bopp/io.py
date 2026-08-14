@@ -4,13 +4,18 @@ import ast
 import msgspec
 import pandas as pd
 import yaml
+
+from .util import extract_header, to_dataframe
 from pathlib import Path
 
 from bopp.models.v1.annotation import Annotation
 
-def to_csv(df: pd.DataFrame, metadata: dict, filepath: str | Path) -> None:
+def to_csv(ann: Annotation, filepath: str | Path) -> None:
     """Writes metadata as YAML frontmatter, followed by the DataFrame."""
     
+    df = to_dataframe(ann)
+    metadata = extract_header(ann)
+
     # 1. Convert the metadata dictionary to a YAML string
     yaml_text = yaml.dump(metadata, sort_keys=False, default_flow_style=False)
     

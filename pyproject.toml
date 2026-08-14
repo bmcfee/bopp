@@ -31,7 +31,7 @@ compile = """
 datamodel-codegen \\
   --input schemas/v1/ \\
   --input-file-type jsonschema \\
-  --base-class-map '{{\"BoppAnnotation\": \"bopp.base.BoppBase\"}}' \\
+  --base-class-map '{{\"Annotation\": \"bopp.base.BoppBase\"}}' \\
   --output bopp/models/v1/ \\
   --output-model-type msgspec.Struct \\
   --formatters ruff-check ruff-format \\
