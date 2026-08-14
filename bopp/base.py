@@ -15,7 +15,6 @@ class BoppBase(msgspec.Struct):
         extent_len = self._get_column_length(self.extent, "Extent")
         payload_len = self._get_column_length(self.payload, "Payload")
         
-        print(f"Extent length: {extent_len}, Payload length: {payload_len}")
         if payload_len != extent_len:
             raise ValueError(
                 f"Length mismatch: Extent contains {extent_len} items, "
