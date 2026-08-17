@@ -20,12 +20,12 @@ def decode_arrow(type_hint, value):
     Intercepts the msgspec parser to build native Arrow arrays 
     instead of standard Python lists.
     """
-    # Unwrap Annotated types (e.g., Annotated[pa.Array, 'float32'])
-    origin = get_origin(type_hint)
-    if origin is typing.Annotated:
-        type_hint = get_args(type_hint)[0]
+    # Loop to unwrap nested Annotated types (e.g., Annotated[Annotated[pa.Array, "float32"], Meta(...)])
+    target = type_hint
+    while get_origin(target) is typing.Annotated:
+        target = get_args(target)[0]
 
-    if type_hint is pa.Array:
+    if target is pa.Array:
         # Convert the raw parsed list directly into a contiguous Arrow buffer
         return pa.array(value)
         
