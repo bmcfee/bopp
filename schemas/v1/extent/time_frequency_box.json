@@ -8,7 +8,7 @@
       "const": "TimeFrequencyBox"
     },
     "time": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Float32Buffer",
       "description": "Array of start time timestamps in seconds.",
       "items": {
         "type": "number",
@@ -16,7 +16,7 @@
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Float32Buffer",
       "description": "Array of box durations in seconds.",
       "items": {
         "type": "number",
@@ -24,7 +24,7 @@
       }
     },
     "freq_min": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Float32Buffer",
       "description": "Array of minimum frequencies in Hz.",
       "items": {
         "type": "number",
@@ -32,7 +32,7 @@
       }
     },
     "freq_max": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Float32Buffer",
       "description": "Array of maximum frequencies in Hz.",
       "items": {
         "type": "number",

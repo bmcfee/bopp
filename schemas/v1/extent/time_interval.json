@@ -8,7 +8,7 @@
       "const": "time_interval"
     },
     "time": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Float32Buffer",
       "description": "Array of start time timestamps in seconds.",
       "items": {
         "type": "number",
@@ -16,7 +16,7 @@
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Float32Buffer",
       "description": "Array of interval durations in seconds.",
       "items": {
         "type": "number",
