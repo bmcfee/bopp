@@ -12,7 +12,7 @@ from pathlib import Path
 
 from bopp.models.v1.annotation import Annotation
 
-from typing import Any, get_origin, get_args
+from typing import Any
 
 
 _TYPE_MAP = {
@@ -39,18 +39,16 @@ def decode_arrow(type_hint, value):
     target = type_hint
     arrow_type = None
 
-    print(type_hint, get_origin(target), value)
-    # Inspect typing.Annotated metadata to extract type hints (e.g. "float32")
-    while get_origin(target) is typing.Annotated:
-        args = get_args(target)
-        target = args[0]
-        for metadata in args[1:]:
+    # Inspect metadata attached via Annotated types (handles typing and typing_extensions)
+    while hasattr(target, "__metadata__"):
+        for metadata in getattr(target, "__metadata__", ()):
             if isinstance(metadata, str) and metadata in _TYPE_MAP:
                 arrow_type = _TYPE_MAP[metadata]
             elif isinstance(metadata, pa.DataType):
                 arrow_type = metadata
+        target = getattr(target, "__origin__", target)
 
-    if target is pa.Array:
+    if target is pa.Array or target == pa.Array:
         # Convert the raw parsed list into a contiguous Arrow buffer using the precision hint if present
         return pa.array(value, type=arrow_type)
         
