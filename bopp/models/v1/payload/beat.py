@@ -11,7 +11,7 @@ from pyarrow import Array
 
 class BeatPositionPayload(Struct, tag_field="payload_type", tag="beat"):
     values: Annotated[
-        Array,
+        Annotated[Array, "int8"],
         Meta(
             description="The metric position of the beat within the measure (e.g., 1 for downbeat, 2, 3, 4)."
         ),

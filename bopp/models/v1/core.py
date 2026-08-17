@@ -18,6 +18,24 @@ A dense columnar array buffer of 32-bit floats.
 """
 
 
+type Int8Buffer = Annotated[
+    list[int],
+    Meta(description="A dense columnar array buffer of 8-bit signed integers."),
+]
+"""
+A dense columnar array buffer of 8-bit signed integers.
+"""
+
+
+type UInt8Buffer = Annotated[
+    list[int],
+    Meta(description="A dense columnar array buffer of 8-bit unsigned integers."),
+]
+"""
+A dense columnar array buffer of 8-bit unsigned integers.
+"""
+
+
 type GenericBuffer = Annotated[
     list[Any],
     Meta(description="A dense columnar array buffer. Instantiated as pyarrow.Array."),
