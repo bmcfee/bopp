@@ -5,14 +5,13 @@ import msgspec
 import pandas as pd
 import pyarrow as pa
 import yaml
-import typing
 
 from .util import extract_header, to_dataframe
 from pathlib import Path
 
 from bopp.models.v1.annotation import Annotation
 
-from typing import Any
+from typing import Any, Annotated, get_args, get_origin
 
 
 _TYPE_MAP = {
@@ -40,13 +39,20 @@ def decode_arrow(type_hint, value):
     arrow_type = None
 
     # Inspect metadata attached via Annotated types (handles typing and typing_extensions)
-    while hasattr(target, "__metadata__"):
-        for metadata in getattr(target, "__metadata__", ()):
+    while get_origin(target) is Annotated or hasattr(target, "__metadata__"):
+        metadata_list = getattr(target, "__metadata__", None) or get_args(target)[1:]
+        for metadata in metadata_list:
             if isinstance(metadata, str) and metadata in _TYPE_MAP:
                 arrow_type = _TYPE_MAP[metadata]
             elif isinstance(metadata, pa.DataType):
                 arrow_type = metadata
-        target = getattr(target, "__origin__", target)
+
+        if get_origin(target) is Annotated:
+            target = get_args(target)[0]
+        elif hasattr(target, "__origin__") and getattr(target, "__origin__") is not target:
+            target = getattr(target, "__origin__")
+        else:
+            break
 
     if target is pa.Array or target == pa.Array:
         # Convert the raw parsed list into a contiguous Arrow buffer using the precision hint if present
