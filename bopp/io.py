@@ -15,19 +15,43 @@ from bopp.models.v1.annotation import Annotation
 from typing import Any, get_origin, get_args
 
 
+_TYPE_MAP = {
+    "float32": pa.float32(),
+    "float64": pa.float64(),
+    "int8": pa.int8(),
+    "int16": pa.int16(),
+    "int32": pa.int32(),
+    "int64": pa.int64(),
+    "uint8": pa.uint8(),
+    "uint16": pa.uint16(),
+    "uint32": pa.uint32(),
+    "uint64": pa.uint64(),
+    "bool": pa.bool_(),
+    "string": pa.string(),
+}
+
+
 def decode_arrow(type_hint, value):
     """
     Intercepts the msgspec parser to build native Arrow arrays 
-    instead of standard Python lists.
+    instead of standard Python lists, respecting precision type hints.
     """
-    # Loop to unwrap nested Annotated types (e.g., Annotated[Annotated[pa.Array, "float32"], Meta(...)])
     target = type_hint
+    arrow_type = None
+
+    # Inspect typing.Annotated metadata to extract type hints (e.g. "float32")
     while get_origin(target) is typing.Annotated:
-        target = get_args(target)[0]
+        args = get_args(target)
+        target = args[0]
+        for metadata in args[1:]:
+            if isinstance(metadata, str) and metadata in _TYPE_MAP:
+                arrow_type = _TYPE_MAP[metadata]
+            elif isinstance(metadata, pa.DataType):
+                arrow_type = metadata
 
     if target is pa.Array:
-        # Convert the raw parsed list directly into a contiguous Arrow buffer
-        return pa.array(value)
+        # Convert the raw parsed list into a contiguous Arrow buffer using the precision hint if present
+        return pa.array(value, type=arrow_type)
         
     raise TypeError(f"Type {type_hint} is not supported")
 
