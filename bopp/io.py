@@ -39,6 +39,7 @@ def decode_arrow(type_hint, value):
     target = type_hint
     arrow_type = None
 
+    print(type_hint, get_origin(target), value)
     # Inspect typing.Annotated metadata to extract type hints (e.g. "float32")
     while get_origin(target) is typing.Annotated:
         args = get_args(target)
