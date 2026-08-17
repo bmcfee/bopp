@@ -5,13 +5,14 @@ import msgspec
 import pandas as pd
 import pyarrow as pa
 import yaml
+import typing
 
 from .util import extract_header, to_dataframe
 from pathlib import Path
 
 from bopp.models.v1.annotation import Annotation
 
-from typing import Any
+from typing import Any, get_origin, get_args
 
 
 def decode_arrow(type_hint, value):
@@ -19,6 +20,11 @@ def decode_arrow(type_hint, value):
     Intercepts the msgspec parser to build native Arrow arrays 
     instead of standard Python lists.
     """
+    # Unwrap Annotated types (e.g., Annotated[pa.Array, 'float32'])
+    origin = get_origin(type_hint)
+    if origin is typing.Annotated:
+        type_hint = get_args(type_hint)[0]
+
     if type_hint is pa.Array:
         # Convert the raw parsed list directly into a contiguous Arrow buffer
         return pa.array(value)

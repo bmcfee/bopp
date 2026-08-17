@@ -39,7 +39,8 @@ datamodel-codegen \\
   --use-union-operator \\
   --disable-timestamp \\
   --enable-generated-header-marker \\
-  --use-schema-description
+  --use-schema-description \\
+  --use-annotated
 """
 
 # A convenience script to do both
