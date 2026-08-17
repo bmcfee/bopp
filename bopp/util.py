@@ -70,7 +70,7 @@ def to_dataframe(annotation: Annotation) -> pd.DataFrame:
     data[f"payload:{payload_type}"] = annotation.payload.values
     
     # 3. Parse Confidence (if present)
-    if annotation.confidence is not None:
+    if annotation.confidence is not None and annotation.confidence is not msgspec.UNSET:
         conf_type = _get_tag(annotation.confidence)
         data[f"confidence:{conf_type}"] = annotation.confidence.confidence
         
