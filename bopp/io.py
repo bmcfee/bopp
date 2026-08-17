@@ -198,7 +198,7 @@ def from_dataframe(df: pd.DataFrame) -> Annotation:
         
     # 4. Pass the raw dictionary through msgspec for instant validation
     # This automatically triggers your tag routing and array-length __post_init__ logic
-    return msgspec.convert(bopp_data, type=Annotation)
+    return msgspec.convert(bopp_data, type=Annotation, dec_hook=decode_arrow)
 
 
 def load_bopp_csv(filepath: str | Path) -> Annotation:
