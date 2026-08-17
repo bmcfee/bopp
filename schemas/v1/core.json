@@ -9,6 +9,18 @@
       "items": { "type": "number", "format": "float" },
       "description": "A dense columnar array buffer of 32-bit floats."
     },
+    "Int8Buffer": {
+      "type": "array",
+      "x-python-type": "typing.Annotated[pyarrow.Array, 'int8']",
+      "items": { "type": "integer" },
+      "description": "A dense columnar array buffer of 8-bit signed integers."
+    },
+    "UInt8Buffer": {
+      "type": "array",
+      "x-python-type": "typing.Annotated[pyarrow.Array, 'uint8']",
+      "items": { "type": "integer" },
+      "description": "A dense columnar array buffer of 8-bit unsigned integers."
+    },
     "GenericBuffer": {
       "type": "array",
       "x-python-type": "pyarrow.Array",
