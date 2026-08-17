@@ -19,15 +19,6 @@ class Annotation(BoppBase):
         payloads.AnyPayload,
         Meta(description="The parallel array of values (e.g., beat, chord)"),
     ]
-    extent: (
-        Annotated[
-            extents.AnyExtent,
-            Meta(
-                description="The parallel array of time/space boundaries. Optional if payload covers the whole media."
-            ),
-        ]
-        | UnsetType
-    ) = UNSET
     bopp_version: (
         Annotated[
             str,
@@ -42,6 +33,15 @@ class Annotation(BoppBase):
         Annotated[
             metadata_1.AnnotationMetadata,
             Meta(description="The metadata describing the annotation"),
+        ]
+        | UnsetType
+    ) = UNSET
+    extent: (
+        Annotated[
+            extents.AnyExtent,
+            Meta(
+                description="The parallel array of time/space boundaries (e.g., time_interval, point)"
+            ),
         ]
         | UnsetType
     ) = UNSET
