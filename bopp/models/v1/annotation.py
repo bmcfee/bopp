@@ -15,16 +15,19 @@ from . import metadata as metadata_1
 
 class Annotation(BoppBase):
     media_id: Annotated[str, Meta(pattern="^[a-zA-Z0-9]+:.*$")]
-    extent: Annotated[
-        extents.AnyExtent,
-        Meta(
-            description="The parallel array of time/space boundaries (e.g., time_interval, point)"
-        ),
-    ]
     payload: Annotated[
         payloads.AnyPayload,
         Meta(description="The parallel array of values (e.g., beat, chord)"),
     ]
+    extent: (
+        Annotated[
+            extents.AnyExtent,
+            Meta(
+                description="The parallel array of time/space boundaries. Optional if payload covers the whole media."
+            ),
+        ]
+        | UnsetType
+    ) = UNSET
     bopp_version: (
         Annotated[
             str,

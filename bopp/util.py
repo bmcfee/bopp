@@ -6,7 +6,6 @@ import msgspec
 
 from typing import Any
 
-# Import your generated msgspec models here
 from .models.v1.annotation import Annotation 
 
 # ==========================================
@@ -25,25 +24,20 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
 
 def extract_header(annotation: Annotation) -> dict[str, Any]:
      """
-     Extracts all singleton fields from a Annotation for YAML serialization,
+     Extracts all singleton fields from an Annotation for YAML serialization,
      explicitly omitting the parallel array blocks.
      """
-     # The fields that belong in the CSV body, not the YAML header
      excluded_fields = {"extent", "payload", "confidence"}
  
      header_data = {}
  
-     # Iterate over all fields defined on the msgspec Struct
      for field in msgspec.structs.fields(annotation):
          if field.name in excluded_fields:
              continue
  
          value = getattr(annotation, field.name)
  
-         # Skip optional fields that weren't populated (e.g., metadata or annotated_domain)
          if value is not None and value is not msgspec.UNSET:
-             # Safely convert nested msgspec structs into standard Python dictionaries 
-             # and lists, ensuring they are 100% compatible with yaml.dump()
              header_data[field.name] = msgspec.to_builtins(value)
  
      return header_data
@@ -51,28 +45,36 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
 
 def to_dataframe(annotation: Annotation) -> pd.DataFrame:
     """
-    Converts a Annotation into a Pandas DataFrame using self-describing 
+    Converts an Annotation into a Pandas DataFrame using self-describing 
     column headers. Singleton metadata is preserved in df.attrs.
     """
     data = {}
     
-    # 1. Parse Extents (Geometry)
-    ext_type = _get_tag(annotation.extent)
-    coords = np.array(annotation.extent.coordinates)
-    num_coord_dims = coords.shape[1] if coords.ndim > 1 else 1
-    
-    for i in range(num_coord_dims):
-        col_name = f"extent:{ext_type}:{i}"
-        data[col_name] = coords[:, i] if num_coord_dims > 1 else coords
+    # 1. Parse Extents (Geometry) if present
+    if annotation.extent is not None and annotation.extent is not msgspec.UNSET:
+        ext_type = _get_tag(annotation.extent)
+        for field in msgspec.structs.fields(type(annotation.extent)):
+            if field.name == "extent_type":
+                continue
+            val = getattr(annotation.extent, field.name)
+            data[f"extent:{ext_type}:{field.name}"] = val
         
     # 2. Parse Payload (Passenger Data)
     payload_type = _get_tag(annotation.payload)
-    data[f"payload:{payload_type}"] = annotation.payload.values
+    for field in msgspec.structs.fields(type(annotation.payload)):
+        if field.name == "payload_type":
+            continue
+        val = getattr(annotation.payload, field.name)
+        data[f"payload:{payload_type}:{field.name}"] = val
     
     # 3. Parse Confidence (if present)
     if annotation.confidence is not None and annotation.confidence is not msgspec.UNSET:
         conf_type = _get_tag(annotation.confidence)
-        data[f"confidence:{conf_type}"] = annotation.confidence.confidence
+        for field in msgspec.structs.fields(type(annotation.confidence)):
+            if field.name == "confidence_type":
+                continue
+            val = getattr(annotation.confidence, field.name)
+            data[f"confidence:{conf_type}:{field.name}"] = val
         
     df = pd.DataFrame(data)
     
@@ -80,7 +82,6 @@ def to_dataframe(annotation: Annotation) -> pd.DataFrame:
     df.attrs["bopp_version"] = annotation.bopp_version
     df.attrs["media_id"] = annotation.media_id
     if annotation.metadata:
-        # to_builtins safely converts nested msgspec Structs into standard dicts
         df.attrs["metadata"] = msgspec.to_builtins(annotation.metadata)
         
     return df
@@ -91,39 +92,39 @@ def from_dataframe(df: pd.DataFrame) -> Annotation:
     Reconstitutes a strictly typed Annotation struct from a DataFrame.
     Expects singletons to be present in df.attrs.
     """
-    # 1. Scaffold the base dictionary from df.attrs
     bopp_data = {
         "bopp_version": df.attrs.get("bopp_version", "1.0.0"),
         "media_id": df.attrs.get("media_id", "unknown:media"),
-        "extent": {"coordinates": []},
-        "payload": {"values": []}
+        "payload": {}
     }
     
     if "metadata" in df.attrs:
         bopp_data["metadata"] = df.attrs["metadata"]
         
-    # 2. Infer types from the self-describing column headers
     coord_cols = [c for c in df.columns if c.startswith("extent:")]
-    payload_col = next(c for c in df.columns if c.startswith("payload:"))
-    conf_col = next((c for c in df.columns if c.startswith("confidence:")), None)
+    payload_cols = [c for c in df.columns if c.startswith("payload:")]
+    conf_cols = [c for c in df.columns if c.startswith("confidence:")]
     
-    bopp_data["extent"]["extent_type"] = coord_cols[0].split(":")[1]
-    bopp_data["payload"]["payload_type"] = payload_col.split(":")[1]
+    if coord_cols:
+        ext_type = coord_cols[0].split(":")[1]
+        bopp_data["extent"] = {"extent_type": ext_type}
+        for col in coord_cols:
+            field_name = col.split(":")[2]
+            bopp_data["extent"][field_name] = df[col].tolist()
+
+    payload_type = payload_cols[0].split(":")[1]
+    bopp_data["payload"]["payload_type"] = payload_type
+    for col in payload_cols:
+        parts = col.split(":")
+        field_name = parts[2] if len(parts) > 2 else "values"
+        bopp_data["payload"][field_name] = df[col].tolist()
     
-    if conf_col:
-        bopp_data["confidence"] = {
-            "confidence_type": conf_col.split(":")[1],
-            "confidence": df[conf_col].tolist()
-        }
+    if conf_cols:
+        conf_type = conf_cols[0].split(":")[1]
+        bopp_data["confidence"] = {"confidence_type": conf_type}
+        for col in conf_cols:
+            parts = col.split(":")
+            field_name = parts[2] if len(parts) > 2 else "confidence"
+            bopp_data["confidence"][field_name] = df[col].tolist()
         
-    # 3. Extract the array data natively
-    bopp_data["payload"]["values"] = df[payload_col].tolist()
-    
-    if len(coord_cols) == 1:
-        bopp_data["extent"]["coordinates"] = df[coord_cols[0]].tolist()
-    else:
-        # Stack 2D+ coordinates (like time_intervals) back into lists of lists
-        bopp_data["extent"]["coordinates"] = df[coord_cols].to_numpy().tolist()
-        
-    # 4. Pass the raw dictionary through msgspec for instant validation
     return msgspec.convert(bopp_data, type=Annotation)

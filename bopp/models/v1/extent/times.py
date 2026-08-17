@@ -10,4 +10,4 @@ from pyarrow import Array
 
 
 class Timestamps(Struct, tag_field="extent_type", tag="timestamps"):
-    coordinates: Annotated[Array, Meta(description="An N array of time values.")]
+    times: Annotated[Array, Meta(description="Array of time values in seconds.")]

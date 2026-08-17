@@ -10,6 +10,12 @@ from pyarrow import Array
 
 
 class PitchContourPayload(Struct, tag_field="payload_type", tag="pitch_contour"):
-    values: Annotated[
-        Array, Meta(description="Pitch contours: (index, frequency, voicing)")
+    index: Annotated[
+        Array, Meta(description="Pitch contour indices/IDs.")
+    ]
+    frequency: Annotated[
+        Array, Meta(description="Pitch contour frequency values in Hz.")
+    ]
+    voicing: Annotated[
+        Array, Meta(description="Pitch contour voicing values/booleans.")
     ]

@@ -8,16 +8,21 @@ class BoppBase(msgspec.Struct):
     arrays on the root Annotation node, safely ignoring sub-models.
     """
     def __post_init__(self):
-        # GUARD: Only run this on the top-level container
-        if not (hasattr(self, "extent") and hasattr(self, "payload")):
+        # GUARD: Only run this on top-level Annotation containers
+        if not hasattr(self, "payload"):
             return
 
-        # Collect all lengths from all array fields in each facet
-        extent_lengths = self._get_all_column_lengths(self.extent, "Extent")
-        payload_lengths = self._get_all_column_lengths(self.payload, "Payload")
-        
-        # Combine all lengths to validate consistency
-        all_lengths = extent_lengths + payload_lengths
+        all_lengths = []
+
+        extent_field = getattr(self, "extent", msgspec.UNSET)
+        if extent_field is not msgspec.UNSET and extent_field is not None:
+            extent_lengths = self._get_all_column_lengths(extent_field, "Extent")
+            all_lengths.extend(extent_lengths)
+
+        payload_field = getattr(self, "payload", msgspec.UNSET)
+        if payload_field is not msgspec.UNSET and payload_field is not None:
+            payload_lengths = self._get_all_column_lengths(payload_field, "Payload")
+            all_lengths.extend(payload_lengths)
         
         confidence_field = getattr(self, "confidence", msgspec.UNSET)
         if confidence_field is not msgspec.UNSET and confidence_field is not None:
@@ -38,12 +43,10 @@ class BoppBase(msgspec.Struct):
         and returns a list of their lengths.
         """
         lengths = []
-        # msgspec.structs.fields() returns a tuple of field definitions for the struct
         for field in msgspec.structs.fields(type(facet_struct)):
             val = getattr(facet_struct, field.name)
             
-            # Collect the length of every field that is an array
-            if isinstance(val, pa.Array):
+            if isinstance(val, (pa.Array, list)):
                 lengths.append(len(val))
         
         if not lengths:

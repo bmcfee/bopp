@@ -30,5 +30,5 @@
       "$ref": "confidences.json" 
     }
   },
-  "required": ["media_id", "extent", "payload"]
+  "required": ["media_id", "payload"]
 }
