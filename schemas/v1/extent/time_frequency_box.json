@@ -7,21 +7,38 @@
     "extent_type": {
       "const": "TimeFrequencyBox"
     },
-    "coordinates": {
+    "time": {
       "$ref": "../core.json#/$defs/GenericBuffer",
-      "description": "An N x 4 array of time-frequency bounding bxoes. Each inner array is [start_time, duration] in seconds.",
+      "description": "Array of start time timestamps in seconds.",
       "items": {
-        "type": "array",
-        "items": [
-          { "type": "number", "minimum": 0.0, "description": "Time" },
-          { "type": "number", "minimum": 0.0, "description": "Duration" },
-          { "type": "number", "minimum": 0.0, "description": "Minimum frequency in Hz" }, 
-          { "type": "number", "minimum": 0.0, "description": "Maximum frequency in Hz" }
-        ],
-        "minItems": 4,
-        "maxItems": 4
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
+    "duration": {
+      "$ref": "../core.json#/$defs/GenericBuffer",
+      "description": "Array of box durations in seconds.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
+    "freq_min": {
+      "$ref": "../core.json#/$defs/GenericBuffer",
+      "description": "Array of minimum frequencies in Hz.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
+    "freq_max": {
+      "$ref": "../core.json#/$defs/GenericBuffer",
+      "description": "Array of maximum frequencies in Hz.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
       }
     }
   },
-  "required": ["extent_type", "coordinates"]
+  "required": ["extent_type", "time", "duration", "freq_min", "freq_max"]
 }

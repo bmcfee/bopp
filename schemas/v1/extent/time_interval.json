@@ -7,19 +7,22 @@
     "extent_type": {
       "const": "time_interval"
     },
-    "coordinates": {
+    "time": {
       "$ref": "../core.json#/$defs/GenericBuffer",
-      "description": "An N x 2 array of time intervals. Each inner array is [start_time, duration] in seconds.",
+      "description": "Array of start time timestamps in seconds.",
       "items": {
-        "type": "array",
-        "items": [
-          { "type": "number", "minimum": 0.0, "description": "Time" },
-          { "type": "number", "minimum": 0.0, "description": "Duration" }
-        ],
-        "minItems": 2,
-        "maxItems": 2
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
+    "duration": {
+      "$ref": "../core.json#/$defs/GenericBuffer",
+      "description": "Array of interval durations in seconds.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
       }
     }
   },
-  "required": ["extent_type", "coordinates"]
+  "required": ["extent_type", "time", "duration"]
 }
