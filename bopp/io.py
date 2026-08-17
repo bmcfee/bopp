@@ -149,9 +149,10 @@ def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
     # 3. Handle Polyphonic / List Data safely
     # If a payload contains lists (e.g., ["C", "E", "G"]), the CSV writer saves them 
     # as literal strings. We evaluate them back to actual Python lists here.
-    payload_col = next((c for c in df.columns if c.startswith("payload:")), None)
-    if payload_col and df[payload_col].dtype == object and df[payload_col].str.startswith('[').any():
-        df[payload_col] = df[payload_col].apply(ast.literal_eval)
+    payload_cols = [c for c in df.columns if c.startswith("payload:")]
+    for col in payload_cols:
+        if df[col].dtype == object and df[col].astype(str).str.startswith('[').any():
+            df[col] = df[col].apply(ast.literal_eval)
 
     # Attach the singleton fields directly to the DataFrame attributes
     df.attrs = metadata
@@ -161,14 +162,13 @@ def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
 def from_dataframe(df: pd.DataFrame) -> Annotation:
     """
     Reconstitutes a strictly typed Annotation struct from a DataFrame.
-    Expects singleton fields (like media_id, annotated_domain) to be in df.attrs.
+    Expects singleton fields (like media_id, metadata) to be in df.attrs.
     """
     # 1. Scaffold the base dictionary with required singletons
     bopp_data = {
         "bopp_version": df.attrs.get("bopp_version", "1.0.0"),
         "media_id": df.attrs.get("media_id", "unknown:media"),
-        "extent": {"coordinates": []},
-        "payload": {"values": []}
+        "payload": {}
     }
     
     # Safely inject optional root fields if they exist in the YAML header
@@ -177,32 +177,36 @@ def from_dataframe(df: pd.DataFrame) -> Annotation:
     if "annotated_domain" in df.attrs:
         bopp_data["annotated_domain"] = df.attrs["annotated_domain"]
         
-    # 2. Infer structural types from the self-describing column headers
+    # 2. Infer structural types from the self-describing column headers (facet:type:field_name)
     coord_cols = [c for c in df.columns if c.startswith("extent:")]
-    payload_col = next(c for c in df.columns if c.startswith("payload:"))
-    conf_col = next((c for c in df.columns if c.startswith("confidence:")), None)
+    payload_cols = [c for c in df.columns if c.startswith("payload:")]
+    conf_cols = [c for c in df.columns if c.startswith("confidence:")]
     
-    bopp_data["extent"]["extent_type"] = coord_cols[0].split(":")[1]
-    bopp_data["payload"]["payload_type"] = payload_col.split(":")[1]
-    
-    if conf_col:
-        bopp_data["confidence"] = {
-            "confidence_type": conf_col.split(":")[1],
-            "confidence": df[conf_col].tolist()
-        }
+    if coord_cols:
+        ext_type = coord_cols[0].split(":")[1]
+        bopp_data["extent"] = {"extent_type": ext_type}
+        for col in coord_cols:
+            parts = col.split(":")
+            field_name = parts[2] if len(parts) > 2 else "values"
+            bopp_data["extent"][field_name] = df[col].tolist()
+
+    if payload_cols:
+        payload_type = payload_cols[0].split(":")[1]
+        bopp_data["payload"]["payload_type"] = payload_type
+        for col in payload_cols:
+            parts = col.split(":")
+            field_name = parts[2] if len(parts) > 2 else "values"
+            bopp_data["payload"][field_name] = df[col].tolist()
+
+    if conf_cols:
+        conf_type = conf_cols[0].split(":")[1]
+        bopp_data["confidence"] = {"confidence_type": conf_type}
+        for col in conf_cols:
+            parts = col.split(":")
+            field_name = parts[2] if len(parts) > 2 else "confidence"
+            bopp_data["confidence"][field_name] = df[col].tolist()
         
-    # 3. Extract the array data natively
-    bopp_data["payload"]["values"] = df[payload_col].tolist()
-    
-    if len(coord_cols) == 1:
-        # 1D points
-        bopp_data["extent"]["coordinates"] = df[coord_cols[0]].tolist()
-    else:
-        # N-Dimensional coordinates (e.g., time_interval [start, duration]) 
-        # Stack them back into a list of lists
-        bopp_data["extent"]["coordinates"] = df[coord_cols].to_numpy().tolist()
-        
-    # 4. Pass the raw dictionary through msgspec for instant validation
+    # 3. Pass the raw dictionary through msgspec for instant validation
     # This automatically triggers your tag routing and array-length __post_init__ logic
     return msgspec.convert(bopp_data, type=Annotation, dec_hook=decode_arrow)
 
