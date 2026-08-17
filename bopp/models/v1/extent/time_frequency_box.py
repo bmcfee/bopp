@@ -11,18 +11,8 @@ from pyarrow import Array
 
 class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="TimeFrequencyBox"):
     time: Annotated[
-        Array,
-        Meta(description="Array of start time timestamps in seconds."),
+        Array, Meta(description="Array of start time timestamps in seconds.")
     ]
-    duration: Annotated[
-        Array,
-        Meta(description="Array of box durations in seconds."),
-    ]
-    freq_min: Annotated[
-        Array,
-        Meta(description="Array of minimum frequencies in Hz."),
-    ]
-    freq_max: Annotated[
-        Array,
-        Meta(description="Array of maximum frequencies in Hz."),
-    ]
+    duration: Annotated[Array, Meta(description="Array of box durations in seconds.")]
+    freq_min: Annotated[Array, Meta(description="Array of minimum frequencies in Hz.")]
+    freq_max: Annotated[Array, Meta(description="Array of maximum frequencies in Hz.")]

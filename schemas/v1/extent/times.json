@@ -7,7 +7,7 @@
     "extent_type": {
       "const": "timestamps"
     },
-    "coordinates": {
+    "time": {
       "$ref": "../core.json#/$defs/GenericBuffer",
       "description": "An N array of time values.",
       "items": {
@@ -16,5 +16,5 @@
       }
     }
   },
-  "required": ["extent_type", "coordinates"]
+  "required": ["extent_type", "time"]
 }

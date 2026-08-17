@@ -10,6 +10,5 @@ from pyarrow import Array
 
 
 class MultiSegmentPayload(Struct, tag_field="payload_type", tag="multi_segment"):
-    values: Annotated[
-        Array, Meta(description="Multi-level segmentation: (label, level)")
-    ]
+    label: Annotated[Array, Meta(description="Multi-level segmentation labels.")]
+    level: Annotated[Array, Meta(description="Multi-level segmentation levels.")]
