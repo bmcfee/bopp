@@ -1,7 +1,6 @@
 from typing import Any
 
 import msgspec
-import pandas as pd
 
 from .models.v1.annotation import Annotation
 
@@ -40,11 +39,13 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
      return header_data
 
 
-def to_dataframe(annotation: Annotation) -> pd.DataFrame:
+def to_dataframe(annotation: Annotation):
     """
     Converts an Annotation into a Pandas DataFrame using self-describing 
     column headers. Singleton metadata is preserved in df.attrs.
     """
+    import pandas as pd
+
     data = {}
     
     # 1. Parse Extents (Geometry) if present
@@ -84,7 +85,7 @@ def to_dataframe(annotation: Annotation) -> pd.DataFrame:
     return df
 
 
-def from_dataframe(df: pd.DataFrame) -> Annotation:
+def from_dataframe(df) -> Annotation:
     """
     Reconstitutes a strictly typed Annotation struct from a DataFrame.
     Expects singletons to be present in df.attrs.

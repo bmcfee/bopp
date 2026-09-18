@@ -3,9 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import msgspec
-import pandas as pd
 import pyarrow as pa
-import yaml
 
 from bopp.models.v1.annotation import Annotation
 
@@ -39,6 +37,7 @@ def encode_arrow(obj: Any) -> Any:
 
 def to_csv(ann: Annotation, filepath: str | Path) -> None:
     """Writes metadata as YAML frontmatter, followed by the DataFrame."""
+    import yaml
     
     df = to_dataframe(ann)
     metadata = extract_header(ann)
@@ -109,11 +108,14 @@ def load_bopp_msgpack(filepath: str) -> Annotation:
     return msgspec.msgpack.decode(binary_data, type=Annotation, dec_hook=decode_arrow)
 
 
-def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
+def read_bopp_csv(filepath: str | Path):
     """
     Reads a BOPP CSV file, extracts the YAML frontmatter into df.attrs, 
     and returns the tabular data as a Pandas DataFrame.
     """
+    import pandas as pd
+    import yaml
+
     yaml_lines = []
     
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -150,7 +152,7 @@ def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
     return df
 
 
-def from_dataframe(df: pd.DataFrame) -> Annotation:
+def from_dataframe(df) -> Annotation:
     """
     Reconstitutes a strictly typed Annotation struct from a DataFrame.
     Expects singleton fields (like media_id, metadata) to be in df.attrs.
