@@ -8,14 +8,14 @@
       "const": "multi_segment"
     },
     "label": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Array",
       "description": "Multi-level segmentation labels.",
       "items": {
         "type": "string"
       }
     },
     "level": {
-      "$ref": "../core.json#/$defs/GenericBuffer",
+      "$ref": "../core.json#/$defs/Array",
       "description": "Multi-level segmentation levels.",
       "items": {
         "type": "integer",

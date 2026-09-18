@@ -8,7 +8,7 @@
       "const": "likelihood"
     },
     "confidence": {
-      "$ref": "../core.json#/$defs/Float32Buffer",
+      "$ref": "../core.json#/$defs/Array",
       "description": "The likeilhood (probability) of each observation",
       "items": {
         "type": "number",
