@@ -10,6 +10,4 @@ from pyarrow import Array
 
 
 class Timestamps(Struct, tag_field="extent_type", tag="timestamps"):
-    time: Annotated[
-        Annotated[Array, "float32"], Meta(description="An N array of time values.")
-    ]
+    time: Annotated[Array, Meta(description="An N array of time values.")]

@@ -11,10 +11,8 @@ from pyarrow import Array
 
 class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
     time: Annotated[
-        Annotated[Array, "float32"],
-        Meta(description="Array of start time timestamps in seconds."),
+        Array, Meta(description="Array of start time timestamps in seconds.")
     ]
     duration: Annotated[
-        Annotated[Array, "float32"],
-        Meta(description="Array of interval durations in seconds."),
+        Array, Meta(description="Array of interval durations in seconds.")
     ]

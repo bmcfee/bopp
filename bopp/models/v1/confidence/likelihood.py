@@ -11,6 +11,5 @@ from pyarrow import Array
 
 class LikelihoodConfidence(Struct, tag_field="confidence_type", tag="likelihood"):
     confidence: Annotated[
-        Annotated[Array, "float32"],
-        Meta(description="The likeilhood (probability) of each observation"),
+        Array, Meta(description="The likeilhood (probability) of each observation")
     ]
