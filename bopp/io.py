@@ -11,53 +11,17 @@ from pathlib import Path
 
 from bopp.models.v1.annotation import Annotation
 
-from typing import Any, Annotated, get_args, get_origin
-
-
-_TYPE_MAP = {
-    "float32": pa.float32(),
-    "float64": pa.float64(),
-    "int8": pa.int8(),
-    "int16": pa.int16(),
-    "int32": pa.int32(),
-    "int64": pa.int64(),
-    "uint8": pa.uint8(),
-    "uint16": pa.uint16(),
-    "uint32": pa.uint32(),
-    "uint64": pa.uint64(),
-    "bool": pa.bool_(),
-    "string": pa.string(),
-}
+from typing import Any
 
 
 def decode_arrow(type_hint, value):
     """
     Intercepts the msgspec parser to build native Arrow arrays 
-    instead of standard Python lists, respecting precision type hints.
+    instead of standard Python lists.
     """
-    target = type_hint
-    arrow_type = None
+    if type_hint is pa.Array or type_hint == pa.Array:
+        return pa.array(value)
 
-    # Inspect metadata attached via Annotated types (handles typing and typing_extensions)
-    while get_origin(target) is Annotated or hasattr(target, "__metadata__"):
-        metadata_list = getattr(target, "__metadata__", None) or get_args(target)[1:]
-        for metadata in metadata_list:
-            if isinstance(metadata, str) and metadata in _TYPE_MAP:
-                arrow_type = _TYPE_MAP[metadata]
-            elif isinstance(metadata, pa.DataType):
-                arrow_type = metadata
-
-        if get_origin(target) is Annotated:
-            target = get_args(target)[0]
-        elif hasattr(target, "__origin__") and getattr(target, "__origin__") is not target:
-            target = getattr(target, "__origin__")
-        else:
-            break
-
-    if target is pa.Array or target == pa.Array:
-        # Convert the raw parsed list into a contiguous Arrow buffer using the precision hint if present
-        return pa.array(value, type=arrow_type)
-        
     raise TypeError(f"Type {type_hint} is not supported")
 
 
