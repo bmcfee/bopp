@@ -1,17 +1,15 @@
-#!/usr/bin/env python
-
 import ast
+from pathlib import Path
+from typing import Any
+
 import msgspec
 import pandas as pd
 import pyarrow as pa
 import yaml
 
-from .util import extract_header, to_dataframe
-from pathlib import Path
-
 from bopp.models.v1.annotation import Annotation
 
-from typing import Any
+from .util import extract_header, to_dataframe
 
 
 def decode_arrow(type_hint, value):

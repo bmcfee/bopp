@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
-from . import util
-from . import io
-from . import models
+from . import io as io
+from . import models as models
+from . import util as util

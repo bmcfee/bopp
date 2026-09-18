@@ -1,12 +1,9 @@
-#!/usr/bin/env python
-
-import pandas as pd
-import numpy as np
-import msgspec
-
 from typing import Any
 
-from .models.v1.annotation import Annotation 
+import msgspec
+import pandas as pd
+
+from .models.v1.annotation import Annotation
 
 # ==========================================
 # 1. Struct <-> DataFrame Translators
