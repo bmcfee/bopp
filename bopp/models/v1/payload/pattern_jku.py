@@ -6,12 +6,19 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-from pyarrow import Array
+
+
+class Value(Struct):
+    midi_pitch: float
+    morph_pitch: float
+    staff: float
+    pattern_id: Annotated[float, Meta(ge=1.0)]
+    occurrence_id: Annotated[float, Meta(ge=1.0)]
 
 
 class PatternJkuPayload(Struct, tag_field="payload_type", tag="pattern_jku"):
     values: Annotated[
-        Array,
+        list[Value],
         Meta(
             description="Pattern (MIDI pitch), including staff height, voice number, occurrence id, and pattern id"
         ),

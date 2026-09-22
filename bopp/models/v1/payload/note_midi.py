@@ -6,10 +6,9 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-from pyarrow import Array
 
 
 class NoteMidiPayload(Struct, tag_field="payload_type", tag="note_midi"):
     values: Annotated[
-        Array, Meta(description="Note pitches in (fractional) MIDI note numbers")
+        list[float], Meta(description="Note pitches in (fractional) MIDI note numbers")
     ]

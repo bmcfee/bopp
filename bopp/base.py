@@ -1,5 +1,4 @@
 import msgspec
-import pyarrow as pa
 
 
 class BoppBase(msgspec.Struct):
@@ -46,7 +45,7 @@ class BoppBase(msgspec.Struct):
         for field in msgspec.structs.fields(type(facet_struct)):
             val = getattr(facet_struct, field.name)
             
-            if isinstance(val, (pa.Array, list)):
+            if isinstance(val, (list,)):
                 lengths.append(len(val))
         
         if not lengths:

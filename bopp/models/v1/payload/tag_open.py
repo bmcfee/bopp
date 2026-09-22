@@ -6,10 +6,9 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-from pyarrow import Array
 
 
 class TagOpenPayload(Struct, tag_field="payload_type", tag="tag_open"):
     values: Annotated[
-        Array, Meta(description="Open tag vocabularies allow all strings")
+        list[str], Meta(description="Open tag vocabularies allow all strings")
     ]

@@ -5,8 +5,7 @@
   "$defs": {
     "Array": {
       "type": "array",
-      "x-python-type": "pyarrow.Array",
-      "description": "A dense columnar array buffer instantiated as pyarrow.Array."
+      "description": "A dense columnar array buffer."
     }
   }
 }

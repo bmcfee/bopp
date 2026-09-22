@@ -6,10 +6,11 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-from pyarrow import Array
+
+type Value = Annotated[float, Meta(ge=0.0)]
 
 
 class TempoPayload(Struct, tag_field="payload_type", tag="tempo"):
     values: Annotated[
-        Array, Meta(description="Tempo measurements, in beats per minute (BPM)")
+        list[Value], Meta(description="Tempo measurements, in beats per minute (BPM)")
     ]

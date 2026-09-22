@@ -8,7 +8,6 @@ version = "0.1.0"
 description = "Bounded Observation Payload Protocol"
 dependencies = [
     "msgspec>=0.18.0",
-    "pyarrow>=19.0.0",
     "pandas>=2.0.0",  # For CSV parsing
     "pyyaml"          # For the CSV header parsing
 ]

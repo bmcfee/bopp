@@ -10,10 +10,7 @@ from msgspec import Meta
 type BoppCorePrimitives = Annotated[Any, Meta(title="BOPP Core Primitives")]
 
 
-type Array = Annotated[
-    list[Any],
-    Meta(description="A dense columnar array buffer instantiated as pyarrow.Array."),
-]
+type Array = Annotated[list[Any], Meta(description="A dense columnar array buffer.")]
 """
-A dense columnar array buffer instantiated as pyarrow.Array.
+A dense columnar array buffer.
 """

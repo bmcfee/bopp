@@ -6,13 +6,29 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-from pyarrow import Array
+
+type TimeItem = Annotated[float, Meta(ge=0.0)]
+
+
+type DurationItem = Annotated[float, Meta(ge=0.0)]
+
+
+type FreqMinItem = Annotated[float, Meta(ge=0.0)]
+
+
+type FreqMaxItem = Annotated[float, Meta(ge=0.0)]
 
 
 class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequency_box"):
     time: Annotated[
-        Array, Meta(description="Array of start time timestamps in seconds.")
+        list[TimeItem], Meta(description="Array of start time timestamps in seconds.")
     ]
-    duration: Annotated[Array, Meta(description="Array of box durations in seconds.")]
-    freq_min: Annotated[Array, Meta(description="Array of minimum frequencies in Hz.")]
-    freq_max: Annotated[Array, Meta(description="Array of maximum frequencies in Hz.")]
+    duration: Annotated[
+        list[DurationItem], Meta(description="Array of box durations in seconds.")
+    ]
+    freq_min: Annotated[
+        list[FreqMinItem], Meta(description="Array of minimum frequencies in Hz.")
+    ]
+    freq_max: Annotated[
+        list[FreqMaxItem], Meta(description="Array of maximum frequencies in Hz.")
+    ]

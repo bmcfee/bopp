@@ -6,8 +6,9 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-from pyarrow import Array
+
+type TimeItem = Annotated[float, Meta(ge=0.0)]
 
 
 class Timestamps(Struct, tag_field="extent_type", tag="timestamps"):
-    time: Annotated[Array, Meta(description="An N array of time values.")]
+    time: Annotated[list[TimeItem], Meta(description="An N array of time values.")]

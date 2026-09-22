@@ -6,13 +6,17 @@ from __future__ import annotations
 from typing import Annotated
 
 from msgspec import Meta, Struct
-from pyarrow import Array
+
+type TimeItem = Annotated[float, Meta(ge=0.0)]
+
+
+type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 
 class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
     time: Annotated[
-        Array, Meta(description="Array of start time timestamps in seconds.")
+        list[TimeItem], Meta(description="Array of start time timestamps in seconds.")
     ]
     duration: Annotated[
-        Array, Meta(description="Array of interval durations in seconds.")
+        list[DurationItem], Meta(description="Array of interval durations in seconds.")
     ]
