@@ -48,7 +48,7 @@ datamodel-codegen \\
 # Registry construction
 register = """
 scripts/generate_registry.py \\
-    --input bopp/models/v1/ \\
+    --input-dir bopp/models/v1/ \\
     --output bopp/registry.py \\
     --base-module bopp.models.v1
 """
