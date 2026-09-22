@@ -7,8 +7,8 @@
     "extent_type": {
       "const": "timestamps"
     },
-    "coordinates": {
-      "type": "array",
+    "time": {
+      "$ref": "../core.json#/$defs/Array",
       "description": "An N array of time values.",
       "items": {
         "type": "number",
@@ -16,5 +16,5 @@
       }
     }
   },
-  "required": ["extent_type", "coordinates"]
+  "required": ["extent_type", "time"]
 }

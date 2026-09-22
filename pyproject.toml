@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Bounded Observation Payload Protocol"
 dependencies = [
     "msgspec>=0.18.0",
+    "pandas>=2.0.0",  # For CSV parsing
     "pyyaml"          # For the CSV header parsing
 ]
 
@@ -39,8 +40,17 @@ datamodel-codegen \\
   --use-union-operator \\
   --disable-timestamp \\
   --enable-generated-header-marker \\
-  --use-schema-description
+  --use-schema-description \\
+  --use-annotated
+"""
+
+# Registry construction
+register = """
+scripts/generate_registry.py \\
+    --input-dir bopp/models/v1/ \\
+    --output bopp/registries/v1.py \\
+    --base-module bopp.models.v1
 """
 
 # A convenience script to do both
-build = ["clean", "compile"]
+build = ["clean", "compile", "register"]

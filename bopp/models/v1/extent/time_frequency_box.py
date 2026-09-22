@@ -7,32 +7,28 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type CoordinateItem = Annotated[float, Meta(description="Time", ge=0.0)]
+type TimeItem = Annotated[float, Meta(ge=0.0)]
 
 
-type CoordinateItem1 = Annotated[float, Meta(description="Duration", ge=0.0)]
+type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 
-type CoordinateItem2 = Annotated[
-    float, Meta(description="Minimum frequency in Hz", ge=0.0)
-]
+type FreqMinItem = Annotated[float, Meta(ge=0.0)]
 
 
-type CoordinateItem3 = Annotated[
-    float, Meta(description="Maximum frequency in Hz", ge=0.0)
-]
+type FreqMaxItem = Annotated[float, Meta(ge=0.0)]
 
 
-type Coordinate = Annotated[
-    list[CoordinateItem | CoordinateItem1 | CoordinateItem2 | CoordinateItem3],
-    Meta(max_length=4, min_length=4),
-]
-
-
-class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="TimeFrequencyBox"):
-    coordinates: Annotated[
-        list[Coordinate],
-        Meta(
-            description="An N x 4 array of time-frequency bounding bxoes. Each inner array is [start_time, duration] in seconds."
-        ),
+class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequency_box"):
+    time: Annotated[
+        list[TimeItem], Meta(description="Array of start time timestamps in seconds.")
+    ]
+    duration: Annotated[
+        list[DurationItem], Meta(description="Array of box durations in seconds.")
+    ]
+    freq_min: Annotated[
+        list[FreqMinItem], Meta(description="Array of minimum frequencies in Hz.")
+    ]
+    freq_max: Annotated[
+        list[FreqMaxItem], Meta(description="Array of maximum frequencies in Hz.")
     ]

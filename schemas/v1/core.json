@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1/core.json",
+  "title": "BOPP Core Primitives",
+  "$defs": {
+    "Array": {
+      "type": "array",
+      "description": "A dense columnar array buffer."
+    }
+  }
+}

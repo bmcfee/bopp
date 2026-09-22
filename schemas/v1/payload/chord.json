@@ -8,7 +8,7 @@
       "const": "chord"
     },
     "values": {
-        "type": "array",
+        "$ref": "../core.json#/$defs/Array",
         "description": "A musical chord string in extended Harte notation.",
         "items": {
           "type": "string",
@@ -18,4 +18,3 @@
   },
   "required": ["payload_type", "values"]
 }
-

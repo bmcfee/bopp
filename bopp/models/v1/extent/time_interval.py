@@ -7,21 +7,16 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type Coordinate1Item = Annotated[float, Meta(description="Time", ge=0.0)]
+type TimeItem = Annotated[float, Meta(ge=0.0)]
 
 
-type Coordinate1Item1 = Annotated[float, Meta(description="Duration", ge=0.0)]
-
-
-type Coordinate = Annotated[
-    list[Coordinate1Item | Coordinate1Item1], Meta(max_length=2, min_length=2)
-]
+type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 
 class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
-    coordinates: Annotated[
-        list[Coordinate],
-        Meta(
-            description="An N x 2 array of time intervals. Each inner array is [start_time, duration] in seconds."
-        ),
+    time: Annotated[
+        list[TimeItem], Meta(description="Array of start time timestamps in seconds.")
+    ]
+    duration: Annotated[
+        list[DurationItem], Meta(description="Array of interval durations in seconds.")
     ]

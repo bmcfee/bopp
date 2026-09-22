@@ -7,13 +7,11 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-
-class Value(Struct):
-    label: str
-    level: Annotated[int, Meta(ge=0)]
+type LevelItem = Annotated[int, Meta(ge=0)]
 
 
 class MultiSegmentPayload(Struct, tag_field="payload_type", tag="multi_segment"):
-    values: Annotated[
-        list[Value], Meta(description="Multi-level segmentation: (label, level)")
+    label: Annotated[list[str], Meta(description="Multi-level segmentation labels.")]
+    level: Annotated[
+        list[LevelItem], Meta(description="Multi-level segmentation levels.")
     ]

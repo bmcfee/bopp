@@ -7,10 +7,8 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type Coordinate = Annotated[float, Meta(ge=0.0)]
+type TimeItem = Annotated[float, Meta(ge=0.0)]
 
 
 class Timestamps(Struct, tag_field="extent_type", tag="timestamps"):
-    coordinates: Annotated[
-        list[Coordinate], Meta(description="An N array of time values.")
-    ]
+    time: Annotated[list[TimeItem], Meta(description="An N array of time values.")]
