@@ -9,7 +9,7 @@ from msgspec import Meta, Struct
 from pyarrow import Array
 
 
-class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="TimeFrequencyBox"):
+class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequency_box"):
     time: Annotated[
         Array, Meta(description="Array of start time timestamps in seconds.")
     ]

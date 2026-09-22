@@ -45,5 +45,13 @@ datamodel-codegen \\
   --use-annotated
 """
 
+# Registry construction
+register = """
+scripts/generate_registry.py \\
+    --input bopp/models/v1/ \\
+    --output bopp/registry.py \\
+    --base-module bopp.models.v1
+"""
+
 # A convenience script to do both
-build = ["clean", "compile"]
+build = ["clean", "compile", "register"]

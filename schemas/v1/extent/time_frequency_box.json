@@ -5,7 +5,7 @@
   "type": "object",
   "properties": {
     "extent_type": {
-      "const": "TimeFrequencyBox"
+      "const": "time_frequency_box"
     },
     "time": {
       "$ref": "../core.json#/$defs/Array",
