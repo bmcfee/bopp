@@ -18,7 +18,6 @@ from .payload import (
     pattern_jku,
     pitch_class,
     pitch_contour_hz,
-    pitch_midi,
     segment_multi,
     segment_open,
     tag_open,
@@ -36,7 +35,6 @@ type AnyPayload = Annotated[
     | pattern_jku.PatternJkuPayload
     | pitch_class.PitchClassPayload
     | pitch_contour_hz.PitchContourPayload
-    | pitch_midi.PitchMidiPayload
     | segment_multi.MultiSegmentPayload
     | segment_open.SegmentOpenPayload
     | tag_open.TagOpenPayload
