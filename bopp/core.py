@@ -63,6 +63,7 @@ def create(
 
     return Annotation(
         media_id=media_id,
+        bopp_version=bopp_version,
         extent=extent_obj,
         payload=payload_obj,
         confidence=confidence_obj
