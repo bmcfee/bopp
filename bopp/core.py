@@ -2,14 +2,7 @@ from typing import Any
 
 import msgspec
 
-from .models.v1.annotation import Annotation
-
-# Assuming the registry script outputs to this module
-from .registry import (
-    CONFIDENCE_TYPE_REGISTRY,
-    EXTENT_TYPE_REGISTRY,
-    PAYLOAD_TYPE_REGISTRY,
-)
+from .registries import get_registry
 
 __all__ = ["create"]
 
@@ -25,8 +18,16 @@ def create(
     payload_kind: str,
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
+    bopp_version: str = "v1",
     **kwargs: Any
-) -> Annotation:
+) -> Any:
+    registry = get_registry(bopp_version)
+    
+    PAYLOAD_TYPE_REGISTRY = registry["PAYLOAD_TYPE_REGISTRY"]
+    EXTENT_TYPE_REGISTRY = registry["EXTENT_TYPE_REGISTRY"]
+    CONFIDENCE_TYPE_REGISTRY = registry["CONFIDENCE_TYPE_REGISTRY"]
+    Annotation = registry["Annotation"]
+
     try:
         payload_cls = PAYLOAD_TYPE_REGISTRY[payload_kind]
     except KeyError as e:

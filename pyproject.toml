@@ -49,7 +49,7 @@ datamodel-codegen \\
 register = """
 scripts/generate_registry.py \\
     --input-dir bopp/models/v1/ \\
-    --output bopp/registry.py \\
+    --output bopp/registries/v1.py \\
     --base-module bopp.models.v1
 """
 
