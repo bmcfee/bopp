@@ -1,8 +1,8 @@
 import ast
-import tomllib
 from pathlib import Path
 
 import msgspec
+import tomllib
 
 from bopp.models.v1.annotation import Annotation
 

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, TypeVar
 
 import msgspec
 
@@ -68,3 +68,28 @@ def create(
         payload=payload_obj,
         confidence=confidence_obj
     )
+
+
+
+T = TypeVar("T")
+
+def validate(obj: Any, target_type: type[T] | None = None) -> bool:
+    if target_type is None:
+        if isinstance(obj, msgspec.Struct):
+            target_type = type(obj)
+        else:
+            raise ValueError("target_type must be provided if obj is not a msgspec.Struct.")
+    assert target_type is not None
+
+    # 1. Handle Struct instances: convert to builtins to strip UNSET keys recursively
+    if isinstance(obj, msgspec.Struct):
+        obj = msgspec.to_builtins(obj)
+    # 2. Handle raw dicts: filter out top-level UNSET sentinels if manually populated
+    elif isinstance(obj, dict):
+        obj = {k: v for k, v in obj.items() if v is not msgspec.UNSET}
+
+    try:
+        msgspec.convert(obj, target_type)
+    except (msgspec.ValidationError, TypeError) as err:
+        raise ValueError(f"Validation failed for {target_type.__name__}: {err}") from err
+    return True
