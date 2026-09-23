@@ -12,6 +12,13 @@ dependencies = [
     "pyyaml"          # For the CSV header parsing
 ]
 
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+    "numpydoc",
+    "pydata-sphinx-theme",
+]
+
 # --- pyproject.toml ---
 
 [tool.hatch.build.targets.wheel]
