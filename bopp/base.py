@@ -2,9 +2,10 @@ import msgspec
 
 
 class BoppBase(msgspec.Struct):
-    """
-    A base class for BOPP models. Dynamically validates parallel columnar 
-    arrays on the root Annotation node, safely ignoring sub-models.
+    """Base class for BOPP models.
+
+    Dynamically validates parallel columnar arrays on the root Annotation node,
+    safely ignoring sub-models.
     """
     def __post_init__(self):
         # GUARD: Only run this on top-level Annotation containers
