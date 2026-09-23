@@ -9,4 +9,4 @@ from msgspec import Meta, Struct
 
 
 class SegmentOpenPayload(Struct, tag_field="payload_type", tag="segment_open"):
-    values: Annotated[list[str], Meta(description="Open vocabulary segment labels")]
+    value: Annotated[list[str], Meta(description="Open vocabulary segment labels")]

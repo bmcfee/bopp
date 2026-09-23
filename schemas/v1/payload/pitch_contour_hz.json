@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "pitch_contour"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Pitch contours: (index, frequency, voicing)",
       "items": {
@@ -17,6 +17,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

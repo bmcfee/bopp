@@ -9,7 +9,7 @@ from msgspec import Meta, Struct
 
 
 class PitchContourPayload(Struct, tag_field="payload_type", tag="pitch_contour"):
-    values: Annotated[
+    value: Annotated[
         list[dict[str, Any]],
         Meta(description="Pitch contours: (index, frequency, voicing)"),
     ]

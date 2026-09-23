@@ -8,7 +8,7 @@ from typing import Annotated
 from msgspec import Meta, Struct
 
 
-class Value(Struct):
+class ValueItem(Struct):
     midi_pitch: float
     morph_pitch: float
     staff: float
@@ -17,8 +17,8 @@ class Value(Struct):
 
 
 class PatternJkuPayload(Struct, tag_field="payload_type", tag="pattern_jku"):
-    values: Annotated[
-        list[Value],
+    value: Annotated[
+        list[ValueItem],
         Meta(
             description="Pattern (MIDI pitch), including staff height, voice number, occurrence id, and pattern id"
         ),

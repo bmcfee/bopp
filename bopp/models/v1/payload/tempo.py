@@ -7,10 +7,11 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type Value = Annotated[float, Meta(ge=0.0)]
+type ValueItem = Annotated[float, Meta(ge=0.0)]
 
 
 class TempoPayload(Struct, tag_field="payload_type", tag="tempo"):
-    values: Annotated[
-        list[Value], Meta(description="Tempo measurements, in beats per minute (BPM)")
+    value: Annotated[
+        list[ValueItem],
+        Meta(description="Tempo measurements, in beats per minute (BPM)"),
     ]

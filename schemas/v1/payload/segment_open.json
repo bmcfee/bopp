@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "segment_open"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Open vocabulary segment labels",
       "items": {
@@ -17,6 +17,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

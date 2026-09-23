@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "tag_open"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Open tag vocabularies allow all strings",
       "items": {
@@ -17,6 +17,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

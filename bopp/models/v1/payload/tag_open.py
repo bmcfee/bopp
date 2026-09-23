@@ -9,6 +9,6 @@ from msgspec import Meta, Struct
 
 
 class TagOpenPayload(Struct, tag_field="payload_type", tag="tag_open"):
-    values: Annotated[
+    value: Annotated[
         list[str], Meta(description="Open tag vocabularies allow all strings")
     ]

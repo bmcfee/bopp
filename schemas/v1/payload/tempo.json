@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "tempo"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Tempo measurements, in beats per minute (BPM)",
       "items": {
@@ -18,6 +18,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

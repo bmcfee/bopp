@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "pattern_jku"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Pattern (MIDI pitch), including staff height, voice number, occurrence id, and pattern id",
       "items": {
@@ -43,6 +43,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

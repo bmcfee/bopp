@@ -8,12 +8,12 @@ from typing import Annotated
 from msgspec import Meta, Struct
 
 
-class Value(Struct):
+class ValueItem(Struct):
     tonic: Annotated[str, Meta(pattern="^[A-G][b#]?$")]
     pitch: int
 
 
 class PitchClassPayload(Struct, tag_field="payload_type", tag="pitch_class"):
-    values: Annotated[
-        list[Value], Meta(description="Pitch class in (tonic, pitch class) format")
+    value: Annotated[
+        list[ValueItem], Meta(description="Pitch class in (tonic, pitch class) format")
     ]
