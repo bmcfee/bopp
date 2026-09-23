@@ -1,7 +1,7 @@
 import msgspec
 import pytest
 
-from bopp.core import _extract_kwargs, create, validate
+from bopp.core import BoppError, _extract_kwargs, create, validate
 from bopp.models.v1.annotation import Annotation
 
 
@@ -44,12 +44,12 @@ def test_create_full():
 
 
 def test_create_invalid_payload_kind():
-    with pytest.raises(ValueError, match="Unrecognized kind identifier"):
+    with pytest.raises(BoppError, match="Unrecognized kind identifier"):
         create(media_id="audio:123", payload_kind="non_existent_kind")
 
 
 def test_create_invalid_extent_kind():
-    with pytest.raises(ValueError, match="Unrecognized extent kind"):
+    with pytest.raises(BoppError, match="Unrecognized extent kind"):
         create(
             media_id="audio:123",
             payload_kind="onset",
@@ -59,7 +59,7 @@ def test_create_invalid_extent_kind():
 
 
 def test_create_invalid_confidence_kind():
-    with pytest.raises(ValueError, match="Unrecognized confidence kind"):
+    with pytest.raises(BoppError, match="Unrecognized confidence kind"):
         create(
             media_id="audio:123",
             payload_kind="onset",
@@ -69,7 +69,7 @@ def test_create_invalid_confidence_kind():
 
 
 def test_create_unconsumed_kwargs():
-    with pytest.raises(ValueError, match="Unconsumed keyword arguments"):
+    with pytest.raises(BoppError, match="Unconsumed keyword arguments"):
         create(
             media_id="audio:123",
             payload_kind="onset",
@@ -97,7 +97,7 @@ def test_validate_dict():
 
 
 def test_validate_missing_target_type():
-    with pytest.raises(ValueError, match="target_type must be provided"):
+    with pytest.raises(BoppError, match="target_type must be provided"):
         validate({"media_id": "123"})
 
 
@@ -107,5 +107,5 @@ def test_validate_invalid_data():
         "media_id": "audio:123",
         "payload": {"payload_type": "onset", "time": "not_a_list"},
     }
-    with pytest.raises(ValueError, match="Validation failed"):
+    with pytest.raises(BoppError, match="Validation failed"):
         validate(invalid_data, target_type=Annotation)

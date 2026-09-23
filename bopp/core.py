@@ -4,7 +4,12 @@ import msgspec
 
 from .registries import get_registry
 
-__all__ = ["create"]
+__all__ = ["BoppError", "create"]
+
+
+class BoppError(Exception):
+    """Base exception class for all errors raised by the BOPP package."""
+
 
 def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[str, Any]:
     """
@@ -62,7 +67,7 @@ def create(
 
     Raises
     ------
-    ValueError
+    BoppError
         If an unrecognized `payload_kind`, `extent_kind`, or `confidence_kind`
         is provided, or if unused keyword arguments remain.
     """
@@ -76,7 +81,7 @@ def create(
     try:
         payload_cls = PAYLOAD_TYPE_REGISTRY[payload_kind]
     except KeyError as e:
-        raise ValueError(f"Unrecognized kind identifier: {e}") from e
+        raise BoppError(f"Unrecognized kind identifier: {e}") from e
 
     payload_args = _extract_kwargs(payload_cls, kwargs)
     payload_obj = payload_cls(**payload_args)
@@ -87,7 +92,7 @@ def create(
         try: 
             extent_cls = EXTENT_TYPE_REGISTRY[extent_kind]
         except KeyError as e:
-            raise ValueError(f"Unrecognized extent kind {e}") from e
+            raise BoppError(f"Unrecognized extent kind {e}") from e
 
         extent_args = _extract_kwargs(extent_cls, kwargs)
         extent_obj = extent_cls(**extent_args)
@@ -97,14 +102,14 @@ def create(
         try:
             confidence_cls = CONFIDENCE_TYPE_REGISTRY[confidence_kind]
         except KeyError as e:
-            raise ValueError(f"Unrecognized confidence kind: {e}") from e
+            raise BoppError(f"Unrecognized confidence kind: {e}") from e
         
         confidence_args = _extract_kwargs(confidence_cls, kwargs)
         confidence_obj = confidence_cls(**confidence_args)
 
     # Any remaining kwargs indicate a user typo or a schema mismatch
     if kwargs:
-        raise ValueError(f"Unconsumed keyword arguments: {list(kwargs.keys())}")
+        raise BoppError(f"Unconsumed keyword arguments: {list(kwargs.keys())}")
 
     return Annotation(
         media_id=media_id,
@@ -137,14 +142,14 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
 
     Raises
     ------
-    ValueError
+    BoppError
         If validation fails or if `target_type` is missing and cannot be inferred.
     """
     if target_type is None:
         if isinstance(obj, msgspec.Struct):
             target_type = type(obj)
         else:
-            raise ValueError("target_type must be provided if obj is not a msgspec.Struct.")
+            raise BoppError("target_type must be provided if obj is not a msgspec.Struct.")
     assert target_type is not None
 
     # 1. Handle Struct instances: convert to builtins to strip UNSET keys recursively
@@ -157,5 +162,5 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
     try:
         msgspec.convert(obj, target_type)
     except (msgspec.ValidationError, TypeError) as err:
-        raise ValueError(f"Validation failed for {target_type.__name__}: {err}") from err
+        raise BoppError(f"Validation failed for {target_type.__name__}: {err}") from err
     return True
