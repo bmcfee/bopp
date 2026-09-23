@@ -23,7 +23,7 @@ extensions = [
         "myst_parser",
 ]
 
-myst_enable_extensions = ["colon_fence", "tables"]
+myst_enable_extensions = ["colon_fence", "attrs_inline", "linkify", "tasklist"]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
