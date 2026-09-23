@@ -1,4 +1,4 @@
-name: Pytest
+name: CI Tests
 
 on:
   push:
@@ -18,6 +18,12 @@ jobs:
           environment-file: .github/environment-test.yml
           environment-name: bopp-test
           cache-environment: true
+
+      - name: Check code generation
+        shell: bash -l {0}
+        run: |
+          hatch run codegen:build
+          git diff --exit-code
 
       - name: Install package
         shell: bash -l {0}
