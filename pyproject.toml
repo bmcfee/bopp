@@ -19,6 +19,14 @@ docs = [
     "json-schema-for-humans",
     "myst-parser",
 ]
+test = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=bopp --cov-report=term-missing"
+testpaths = ["tests"]
 
 # --- pyproject.toml ---
 
