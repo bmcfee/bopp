@@ -1,4 +1,4 @@
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import msgspec
 
@@ -147,7 +147,7 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
     """
     if target_type is None:
         if isinstance(obj, msgspec.Struct):
-            target_type = type(obj)
+            target_type = cast(type[T], type(obj))
         else:
             raise BoppError("target_type must be provided if obj is not a msgspec.Struct.")
     assert target_type is not None

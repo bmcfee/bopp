@@ -176,7 +176,7 @@ def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
             df[col] = df[col].apply(ast.literal_eval)
 
     # Attach the singleton fields directly to the DataFrame attributes
-    df.attrs = metadata
+    df.attrs.update(metadata)
     return df
 
 
