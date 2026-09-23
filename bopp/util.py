@@ -10,7 +10,17 @@ from .models.v1.annotation import Annotation
 
 def _get_tag(struct: msgspec.Struct) -> str | None:
     """
-    Retrieves the tag value from a msgspec Struct, if it has one.
+    Retrieve the tag value from a msgspec Struct, if defined.
+
+    Parameters
+    ----------
+    struct : msgspec.Struct
+        The struct from which to extract the tag.
+
+    Returns
+    -------
+    str or None
+        The tag string if defined, otherwise None.
     """
     config = getattr(struct, "__struct_config__", None)
     if config is not None:
@@ -20,8 +30,19 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
 
 def extract_header(annotation: Annotation) -> dict[str, Any]:
     """
-    Extracts all singleton fields from an Annotation for TOML serialization,
-    explicitly omitting the parallel array blocks.
+    Extract all singleton fields from an Annotation for TOML serialization.
+
+    Parallel array blocks (`extent`, `payload`, `confidence`) are omitted.
+
+    Parameters
+    ----------
+    annotation : Annotation
+        The Annotation struct to extract metadata fields from.
+
+    Returns
+    -------
+    dict of str to Any
+        Dictionary of serialized header/singleton fields.
     """
     excluded_fields = {"extent", "payload", "confidence"}
 
@@ -41,8 +62,20 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
 
 def to_dataframe(annotation: Annotation):
     """
-    Converts an Annotation into a Pandas DataFrame using self-describing 
-    column headers. Singleton metadata is preserved in df.attrs.
+    Convert an Annotation instance into a Pandas DataFrame using self-describing column headers.
+
+    Singleton metadata is preserved in `df.attrs`.
+
+    Parameters
+    ----------
+    annotation : Annotation
+        The Annotation struct instance to convert.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame representing parallel array fields with column names prefixed
+        by facet and tag.
     """
     import pandas as pd
 
@@ -87,8 +120,19 @@ def to_dataframe(annotation: Annotation):
 
 def from_dataframe(df) -> Annotation:
     """
-    Reconstitutes a strictly typed Annotation struct from a DataFrame.
-    Expects singletons to be present in df.attrs.
+    Reconstitute a strictly typed Annotation struct from a DataFrame.
+
+    Expects singleton fields to be present in `df.attrs`.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame with self-describing column names and attributes.
+
+    Returns
+    -------
+    Annotation
+        Validated Annotation struct built from the DataFrame data.
     """
     bopp_data = {
         "bopp_version": df.attrs.get("bopp_version", "1.0.0"),

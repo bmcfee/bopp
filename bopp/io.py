@@ -10,7 +10,16 @@ from .util import extract_header, to_dataframe
 
 
 def to_csv(ann: Annotation, filepath: str | Path) -> None:
-    """Writes metadata as TOML frontmatter, followed by the DataFrame."""
+    """
+    Write metadata as TOML frontmatter followed by tabular data to a CSV file.
+
+    Parameters
+    ----------
+    ann : Annotation
+        The Annotation struct instance to export.
+    filepath : str or pathlib.Path
+        Target file path for the output CSV file.
+    """
     df = to_dataframe(ann)
     metadata = extract_header(ann)
 
@@ -32,8 +41,20 @@ def to_csv(ann: Annotation, filepath: str | Path) -> None:
         df.to_csv(f, index=False)
 
 
-def load_bopp_json(filepath: str) -> Annotation:
-    """Reads a BOPP JSON file directly into the Python model."""
+def load_bopp_json(filepath: str | Path) -> Annotation:
+    """
+    Read a BOPP JSON file directly into an Annotation model instance.
+
+    Parameters
+    ----------
+    filepath : str or pathlib.Path
+        Path to the BOPP JSON file to read.
+
+    Returns
+    -------
+    Annotation
+        Decoded and validated Annotation instance.
+    """
     # msgspec operates fastest on raw bytes, so we read as "rb"
     with open(filepath, "rb") as f:
         data = f.read()
@@ -41,8 +62,17 @@ def load_bopp_json(filepath: str) -> Annotation:
     return msgspec.json.decode(data, type=Annotation)
 
 
-def save_bopp_json(annotation: Annotation, filepath: str) -> None:
-    """Serializes a Annotation instance directly into a JSON file."""
+def save_bopp_json(annotation: Annotation, filepath: str | Path) -> None:
+    """
+    Serialize an Annotation instance directly into a JSON file.
+
+    Parameters
+    ----------
+    annotation : Annotation
+        The Annotation instance to serialize.
+    filepath : str or pathlib.Path
+        Target file path for saving the JSON output.
+    """
     # msgspec encodes structs natively without needing conversion dicts
     json_data = msgspec.json.encode(annotation)
     
@@ -54,9 +84,16 @@ def save_bopp_json(annotation: Annotation, filepath: str) -> None:
 # ==========================================
 # 1. Saving (Encoding) to Msgpack
 # ==========================================
-def save_bopp_msgpack(annotation: Annotation, filepath: str) -> None:
+def save_bopp_msgpack(annotation: Annotation, filepath: str | Path) -> None:
     """
-    Serializes a Annotation instance directly into a binary msgpack file.
+    Serialize an Annotation instance directly into a binary MsgPack file.
+
+    Parameters
+    ----------
+    annotation : Annotation
+        The Annotation instance to serialize.
+    filepath : str or pathlib.Path
+        Target file path for saving the MsgPack binary output.
     """
     # msgspec encodes structs natively without needing conversion dicts
     binary_data = msgspec.msgpack.encode(annotation)
@@ -69,10 +106,19 @@ def save_bopp_msgpack(annotation: Annotation, filepath: str) -> None:
 # ==========================================
 # 2. Loading (Decoding) from Msgpack
 # ==========================================
-def load_bopp_msgpack(filepath: str) -> Annotation:
+def load_bopp_msgpack(filepath: str | Path) -> Annotation:
     """
-    Reads a binary msgpack file and decodes/validates it back into 
-    the Annotation struct (running your length checks via __post_init__).
+    Read a binary MsgPack file and decode it into an Annotation struct.
+
+    Parameters
+    ----------
+    filepath : str or pathlib.Path
+        Path to the binary MsgPack file.
+
+    Returns
+    -------
+    Annotation
+        Decoded and validated Annotation instance.
     """
     with open(filepath, "rb") as f:
         binary_data = f.read()
@@ -83,8 +129,19 @@ def load_bopp_msgpack(filepath: str) -> Annotation:
 
 def read_bopp_csv(filepath: str | Path):
     """
-    Reads a BOPP CSV file, extracts the TOML frontmatter into df.attrs, 
-    and returns the tabular data as a Pandas DataFrame.
+    Read a BOPP CSV file, extract TOML frontmatter into `df.attrs`, and return
+    a Pandas DataFrame.
+
+    Parameters
+    ----------
+    filepath : str or pathlib.Path
+        Path to the BOPP CSV file to read.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing tabular content, with metadata attributes
+        stored in `attrs`.
     """
     import pandas as pd
 
@@ -126,8 +183,19 @@ def read_bopp_csv(filepath: str | Path):
 
 def from_dataframe(df) -> Annotation:
     """
-    Reconstitutes a strictly typed Annotation struct from a DataFrame.
-    Expects singleton fields (like media_id, metadata) to be in df.attrs.
+    Reconstitute a strictly typed Annotation struct from a DataFrame.
+
+    Expects singleton fields (like media_id, metadata) to be in `df.attrs`.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing BOPP tabular columns and frontmatter attributes.
+
+    Returns
+    -------
+    Annotation
+        Validated Annotation struct constructed from the DataFrame.
     """
     # 1. Scaffold the base dictionary with required singletons
     bopp_data = {
@@ -178,8 +246,17 @@ def from_dataframe(df) -> Annotation:
 
 def load_bopp_csv(filepath: str | Path) -> Annotation:
     """
-    End-to-end wrapper: Reads a BOPP CSV file directly into a validated 
-    Annotation struct.
+    Read a BOPP CSV file directly into a validated Annotation struct.
+
+    Parameters
+    ----------
+    filepath : str or pathlib.Path
+        Path to the BOPP CSV file.
+
+    Returns
+    -------
+    Annotation
+        Decoded and validated Annotation instance.
     """
     df = read_bopp_csv(filepath)
     return from_dataframe(df)
