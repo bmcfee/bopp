@@ -57,7 +57,7 @@ jobs:
 
     - name: Docstring formatting check  
       shell: bash -l {0}
-      run: numpydoc lint bopp/*.py bopp/*/*.py
+      run: numpydoc lint bopp/*.py bopp/*/*.py bopp/*/*/*.py bopp/*/*/*/*.py
     
     - name: Type check package
       shell: bash -l {0}
