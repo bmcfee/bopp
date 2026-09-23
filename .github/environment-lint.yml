@@ -1,13 +1,9 @@
-name: bopp-ci
+name: bopp-lint
 channels:
   - conda-forge
 dependencies:
   - python=3.12
   - pip
-  - msgspec>=0.18.0
-  - pandas>=2.0.0
-  - pytest
-  - pytest-cov
   - codespell
   - mypy
   - ruff

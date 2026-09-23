@@ -15,8 +15,8 @@ jobs:
       - name: Setup Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          environment-file: .github/environment-lint.yml
-          environment-name: bopp-ci
+          environment-file: .github/environment-test.yml
+          environment-name: bopp-test
           cache-environment: true
 
       - name: Install package
