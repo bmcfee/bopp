@@ -21,6 +21,17 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
     -------
     str or None
         The tag string if defined, otherwise None.
+
+    See Also
+    --------
+    to_dataframe : Converts an Annotation instance into a DataFrame using tag names.
+
+    Examples
+    --------
+    >>> from bopp.models.v1.payload.beat import BeatPositionPayload
+    >>> payload = BeatPositionPayload(position=[1, 2], beat=[1.0, 2.0])
+    >>> _get_tag(payload)
+    'beat'
     """
     config = getattr(struct, "__struct_config__", None)
     if config is not None:
@@ -43,6 +54,18 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
     -------
     dict of str to Any
         Dictionary of serialized header/singleton fields.
+
+    See Also
+    --------
+    to_dataframe : Extracts parallel arrays into a DataFrame and header to `df.attrs`.
+
+    Examples
+    --------
+    >>> from bopp.models.v1.annotation import Annotation
+    >>> ann = Annotation(media_id="audio:123", payload={"payload_type": "onset", "time": [0.1]})
+    >>> header = extract_header(ann)
+    >>> header["media_id"]
+    'audio:123'
     """
     excluded_fields = {"extent", "payload", "confidence"}
 
@@ -76,6 +99,22 @@ def to_dataframe(annotation: Annotation):
     pandas.DataFrame
         DataFrame representing parallel array fields with column names prefixed
         by facet and tag.
+
+    See Also
+    --------
+    from_dataframe : Reconstitute an Annotation struct from a DataFrame.
+    extract_header : Extract singleton header fields from an Annotation.
+
+    Examples
+    --------
+    >>> from bopp.models.v1.annotation import Annotation
+    >>> ann = Annotation(
+    ...     media_id="audio:123",
+    ...     payload={"payload_type": "onset", "time": [0.1, 0.5]}
+    ... )
+    >>> df = to_dataframe(ann)
+    >>> df.attrs["media_id"]
+    'audio:123'
     """
     import pandas as pd
 
@@ -133,6 +172,19 @@ def from_dataframe(df) -> Annotation:
     -------
     Annotation
         Validated Annotation struct built from the DataFrame data.
+
+    See Also
+    --------
+    to_dataframe : Convert an Annotation instance into a Pandas DataFrame.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> df = pd.DataFrame({"payload:onset:time": [0.1, 0.5]})
+    >>> df.attrs["media_id"] = "audio:123"
+    >>> ann = from_dataframe(df)
+    >>> ann.media_id
+    'audio:123'
     """
     bopp_data = {
         "bopp_version": df.attrs.get("bopp_version", "1.0.0"),
