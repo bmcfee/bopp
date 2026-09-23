@@ -1,5 +1,6 @@
 BOPP: The Bounded Observation Payload Protocol
 ==============================================
+[![CI Tests](https://github.com/bmcfee/bopp/actions/workflows/ci.yml/badge.svg)](https://github.com/bmcfee/bopp/actions/workflows/ci.yml)
 
 Overview
 --------
