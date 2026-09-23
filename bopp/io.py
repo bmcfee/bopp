@@ -1,4 +1,5 @@
 import ast
+import tomllib
 from pathlib import Path
 
 import msgspec
@@ -9,18 +10,17 @@ from .util import extract_header, to_dataframe
 
 
 def to_csv(ann: Annotation, filepath: str | Path) -> None:
-    """Writes metadata as YAML frontmatter, followed by the DataFrame."""
-    import yaml
-    
+    """Writes metadata as TOML frontmatter, followed by the DataFrame."""
     df = to_dataframe(ann)
     metadata = extract_header(ann)
 
-    # 1. Convert the metadata dictionary to a YAML string
-    yaml_text = yaml.dump(metadata, sort_keys=False, default_flow_style=False)
+    # 1. Convert the metadata dictionary to a TOML string
+    toml_bytes = msgspec.toml.encode(metadata)
+    toml_text = toml_bytes.decode("utf-8")
     
     # 2. Prefix every line with a comment hash
     frontmatter = ["# ---\n"]
-    for line in yaml_text.splitlines():
+    for line in toml_text.splitlines():
         frontmatter.append(f"# {line}\n")
     frontmatter.append("# ---\n")
 
@@ -83,16 +83,15 @@ def load_bopp_msgpack(filepath: str) -> Annotation:
 
 def read_bopp_csv(filepath: str | Path):
     """
-    Reads a BOPP CSV file, extracts the YAML frontmatter into df.attrs, 
+    Reads a BOPP CSV file, extracts the TOML frontmatter into df.attrs, 
     and returns the tabular data as a Pandas DataFrame.
     """
     import pandas as pd
-    import yaml
 
-    yaml_lines = []
+    toml_lines = []
     
     with open(filepath, 'r', encoding='utf-8') as f:
-        # 1. Parse YAML Frontmatter
+        # 1. Parse TOML Frontmatter
         first_line = f.readline().strip()
         
         if first_line == "# ---":
@@ -101,9 +100,9 @@ def read_bopp_csv(filepath: str | Path):
                 if not line or line.strip() == "# ---":
                     break
                 # Strip the comment hash and leading space
-                yaml_lines.append(line.lstrip('#').lstrip(' '))
+                toml_lines.append(line.lstrip('#').lstrip(' '))
                 
-            metadata = yaml.safe_load("".join(yaml_lines))
+            metadata = tomllib.loads("".join(toml_lines))
         else:
             # No frontmatter found, reset the file pointer
             f.seek(0)
@@ -137,7 +136,7 @@ def from_dataframe(df) -> Annotation:
         "payload": {}
     }
     
-    # Safely inject optional root fields if they exist in the YAML header
+    # Safely inject optional root fields if they exist in the TOML header
     if "metadata" in df.attrs:
         bopp_data["metadata"] = df.attrs["metadata"]
     if "annotated_domain" in df.attrs:

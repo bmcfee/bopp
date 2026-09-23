@@ -19,24 +19,24 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
 
 
 def extract_header(annotation: Annotation) -> dict[str, Any]:
-     """
-     Extracts all singleton fields from an Annotation for YAML serialization,
-     explicitly omitting the parallel array blocks.
-     """
-     excluded_fields = {"extent", "payload", "confidence"}
- 
-     header_data = {}
- 
-     for field in msgspec.structs.fields(annotation):
-         if field.name in excluded_fields:
-             continue
- 
-         value = getattr(annotation, field.name)
- 
-         if value is not None and value is not msgspec.UNSET:
-             header_data[field.name] = msgspec.to_builtins(value)
- 
-     return header_data
+    """
+    Extracts all singleton fields from an Annotation for TOML serialization,
+    explicitly omitting the parallel array blocks.
+    """
+    excluded_fields = {"extent", "payload", "confidence"}
+
+    header_data = {}
+
+    for field in msgspec.structs.fields(annotation):
+        if field.name in excluded_fields:
+            continue
+
+        value = getattr(annotation, field.name)
+
+        if value is not None and value is not msgspec.UNSET:
+            header_data[field.name] = msgspec.to_builtins(value)
+
+    return header_data
 
 
 def to_dataframe(annotation: Annotation):
