@@ -49,4 +49,4 @@ def test_dataframe_roundtrip():
 
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == ann.media_id
-    assert reconstructed.payload.payload_type == ann.payload.payload_type
+    assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)

@@ -11,6 +11,7 @@ from bopp.io import (
     save_bopp_msgpack,
     to_csv,
 )
+from bopp.util import _get_tag
 
 
 def test_json_roundtrip(tmp_path):
@@ -27,7 +28,7 @@ def test_json_roundtrip(tmp_path):
     loaded = load_bopp_json(file_path)
 
     assert loaded.media_id == ann.media_id
-    assert loaded.payload.payload_type == ann.payload.payload_type
+    assert _get_tag(loaded.payload) == _get_tag(ann.payload)
 
 
 def test_msgpack_roundtrip(tmp_path):
@@ -44,7 +45,7 @@ def test_msgpack_roundtrip(tmp_path):
     loaded = load_bopp_msgpack(file_path)
 
     assert loaded.media_id == ann.media_id
-    assert loaded.payload.payload_type == ann.payload.payload_type
+    assert _get_tag(loaded.payload) == _get_tag(ann.payload)
 
 
 def test_csv_roundtrip(tmp_path):
@@ -67,7 +68,7 @@ def test_csv_roundtrip(tmp_path):
     # Test direct loading into Annotation struct
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert loaded.payload.payload_type == ann.payload.payload_type
+    assert _get_tag(loaded.payload) == _get_tag(ann.payload)
 
 
 def test_read_bopp_csv_list_evaluation(tmp_path):
