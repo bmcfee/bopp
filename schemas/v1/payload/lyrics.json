@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "lyrics"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Open strings for lyrics annotations",
       "items": {
@@ -17,6 +17,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

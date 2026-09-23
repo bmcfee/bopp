@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "chord"
     },
-    "values": {
+    "value": {
         "$ref": "../core.json#/$defs/Array",
         "description": "A musical chord string in extended Harte notation.",
         "items": {
@@ -16,5 +16,5 @@
         }
     }
   },
-  "required": ["payload_type", "values"]
+  "required": ["payload_type", "value"]
 }

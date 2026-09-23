@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "note_midi"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Note pitches in (fractional) MIDI note numbers",
       "items": {
@@ -17,6 +17,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

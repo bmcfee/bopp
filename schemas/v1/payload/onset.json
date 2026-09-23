@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "onset"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Onset event markers",
       "items": {}
@@ -15,6 +15,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }

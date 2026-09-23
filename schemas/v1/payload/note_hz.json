@@ -7,7 +7,7 @@
     "payload_type": {
       "const": "note_hz"
     },
-    "values": {
+    "value": {
       "$ref": "../core.json#/$defs/Array",
       "description": "Note pitches in Hz",
       "items": {
@@ -18,6 +18,6 @@
   },
   "required": [
     "payload_type",
-    "values"
+    "value"
   ]
 }
