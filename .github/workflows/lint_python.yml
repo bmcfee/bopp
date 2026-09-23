@@ -1,0 +1,68 @@
+name: lint_python
+on: [pull_request, push]
+jobs:
+  lint_python:
+    name: "Lint and code analysis"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.12"
+            channel-priority: "flexible"
+            envfile: ".github/environment-lint.yml"
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+    - name: Cache conda
+      uses: actions/cache@v6
+      env:
+        CACHE_NUMBER: 0
+      with:
+        path: ~/conda_pkgs_dir
+        key: ${{ runner.os }}-${{ matrix.python-version }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles( matrix.envfile ) }}
+    - name: Install conda environmnent
+      uses: conda-incubator/setup-miniconda@v4
+      with: 
+        auto-update-conda: false
+        python-version: ${{ matrix.python-version }}
+        add-pip-as-python-dependency: true
+        auto-activate: false
+        activate-environment: lint
+        # mamba-version: "*"
+        channel-priority: ${{ matrix.channel-priority }}
+        environment-file: ${{ matrix.envfile }}
+        conda-remove-defaults: true
+        use-only-tar-bz2: false 
+
+    - name: Conda info
+      shell: bash -l {0}
+      run: |
+        conda info -a
+        conda list
+
+    - name: Spell check
+      shell: bash -l {0}
+      run: codespell --ignore-words-list="ba,trough,ue,Shepard" --skip="*demo.ipynb,./AUTHORS.md,./docs/changelog.rst"
+
+    - name: Linting check
+      shell: bash -l {0}
+      run: ruff check --output-format=github bopp
+
+    - name: Linting check on docs
+      shell: bash -l {0}
+      run: ruff check --output-format=github docs
+
+    - name: Docstring formatting check  
+      shell: bash -l {0}
+      run: numpydoc lint bopp/*.py bopp/*/*.py
+    
+    - name: Type check package
+      shell: bash -l {0}
+      run: python -m mypy --pretty bopp
+    
+    - name: Type check tests
+      shell: bash -l {0}
+      run: python -m mypy --pretty tests
