@@ -32,9 +32,9 @@ CONFIDENCE_TYPE_REGISTRY = {
 }
 
 EXTENT_TYPE_REGISTRY = {
+    'time': Timestamps,
     'time_frequency_box': TimeFrequencyBoxExtent,
     'time_interval': TimeIntervalExtent,
-    'timestamps': Timestamps,
 }
 
 METADATA_TYPE_REGISTRY = {
