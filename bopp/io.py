@@ -2,6 +2,7 @@ import ast
 from pathlib import Path
 
 import msgspec
+import pandas as pd
 import tomllib
 
 from bopp.models.v1.annotation import Annotation
@@ -127,10 +128,9 @@ def load_bopp_msgpack(filepath: str | Path) -> Annotation:
     return msgspec.msgpack.decode(binary_data, type=Annotation)
 
 
-def read_bopp_csv(filepath: str | Path):
+def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
     """
-    Read a BOPP CSV file, extract TOML frontmatter into `df.attrs`, and return
-    a Pandas DataFrame.
+    Read a BOPP CSV file, extract TOML frontmatter into `df.attrs`, and return a Pandas DataFrame.
 
     Parameters
     ----------
@@ -143,7 +143,6 @@ def read_bopp_csv(filepath: str | Path):
         DataFrame containing tabular content, with metadata attributes
         stored in `attrs`.
     """
-    import pandas as pd
 
     toml_lines = []
     

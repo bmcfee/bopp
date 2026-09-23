@@ -1,3 +1,4 @@
+"""BOPP: Bounded Observation Payload Protocol."""
 from . import io as io
 from . import models as models
 from . import registries as registries
