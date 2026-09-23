@@ -18,6 +18,7 @@ def test_json_roundtrip(tmp_path):
         media_id="track:json_test",
         payload_kind="onset",
         time=[0.1, 0.5, 1.2],
+        value=[1, 1, 1],
     )
     file_path = tmp_path / "test.json"
 
@@ -33,6 +34,7 @@ def test_msgpack_roundtrip(tmp_path):
         media_id="track:msgpack_test",
         payload_kind="onset",
         time=[0.3, 0.7],
+        value=[1, 1],
     )
     file_path = tmp_path / "test.msgpack"
 
@@ -48,6 +50,7 @@ def test_csv_roundtrip(tmp_path):
         media_id="track:csv_test",
         payload_kind="onset",
         time=[0.1, 0.4],
+        value=[1, 1],
     )
     file_path = tmp_path / "test.csv"
 

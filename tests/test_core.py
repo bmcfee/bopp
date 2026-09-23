@@ -22,6 +22,7 @@ def test_create_minimal():
         media_id="audio:123",
         payload_kind="onset",
         time=[0.1, 0.5],
+        value=[1, 1],
     )
     assert isinstance(ann, Annotation)
     assert ann.media_id == "audio:123"
@@ -35,6 +36,7 @@ def test_create_full():
         extent_kind="timestamps",
         confidence_kind="likelihood",
         time=[0.1, 0.5],
+        value=[1, 1],
         likelihood=[0.9, 0.95],
     )
     assert ann.extent is not None
@@ -55,6 +57,7 @@ def test_create_invalid_extent_kind():
             payload_kind="onset",
             extent_kind="non_existent_extent",
             time=[0.1],
+            value=[1],
         )
 
 
@@ -65,6 +68,7 @@ def test_create_invalid_confidence_kind():
             payload_kind="onset",
             confidence_kind="non_existent_conf",
             time=[0.1],
+            value=[1],
         )
 
 
@@ -74,6 +78,7 @@ def test_create_unconsumed_kwargs():
             media_id="audio:123",
             payload_kind="onset",
             time=[0.1],
+            value=[1],
             unused_param="invalid",
         )
 
@@ -83,6 +88,7 @@ def test_validate_struct():
         media_id="audio:123",
         payload_kind="onset",
         time=[0.1],
+        value=[1],
     )
     assert validate(ann) is True
 
@@ -91,7 +97,7 @@ def test_validate_dict():
     data = {
         "bopp_version": "v1",
         "media_id": "audio:123",
-        "payload": {"payload_type": "onset", "time": [0.1]},
+        "payload": {"payload_type": "onset", "time": [0.1], "value": [1]},
     }
     assert validate(data, target_type=Annotation) is True
 
@@ -105,7 +111,7 @@ def test_validate_invalid_data():
     invalid_data = {
         "bopp_version": "v1",
         "media_id": "audio:123",
-        "payload": {"payload_type": "onset", "time": "not_a_list"},
+        "payload": {"payload_type": "onset", "time": "not_a_list", "value": [1]},
     }
     with pytest.raises(BoppError, match="Validation failed"):
         validate(invalid_data, target_type=Annotation)

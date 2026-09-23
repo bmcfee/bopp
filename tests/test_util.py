@@ -23,6 +23,7 @@ def test_extract_header():
         media_id="track:1",
         payload_kind="onset",
         time=[0.1, 0.2],
+        value=[1, 1],
     )
     header = extract_header(ann)
     assert header["media_id"] == "track:1"
@@ -38,6 +39,7 @@ def test_dataframe_roundtrip():
         extent_kind="timestamps",
         confidence_kind="likelihood",
         time=[0.1, 0.2],
+        value=[1, 1],
         likelihood=[0.8, 0.9],
     )
 
