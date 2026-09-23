@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.12
   - pip
+  - hatchling
   - msgspec>=0.18.0
   - pandas>=2.0.0
   - pytest
