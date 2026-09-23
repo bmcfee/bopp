@@ -7,8 +7,8 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type Value = Annotated[float, Meta(ge=0.0)]
+type ValueItem = Annotated[float, Meta(ge=0.0)]
 
 
 class NoteHzPayload(Struct, tag_field="payload_type", tag="note_hz"):
-    values: Annotated[list[Value], Meta(description="Note pitches in Hz")]
+    value: Annotated[list[ValueItem], Meta(description="Note pitches in Hz")]

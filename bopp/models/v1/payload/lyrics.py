@@ -10,6 +10,4 @@ from msgspec import Meta, Struct
 
 class LyricsPayload(Struct):
     payload_type: Literal["lyrics"]
-    values: Annotated[
-        list[str], Meta(description="Open strings for lyrics annotations")
-    ]
+    value: Annotated[list[str], Meta(description="Open strings for lyrics annotations")]

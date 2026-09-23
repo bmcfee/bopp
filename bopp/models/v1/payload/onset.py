@@ -9,4 +9,4 @@ from msgspec import Meta, Struct
 
 
 class OnsetPayload(Struct, tag_field="payload_type", tag="onset"):
-    values: Annotated[list[Any], Meta(description="Onset event markers")]
+    value: Annotated[list[Any], Meta(description="Onset event markers")]

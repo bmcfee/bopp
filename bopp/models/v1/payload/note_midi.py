@@ -9,6 +9,6 @@ from msgspec import Meta, Struct
 
 
 class NoteMidiPayload(Struct, tag_field="payload_type", tag="note_midi"):
-    values: Annotated[
+    value: Annotated[
         list[float], Meta(description="Note pitches in (fractional) MIDI note numbers")
     ]

@@ -7,7 +7,7 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type Value = Annotated[
+type ValueItem = Annotated[
     str,
     Meta(
         pattern="^N|([A-G][b#]?)(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?$"
@@ -16,7 +16,7 @@ type Value = Annotated[
 
 
 class KeyModePayload(Struct, tag_field="payload_type", tag="key_mode"):
-    values: Annotated[
-        list[Value],
+    value: Annotated[
+        list[ValueItem],
         Meta(description="Key and optional mode (major/minor or Greek modes)"),
     ]
