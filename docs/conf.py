@@ -19,8 +19,11 @@ extensions = [
         'sphinx.ext.doctest',
         'sphinx.ext.viewcode',
         'sphinx.ext.intersphinx',
-        'numpydoc'
+        'numpydoc',
+        "myst_parser",
 ]
+
+myst_enable_extensions = ["colon_fence", "tables"]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']

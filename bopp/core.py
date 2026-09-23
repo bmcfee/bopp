@@ -4,7 +4,7 @@ import msgspec
 
 from .registries import get_registry
 
-__all__ = ["BoppError", "create"]
+__all__ = ["BoppError", "create", "validate"]
 
 
 class BoppError(Exception):
@@ -38,7 +38,7 @@ def create(
     payload_kind: str,
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
-    bopp_version: str = "v1",
+    bopp_version: str = "1.0.0",
     **kwargs: Any
 ) -> Any:
     """

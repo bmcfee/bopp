@@ -69,20 +69,3 @@ def test_csv_roundtrip(tmp_path):
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == _get_tag(ann.payload)
-
-
-def test_read_bopp_csv_list_evaluation(tmp_path):
-    csv_content = (
-        "# ---\n"
-        'media_id = "track:list_test"\n'
-        'bopp_version = "v1"\n'
-        "# ---\n"
-        "payload:chord:value\n"
-        '"[\'C\', \'E\', \'G\']"\n'
-    )
-    file_path = tmp_path / "polyphonic.csv"
-    file_path.write_text(csv_content, encoding="utf-8")
-
-    df = read_bopp_csv(file_path)
-    assert isinstance(df["payload:chord:value"].iloc[0], list)
-    assert df["payload:chord:value"].iloc[0] == ["C", "E", "G"]

@@ -21,12 +21,13 @@ def test_create_minimal():
     ann = create(
         media_id="audio:123",
         payload_kind="onset",
+        extent_kind="timestamps",
         time=[0.1, 0.5],
         value=[1, 1],
     )
     assert isinstance(ann, Annotation)
     assert ann.media_id == "audio:123"
-    assert ann.payload.payload_type == "onset"
+    assert ann.payload.__struct_config__.tag == "onset"
 
 
 def test_create_full():
@@ -37,12 +38,12 @@ def test_create_full():
         confidence_kind="likelihood",
         time=[0.1, 0.5],
         value=[1, 1],
-        likelihood=[0.9, 0.95],
+        confidence=[0.9, 0.95],
     )
     assert ann.extent is not None
-    assert ann.extent.extent_type == "timestamps"
+    assert ann.extent.__struct_config__.tag == "timestamps"
     assert ann.confidence is not None
-    assert ann.confidence.confidence_type == "likelihood"
+    assert ann.confidence.__struct_config__.tag == "likelihood"
 
 
 def test_create_invalid_payload_kind():
@@ -87,6 +88,7 @@ def test_validate_struct():
     ann = create(
         media_id="audio:123",
         payload_kind="onset",
+        extent_kind="timestamps",
         time=[0.1],
         value=[1],
     )
@@ -95,7 +97,7 @@ def test_validate_struct():
 
 def test_validate_dict():
     data = {
-        "bopp_version": "v1",
+        "bopp_version": "1.0.0",
         "media_id": "audio:123",
         "payload": {"payload_type": "onset", "time": [0.1], "value": [1]},
     }

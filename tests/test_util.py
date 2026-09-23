@@ -22,12 +22,13 @@ def test_extract_header():
     ann = create(
         media_id="track:1",
         payload_kind="onset",
+        extent_kind="timestamps",
         time=[0.1, 0.2],
         value=[1, 1],
     )
     header = extract_header(ann)
     assert header["media_id"] == "track:1"
-    assert header["bopp_version"] == "v1"
+    assert header["bopp_version"] == "1.0.0"
     assert "payload" not in header
     assert "extent" not in header
 
@@ -40,7 +41,7 @@ def test_dataframe_roundtrip():
         confidence_kind="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
-        likelihood=[0.8, 0.9],
+        confidence=[0.8, 0.9],
     )
 
     df = to_dataframe(ann)

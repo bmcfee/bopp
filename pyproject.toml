@@ -16,6 +16,8 @@ docs = [
     "sphinx",
     "numpydoc",
     "pydata-sphinx-theme",
+    "json-schema-for-humans",
+    "myst-parser",
 ]
 
 # --- pyproject.toml ---
