@@ -18,7 +18,7 @@ def test_json_roundtrip(tmp_path):
     ann = create(
         media_id="track:json_test",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         time=[0.1, 0.5, 1.2],
         value=[1, 1, 1],
     )
@@ -35,7 +35,7 @@ def test_msgpack_roundtrip(tmp_path):
     ann = create(
         media_id="track:msgpack_test",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         time=[0.3, 0.7],
         value=[1, 1],
     )
@@ -52,7 +52,7 @@ def test_csv_roundtrip(tmp_path):
     ann = create(
         media_id="track:csv_test",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         time=[0.1, 0.4],
         value=[1, 1],
     )

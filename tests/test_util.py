@@ -22,7 +22,7 @@ def test_extract_header():
     ann = create(
         media_id="track:1",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         time=[0.1, 0.2],
         value=[1, 1],
     )
@@ -37,7 +37,7 @@ def test_dataframe_roundtrip():
     ann = create(
         media_id="track:1",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         confidence_kind="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],

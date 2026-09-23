@@ -21,7 +21,7 @@ def test_create_minimal():
     ann = create(
         media_id="audio:123",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         time=[0.1, 0.5],
         value=[1, 1],
     )
@@ -34,14 +34,14 @@ def test_create_full():
     ann = create(
         media_id="audio:456",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         confidence_kind="likelihood",
         time=[0.1, 0.5],
         value=[1, 1],
         confidence=[0.9, 0.95],
     )
     assert ann.extent is not None
-    assert ann.extent.__struct_config__.tag == "timestamps"
+    assert ann.extent.__struct_config__.tag == "time"
     assert ann.confidence is not None
     assert ann.confidence.__struct_config__.tag == "likelihood"
 
@@ -88,7 +88,7 @@ def test_validate_struct():
     ann = create(
         media_id="audio:123",
         payload_kind="onset",
-        extent_kind="timestamps",
+        extent_kind="time",
         time=[0.1],
         value=[1],
     )
