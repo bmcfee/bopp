@@ -6,7 +6,7 @@ dependencies:
   - pip
   - hatch
   - ruff
-  - datamodel-codegen
+  - datamodel-code-generator
   - msgspec>=0.18.0
   - pandas>=2.0.0
   - pytest
