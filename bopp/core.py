@@ -7,7 +7,7 @@ from .registries import get_registry
 __all__ = [
     "BoppError",
     "BoppValidationError",
-    "BoppArrayLengthMismatchError",
+    "BoppArrayError",
     "BoppRegistryError",
     "BoppArgumentError",
     "BoppIOError",
@@ -24,8 +24,8 @@ class BoppValidationError(BoppError):
     """Raised when object schema or structure validation fails."""
 
 
-class BoppArrayLengthMismatchError(BoppValidationError):
-    """Raised when array lengths across Extent, Payload, and Confidence facets mismatch."""
+class BoppArrayError(BoppValidationError):
+    """Raised for errors related to array structures or array length mismatches."""
 
 
 class BoppRegistryError(BoppError, KeyError):

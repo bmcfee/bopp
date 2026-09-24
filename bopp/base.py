@@ -1,6 +1,6 @@
 import msgspec
 
-from .core import BoppArgumentError, BoppArrayLengthMismatchError
+from .core import BoppArgumentError, BoppArrayError
 
 
 class BoppBase(msgspec.Struct):
@@ -29,7 +29,7 @@ class BoppBase(msgspec.Struct):
 
         # Ensure all found arrays have the same length
         if len(set(all_lengths)) > 1:
-            raise BoppArrayLengthMismatchError(
+            raise BoppArrayError(
                 f"Length mismatch: Found multiple array lengths {set(all_lengths)} "
                 "across Extent, Payload, and Confidence facets."
             )

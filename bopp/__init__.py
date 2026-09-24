@@ -5,7 +5,7 @@ from . import registries as registries
 from . import util as util
 from .core import (
     BoppArgumentError,
-    BoppArrayLengthMismatchError,
+    BoppArrayError,
     BoppError,
     BoppIOError,
     BoppRegistryError,

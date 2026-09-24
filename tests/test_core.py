@@ -3,7 +3,7 @@ import pytest
 
 from bopp.core import (
     BoppArgumentError,
-    BoppArrayLengthMismatchError,
+    BoppArrayError,
     BoppError,
     BoppRegistryError,
     BoppValidationError,
@@ -94,7 +94,7 @@ def test_create_unconsumed_kwargs():
 
 
 def test_create_mismatched_array_lengths():
-    with pytest.raises(BoppArrayLengthMismatchError, match="Length mismatch"):
+    with pytest.raises(BoppArrayError, match="Length mismatch"):
         create(
             media_id="audio:123",
             payload_kind="onset",
