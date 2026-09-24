@@ -23,7 +23,7 @@ def get_registry(version: str) -> dict[str, Any]:
     ValueError
         If the provided `version` is not supported.
     """
-    if version in ("1.0.0", "v1", "1"):
+    if version in ("1.0", "v1", "1"):
         from bopp.models.v1.annotation import Annotation
 
         from . import v1
