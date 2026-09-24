@@ -25,7 +25,7 @@ test = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=bopp --cov-report=term-missing"
+addopts = "--cov=bopp --cov-report=term-missing --cov-branch --cov-report=xml"
 testpaths = ["tests"]
 
 [tool.numpydoc_validation]
