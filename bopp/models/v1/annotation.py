@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from msgspec import UNSET, Meta, UnsetType
 
@@ -49,6 +49,15 @@ class Annotation(BoppBase):
         Annotated[
             confidences.AnyConfidence,
             Meta(description="Optional parallel array of likelihoods or votes"),
+        ]
+        | UnsetType
+    ) = UNSET
+    sandbox: (
+        Annotated[
+            Any,
+            Meta(
+                description="Unstructured storage area for arbitrary user-defined data"
+            ),
         ]
         | UnsetType
     ) = UNSET
