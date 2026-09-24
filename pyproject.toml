@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bopp"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Bounded Observation Payload Protocol"
 dependencies = [
     "msgspec>=0.18.0",
@@ -30,6 +30,9 @@ test = [
     "polars>=0.20.0",
     "pyarrow>=12.0.0",
 ]
+
+[tool.hatch.version]
+path = "bopp/_version.py"
 
 [tool.pytest.ini_options]
 addopts = "--cov=bopp --cov-report=term-missing --cov-branch --cov-report=xml"
