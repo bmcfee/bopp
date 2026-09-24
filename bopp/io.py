@@ -12,7 +12,7 @@ from .models.v1.annotation import Annotation
 from .util import extract_header, from_dataframe, to_dataframe
 
 if TYPE_CHECKING:
-    from pandas import DataFrame
+    import pandas as pd
 
 
 def to_csv(ann: Annotation, filepath: str | Path) -> None:
@@ -140,7 +140,7 @@ def load_bopp_msgpack(filepath: str | Path) -> Annotation:
     return msgspec.msgpack.decode(binary_data, type=Annotation)
 
 
-def read_bopp_csv(filepath: str | Path) -> DataFrame:
+def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
     """
     Read a BOPP CSV file, extract TOML frontmatter into `df.attrs`, and return a Pandas DataFrame.
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, TypeVar, cast
 
 import msgspec
@@ -151,8 +153,8 @@ def create(
     )
 
 
-
 T = TypeVar("T")
+
 
 def validate(obj: Any, target_type: type[T] | None = None) -> bool:
     """

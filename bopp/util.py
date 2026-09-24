@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Literal
 
 import msgspec
@@ -91,7 +93,7 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
 def to_dataframe(
     annotation: Annotation,
     backend: Literal["pandas", "pandas-pyarrow", "polars"] = "pandas",
-) -> "pd.DataFrame | pl.DataFrame":
+) -> pd.DataFrame | pl.DataFrame:
     """
     Convert an Annotation instance into a Pandas or Polars DataFrame.
 
