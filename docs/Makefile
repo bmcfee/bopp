@@ -18,7 +18,7 @@ help:
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
 	generate-schema-doc \
-		--config template_name=md_nested \
+		--config template_name=js \
 		../schemas/v1/annotation.json \
-		schema_v1.md
+		_static/schema_v1.html
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)

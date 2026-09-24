@@ -16,4 +16,4 @@ bopp documentation
    :maxdepth: 1
    :caption: Schema
 
-   schema_v1.md
+   schema.rst
