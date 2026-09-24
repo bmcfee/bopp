@@ -173,13 +173,13 @@ def to_dataframe(
             except ImportError as err:
                 raise BoppIOError("pyarrow is required for backend='pandas-pyarrow'") from err
 
-            df = pd.DataFrame(data).convert_dtypes(dtype_backend="pyarrow")
+            df_pd = pd.DataFrame(data).convert_dtypes(dtype_backend="pyarrow")
         else:
-            df = pd.DataFrame(data)
+            df_pd = pd.DataFrame(data)
 
         for k, v in attrs.items():
-            df.attrs[k] = v
-        return df
+            df_pd.attrs[k] = v
+        return df_pd
 
     elif backend == "polars":
         try:
@@ -187,9 +187,9 @@ def to_dataframe(
         except ImportError as err:
             raise BoppIOError("polars is required for backend='polars'") from err
 
-        df = pl.DataFrame(data)
-        df.attrs = attrs  # type: ignore[attr-defined]
-        return df
+        df_pl = pl.DataFrame(data)
+        df_pl.attrs = attrs  # type: ignore[attr-defined]
+        return df_pl
 
     else:
         raise BoppArgumentError(f"Unsupported backend: {backend}")

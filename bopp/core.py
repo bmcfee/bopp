@@ -5,12 +5,12 @@ import msgspec
 from .registries import get_registry
 
 __all__ = [
-    "BoppError",
-    "BoppValidationError",
-    "BoppArrayError",
-    "BoppRegistryError",
     "BoppArgumentError",
+    "BoppArrayError",
+    "BoppError",
     "BoppIOError",
+    "BoppRegistryError",
+    "BoppValidationError",
     "create",
     "validate",
 ]

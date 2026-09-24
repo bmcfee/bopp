@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import ast
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import msgspec
-import pandas as pd
 import tomllib
 
-from bopp.models.v1.annotation import Annotation
-
+from .core import BoppArgumentError
+from .models.v1.annotation import Annotation
 from .util import extract_header, from_dataframe, to_dataframe
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 
 def to_csv(ann: Annotation, filepath: str | Path) -> None:
@@ -39,7 +44,14 @@ def to_csv(ann: Annotation, filepath: str | Path) -> None:
         f.writelines(frontmatter)
         
         # 4. Hand the open file pointer to Pandas!
-        df.to_csv(f, index=False)
+        if hasattr(df, 'to_csv'):
+            # is this a pandas dataframe?
+            df.to_csv(f, index=False)
+        elif hasattr(df, "write_csv"):
+            # Is this a polars dataframe?
+            df.write_csv(f)
+        else:
+            raise BoppArgumentError(f"Unknown dataframe type: {type(df)}")
 
 
 def load_bopp_json(filepath: str | Path) -> Annotation:
@@ -128,7 +140,7 @@ def load_bopp_msgpack(filepath: str | Path) -> Annotation:
     return msgspec.msgpack.decode(binary_data, type=Annotation)
 
 
-def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
+def read_bopp_csv(filepath: str | Path) -> DataFrame:
     """
     Read a BOPP CSV file, extract TOML frontmatter into `df.attrs`, and return a Pandas DataFrame.
 
@@ -143,6 +155,7 @@ def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
         DataFrame containing tabular content, with metadata attributes
         stored in `attrs`.
     """
+    import pandas as pd
 
     toml_lines = []
     
