@@ -10,5 +10,7 @@ dependencies:
   - numpydoc>=1.8.0
   - sphinx>=5.1.0
   - pandas-stubs
+  - polars
+  - pyarrow
   - msgspec
   - pytest
