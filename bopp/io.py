@@ -7,7 +7,7 @@ import tomllib
 
 from bopp.models.v1.annotation import Annotation
 
-from .util import extract_header, to_dataframe
+from .util import extract_header, from_dataframe, to_dataframe
 
 
 def to_csv(ann: Annotation, filepath: str | Path) -> None:
@@ -178,69 +178,6 @@ def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
     # Attach the singleton fields directly to the DataFrame attributes
     df.attrs.update(metadata)
     return df
-
-
-def from_dataframe(df) -> Annotation:
-    """
-    Reconstitute a strictly typed Annotation struct from a DataFrame.
-
-    Expects singleton fields (like media_id, metadata) to be in `df.attrs`.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        DataFrame containing BOPP tabular columns and frontmatter attributes.
-
-    Returns
-    -------
-    Annotation
-        Validated Annotation struct constructed from the DataFrame.
-    """
-    # 1. Scaffold the base dictionary with required singletons
-    bopp_data = {
-        "bopp_version": df.attrs.get("bopp_version", "1.0.0"),
-        "media_id": df.attrs.get("media_id", "unknown:media"),
-        "payload": {}
-    }
-    
-    # Safely inject optional root fields if they exist in the TOML header
-    if "metadata" in df.attrs:
-        bopp_data["metadata"] = df.attrs["metadata"]
-    if "annotated_domain" in df.attrs:
-        bopp_data["annotated_domain"] = df.attrs["annotated_domain"]
-        
-    # 2. Infer structural types from the self-describing column headers (facet:type:field_name)
-    coord_cols = [c for c in df.columns if c.startswith("extent:")]
-    payload_cols = [c for c in df.columns if c.startswith("payload:")]
-    conf_cols = [c for c in df.columns if c.startswith("confidence:")]
-    
-    if coord_cols:
-        ext_type = coord_cols[0].split(":")[1]
-        bopp_data["extent"] = {"extent_type": ext_type}
-        for col in coord_cols:
-            parts = col.split(":")
-            field_name = parts[2] if len(parts) > 2 else "values"
-            bopp_data["extent"][field_name] = df[col].tolist()
-
-    if payload_cols:
-        payload_type = payload_cols[0].split(":")[1]
-        bopp_data["payload"]["payload_type"] = payload_type
-        for col in payload_cols:
-            parts = col.split(":")
-            field_name = parts[2] if len(parts) > 2 else "values"
-            bopp_data["payload"][field_name] = df[col].tolist()
-
-    if conf_cols:
-        conf_type = conf_cols[0].split(":")[1]
-        bopp_data["confidence"] = {"confidence_type": conf_type}
-        for col in conf_cols:
-            parts = col.split(":")
-            field_name = parts[2] if len(parts) > 2 else "confidence"
-            bopp_data["confidence"][field_name] = df[col].tolist()
-        
-    # 3. Pass the raw dictionary through msgspec for instant validation
-    # This automatically triggers your tag routing and array-length __post_init__ logic
-    return msgspec.convert(bopp_data, type=Annotation)
 
 
 def load_bopp_csv(filepath: str | Path) -> Annotation:

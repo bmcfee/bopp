@@ -194,6 +194,8 @@ def from_dataframe(df) -> Annotation:
     
     if "metadata" in df.attrs:
         bopp_data["metadata"] = df.attrs["metadata"]
+    if "annotated_domain" in df.attrs:
+        bopp_data["annotated_domain"] = df.attrs["annotated_domain"]
         
     coord_cols = [c for c in df.columns if c.startswith("extent:")]
     payload_cols = [c for c in df.columns if c.startswith("payload:")]
@@ -203,15 +205,17 @@ def from_dataframe(df) -> Annotation:
         ext_type = coord_cols[0].split(":")[1]
         bopp_data["extent"] = {"extent_type": ext_type}
         for col in coord_cols:
-            field_name = col.split(":")[2]
+            parts = col.split(":")
+            field_name = parts[2] if len(parts) > 2 else "values"
             bopp_data["extent"][field_name] = df[col].tolist()
 
-    payload_type = payload_cols[0].split(":")[1]
-    bopp_data["payload"]["payload_type"] = payload_type
-    for col in payload_cols:
-        parts = col.split(":")
-        field_name = parts[2] if len(parts) > 2 else "values"
-        bopp_data["payload"][field_name] = df[col].tolist()
+    if payload_cols:
+        payload_type = payload_cols[0].split(":")[1]
+        bopp_data["payload"]["payload_type"] = payload_type
+        for col in payload_cols:
+            parts = col.split(":")
+            field_name = parts[2] if len(parts) > 2 else "values"
+            bopp_data["payload"][field_name] = df[col].tolist()
     
     if conf_cols:
         conf_type = conf_cols[0].split(":")[1]
