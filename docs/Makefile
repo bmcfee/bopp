@@ -19,6 +19,8 @@ help:
 %: Makefile
 	generate-schema-doc \
 		--config template_name=js \
+		--config expand_buttons=True \
+		--config footer_show_time=False \
 		../schemas/v1/annotation.json \
 		_static/schema_v1.html
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
