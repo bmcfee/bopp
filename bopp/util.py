@@ -1,8 +1,13 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import msgspec
 
+from .core import BoppArgumentError, BoppIOError
 from .models.v1.annotation import Annotation
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import polars as pl
 
 # ==========================================
 # 1. Struct <-> DataFrame Translators
@@ -83,20 +88,25 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
     return header_data
 
 
-def to_dataframe(annotation: Annotation):
+def to_dataframe(
+    annotation: Annotation,
+    backend: Literal["pandas", "pandas-pyarrow", "polars"] = "pandas",
+) -> "pd.DataFrame | pl.DataFrame":
     """
-    Convert an Annotation instance into a Pandas DataFrame using self-describing column headers.
+    Convert an Annotation instance into a Pandas or Polars DataFrame.
 
-    Singleton metadata is preserved in `df.attrs`.
+    Singleton metadata is preserved in `df.attrs` (for Pandas) or custom attributes (for Polars).
 
     Parameters
     ----------
     annotation : Annotation
         The Annotation struct instance to convert.
+    backend : {"pandas", "pandas-pyarrow", "polars"}, default "pandas"
+        The DataFrame framework and backend to return.
 
     Returns
     -------
-    pandas.DataFrame
+    pandas.DataFrame or polars.DataFrame
         DataFrame representing parallel array fields with column names prefixed
         by facet and tag.
 
@@ -112,14 +122,12 @@ def to_dataframe(annotation: Annotation):
     ...     media_id="audio:123",
     ...     payload={"payload_type": "onset", "time": [0.1, 0.5]}
     ... )
-    >>> df = to_dataframe(ann)
+    >>> df = to_dataframe(ann, backend="pandas")
     >>> df.attrs["media_id"]
     'audio:123'
     """
-    import pandas as pd
+    data: dict[str, Any] = {}
 
-    data = {}
-    
     # 1. Parse Extents (Geometry) if present
     if annotation.extent is not None and annotation.extent is not msgspec.UNSET:
         ext_type = _get_tag(annotation.extent)
@@ -128,7 +136,7 @@ def to_dataframe(annotation: Annotation):
                 continue
             val = getattr(annotation.extent, field.name)
             data[f"extent:{ext_type}:{field.name}"] = val
-        
+
     # 2. Parse Payload (Passenger Data)
     payload_type = _get_tag(annotation.payload)
     for field in msgspec.structs.fields(type(annotation.payload)):
@@ -136,7 +144,7 @@ def to_dataframe(annotation: Annotation):
             continue
         val = getattr(annotation.payload, field.name)
         data[f"payload:{payload_type}:{field.name}"] = val
-    
+
     # 3. Parse Confidence (if present)
     if annotation.confidence is not None and annotation.confidence is not msgspec.UNSET:
         conf_type = _get_tag(annotation.confidence)
@@ -145,27 +153,57 @@ def to_dataframe(annotation: Annotation):
                 continue
             val = getattr(annotation.confidence, field.name)
             data[f"confidence:{conf_type}:{field.name}"] = val
-        
-    df = pd.DataFrame(data)
-    
-    # 4. Stash the singleton data safely into the DataFrame's attributes
-    df.attrs["bopp_version"] = annotation.bopp_version
-    df.attrs["media_id"] = annotation.media_id
+
+    attrs = {
+        "bopp_version": annotation.bopp_version,
+        "media_id": annotation.media_id,
+    }
     if annotation.metadata:
-        df.attrs["metadata"] = msgspec.to_builtins(annotation.metadata)
-        
-    return df
+        attrs["metadata"] = msgspec.to_builtins(annotation.metadata)
+
+    if backend in ("pandas", "pandas-pyarrow"):
+        try:
+            import pandas as pd
+        except ImportError as err:
+            raise BoppIOError("pandas is required for backend='pandas'") from err
+
+        if backend == "pandas-pyarrow":
+            try:
+                import pyarrow  # noqa: F401
+            except ImportError as err:
+                raise BoppIOError("pyarrow is required for backend='pandas-pyarrow'") from err
+
+            df = pd.DataFrame(data).convert_dtypes(dtype_backend="pyarrow")
+        else:
+            df = pd.DataFrame(data)
+
+        for k, v in attrs.items():
+            df.attrs[k] = v
+        return df
+
+    elif backend == "polars":
+        try:
+            import polars as pl
+        except ImportError as err:
+            raise BoppIOError("polars is required for backend='polars'") from err
+
+        df = pl.DataFrame(data)
+        df.attrs = attrs  # type: ignore[attr-defined]
+        return df
+
+    else:
+        raise BoppArgumentError(f"Unsupported backend: {backend}")
 
 
-def from_dataframe(df) -> Annotation:
+def from_dataframe(df: Any) -> Annotation:
     """
-    Reconstitute a strictly typed Annotation struct from a DataFrame.
+    Reconstitute a strictly typed Annotation struct from a Pandas or Polars DataFrame.
 
-    Expects singleton fields to be present in `df.attrs`.
+    Expects singleton fields to be present in `df.attrs` or custom attributes.
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : pandas.DataFrame or polars.DataFrame
         DataFrame with self-describing column names and attributes.
 
     Returns
@@ -175,39 +213,64 @@ def from_dataframe(df) -> Annotation:
 
     See Also
     --------
-    to_dataframe : Convert an Annotation instance into a Pandas DataFrame.
-
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> df = pd.DataFrame({"payload:onset:time": [0.1, 0.5]})
-    >>> df.attrs["media_id"] = "audio:123"
-    >>> ann = from_dataframe(df)
-    >>> ann.media_id
-    'audio:123'
+    to_dataframe : Convert an Annotation instance into a Pandas or Polars DataFrame.
     """
-    bopp_data = {
-        "bopp_version": df.attrs.get("bopp_version", "1.0.0"),
-        "media_id": df.attrs.get("media_id", "unknown:media"),
-        "payload": {}
+    is_pandas = False
+    is_polars = False
+
+    try:
+        import pandas as pd
+
+        if isinstance(df, pd.DataFrame):
+            is_pandas = True
+    except ImportError:
+        pass
+
+    if not is_pandas:
+        try:
+            import polars as pl
+
+            if isinstance(df, pl.DataFrame):
+                is_polars = True
+        except ImportError:
+            pass
+
+    if not (is_pandas or is_polars):
+        raise BoppArgumentError(
+            f"Unsupported DataFrame type: {type(df)}. Must be a pandas or polars DataFrame."
+        )
+
+    attrs = getattr(df, "attrs", {})
+    columns = list(df.columns)
+
+    bopp_data: dict[str, Any] = {
+        "bopp_version": attrs.get("bopp_version", "1.0.0"),
+        "media_id": attrs.get("media_id", "unknown:media"),
+        "payload": {},
     }
-    
-    if "metadata" in df.attrs:
-        bopp_data["metadata"] = df.attrs["metadata"]
-    if "annotated_domain" in df.attrs:
-        bopp_data["annotated_domain"] = df.attrs["annotated_domain"]
-        
-    coord_cols = [c for c in df.columns if c.startswith("extent:")]
-    payload_cols = [c for c in df.columns if c.startswith("payload:")]
-    conf_cols = [c for c in df.columns if c.startswith("confidence:")]
-    
+
+    if "metadata" in attrs:
+        bopp_data["metadata"] = attrs["metadata"]
+    if "annotated_domain" in attrs:
+        bopp_data["annotated_domain"] = attrs["annotated_domain"]
+
+    coord_cols = [c for c in columns if c.startswith("extent:")]
+    payload_cols = [c for c in columns if c.startswith("payload:")]
+    conf_cols = [c for c in columns if c.startswith("confidence:")]
+
+    def _get_column_list(column_name: str) -> list[Any]:
+        if is_pandas:
+            return df[column_name].tolist()
+        else:
+            return df[column_name].to_list()
+
     if coord_cols:
         ext_type = coord_cols[0].split(":")[1]
         bopp_data["extent"] = {"extent_type": ext_type}
         for col in coord_cols:
             parts = col.split(":")
             field_name = parts[2] if len(parts) > 2 else "values"
-            bopp_data["extent"][field_name] = df[col].tolist()
+            bopp_data["extent"][field_name] = _get_column_list(col)
 
     if payload_cols:
         payload_type = payload_cols[0].split(":")[1]
@@ -215,14 +278,14 @@ def from_dataframe(df) -> Annotation:
         for col in payload_cols:
             parts = col.split(":")
             field_name = parts[2] if len(parts) > 2 else "values"
-            bopp_data["payload"][field_name] = df[col].tolist()
-    
+            bopp_data["payload"][field_name] = _get_column_list(col)
+
     if conf_cols:
         conf_type = conf_cols[0].split(":")[1]
         bopp_data["confidence"] = {"confidence_type": conf_type}
         for col in conf_cols:
             parts = col.split(":")
             field_name = parts[2] if len(parts) > 2 else "confidence"
-            bopp_data["confidence"][field_name] = df[col].tolist()
-        
+            bopp_data["confidence"][field_name] = _get_column_list(col)
+
     return msgspec.convert(bopp_data, type=Annotation)

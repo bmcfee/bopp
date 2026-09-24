@@ -8,10 +8,14 @@ version = "0.1.0"
 description = "Bounded Observation Payload Protocol"
 dependencies = [
     "msgspec>=0.18.0",
-    "pandas>=2.0.0",  # For CSV parsing
 ]
 
 [project.optional-dependencies]
+dataframe = [
+    "pandas>=2.0.0",
+    "polars>=0.20.0",
+    "pyarrow>=12.0.0",
+]
 docs = [
     "sphinx",
     "numpydoc",
@@ -22,6 +26,9 @@ docs = [
 test = [
     "pytest",
     "pytest-cov",
+    "pandas>=2.0.0",
+    "polars>=0.20.0",
+    "pyarrow>=12.0.0",
 ]
 
 [tool.pytest.ini_options]

@@ -1,7 +1,9 @@
 import msgspec
 import pandas as pd
+import polars as pl
+import pytest
 
-from bopp.core import create
+from bopp.core import BoppArgumentError, create
 from bopp.util import _get_tag, extract_header, from_dataframe, to_dataframe
 
 
@@ -33,7 +35,7 @@ def test_extract_header():
     assert "extent" not in header
 
 
-def test_dataframe_roundtrip():
+def test_pandas_dataframe_roundtrip():
     ann = create(
         media_id="track:1",
         payload_kind="onset",
@@ -44,10 +46,66 @@ def test_dataframe_roundtrip():
         confidence=[0.8, 0.9],
     )
 
-    df = to_dataframe(ann)
+    df = to_dataframe(ann, backend="pandas")
     assert isinstance(df, pd.DataFrame)
     assert df.attrs["media_id"] == "track:1"
 
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == ann.media_id
     assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
+
+
+def test_pandas_pyarrow_dataframe_roundtrip():
+    ann = create(
+        media_id="track:1",
+        payload_kind="onset",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[0.1, 0.2],
+        value=[1, 1],
+        confidence=[0.8, 0.9],
+    )
+
+    df = to_dataframe(ann, backend="pandas-pyarrow")
+    assert isinstance(df, pd.DataFrame)
+    assert df.attrs["media_id"] == "track:1"
+
+    reconstructed = from_dataframe(df)
+    assert reconstructed.media_id == ann.media_id
+    assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
+
+
+def test_polars_dataframe_roundtrip():
+    ann = create(
+        media_id="track:1",
+        payload_kind="onset",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[0.1, 0.2],
+        value=[1, 1],
+        confidence=[0.8, 0.9],
+    )
+
+    df = to_dataframe(ann, backend="polars")
+    assert isinstance(df, pl.DataFrame)
+    assert df.attrs["media_id"] == "track:1"
+
+    reconstructed = from_dataframe(df)
+    assert reconstructed.media_id == ann.media_id
+    assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
+
+
+def test_invalid_backend():
+    ann = create(
+        media_id="track:1",
+        payload_kind="onset",
+        time=[0.1],
+        value=[1],
+    )
+    with pytest.raises(BoppArgumentError, match="Unsupported backend"):
+        to_dataframe(ann, backend="invalid_backend")  # type: ignore[arg-type]
+
+
+def test_from_dataframe_unsupported_type():
+    with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
+        from_dataframe({"not": "a_dataframe"})
