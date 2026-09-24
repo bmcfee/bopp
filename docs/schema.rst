@@ -1,8 +1,7 @@
-Schema
-======
+Schema Specifications
+=====================
 
-Version 1
----------
-.. raw:: html
+.. toctree::
+   :maxdepth: 1
 
-   <iframe src="_static/schema_v1.html" width="100%" height="800px" style="border:none;"></iframe>
+   schema_v1
