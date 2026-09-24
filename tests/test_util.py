@@ -99,6 +99,7 @@ def test_invalid_backend():
     ann = create(
         media_id="track:1",
         payload_kind="onset",
+        extent_kind="time",
         time=[0.1],
         value=[1],
     )
