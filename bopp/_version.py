@@ -2,7 +2,7 @@
 
 from typing import Final
 
-__version__: Final[str] 
+__version__: Final[str]
 
 __version__ = "0.0.1dev"
 
@@ -16,7 +16,13 @@ SCHEMA_TO_REGISTRY: Final[dict[str, str]] = {
 
 
 def get_current_schema_version() -> str:
-    """Return the default schema version for BOPP models."""
+    """Return the default schema version for BOPP models.
+
+    Returns
+    -------
+    str
+        The default schema version string.
+    """
     return DEFAULT_SCHEMA_VERSION
 
 
