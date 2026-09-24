@@ -8,10 +8,6 @@ class BoppBase(msgspec.Struct):
     safely ignoring sub-models.
     """
     def __post_init__(self):
-        # GUARD: Only run this on top-level Annotation containers
-        if not hasattr(self, "payload"):
-            return
-
         all_lengths = []
 
         extent_field = getattr(self, "extent", msgspec.UNSET)
