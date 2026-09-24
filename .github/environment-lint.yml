@@ -11,6 +11,6 @@ dependencies:
   - sphinx>=5.1.0
   - pandas-stubs
   - polars
-  - pyarrow
+  - pyarrow-stubs
   - msgspec
   - pytest
