@@ -4,11 +4,40 @@ import msgspec
 
 from .registries import get_registry
 
-__all__ = ["BoppError", "create", "validate"]
+__all__ = [
+    "BoppError",
+    "BoppValidationError",
+    "BoppArrayLengthMismatchError",
+    "BoppRegistryError",
+    "BoppArgumentError",
+    "BoppIOError",
+    "create",
+    "validate",
+]
 
 
 class BoppError(Exception):
     """Base exception class for all errors raised by the BOPP package."""
+
+
+class BoppValidationError(BoppError):
+    """Raised when object schema or structure validation fails."""
+
+
+class BoppArrayLengthMismatchError(BoppValidationError):
+    """Raised when array lengths across Extent, Payload, and Confidence facets mismatch."""
+
+
+class BoppRegistryError(BoppError, KeyError):
+    """Raised when an unregistered kind identifier is requested."""
+
+
+class BoppArgumentError(BoppError, ValueError):
+    """Raised when invalid or unconsumed keyword arguments are passed."""
+
+
+class BoppIOError(BoppError):
+    """Raised for errors during reading, writing, or parsing BOPP data formats."""
 
 
 def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -54,7 +83,7 @@ def create(
         Kind identifier registered for the extent struct, if applicable.
     confidence_kind : str or None, optional
         Kind identifier registered for the confidence struct, if applicable.
-    bopp_version : str, default "v1"
+    bopp_version : str, default "1.0.0"
         Schema version string to select the underlying type registry.
     **kwargs : Any
         Keyword arguments matching fields for the payload, extent, or
@@ -67,9 +96,11 @@ def create(
 
     Raises
     ------
-    BoppError
+    BoppRegistryError
         If an unrecognized `payload_kind`, `extent_kind`, or `confidence_kind`
-        is provided, or if unused keyword arguments remain.
+        is provided.
+    BoppArgumentError
+        If unused keyword arguments remain.
     """
     registry = get_registry(bopp_version)
     
@@ -81,7 +112,7 @@ def create(
     try:
         payload_cls = PAYLOAD_TYPE_REGISTRY[payload_kind]
     except KeyError as e:
-        raise BoppError(f"Unrecognized kind identifier: {e}") from e
+        raise BoppRegistryError(f"Unrecognized kind identifier: {e}") from e
 
     payload_args = _extract_kwargs(payload_cls, kwargs)
     payload_obj = payload_cls(**payload_args)
@@ -92,7 +123,7 @@ def create(
         try: 
             extent_cls = EXTENT_TYPE_REGISTRY[extent_kind]
         except KeyError as e:
-            raise BoppError(f"Unrecognized extent kind {e}") from e
+            raise BoppRegistryError(f"Unrecognized extent kind {e}") from e
 
         extent_args = _extract_kwargs(extent_cls, kwargs)
         extent_obj = extent_cls(**extent_args)
@@ -102,14 +133,14 @@ def create(
         try:
             confidence_cls = CONFIDENCE_TYPE_REGISTRY[confidence_kind]
         except KeyError as e:
-            raise BoppError(f"Unrecognized confidence kind: {e}") from e
+            raise BoppRegistryError(f"Unrecognized confidence kind: {e}") from e
         
         confidence_args = _extract_kwargs(confidence_cls, kwargs)
         confidence_obj = confidence_cls(**confidence_args)
 
     # Any remaining kwargs indicate a user typo or a schema mismatch
     if kwargs:
-        raise BoppError(f"Unconsumed keyword arguments: {list(kwargs.keys())}")
+        raise BoppArgumentError(f"Unconsumed keyword arguments: {list(kwargs.keys())}")
 
     return Annotation(
         media_id=media_id,
@@ -142,14 +173,16 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
 
     Raises
     ------
-    BoppError
-        If validation fails or if `target_type` is missing and cannot be inferred.
+    BoppArgumentError
+        If `target_type` is missing and cannot be inferred.
+    BoppValidationError
+        If validation fails.
     """
     if target_type is None:
         if isinstance(obj, msgspec.Struct):
             target_type = cast(type[T], type(obj))
         else:
-            raise BoppError("target_type must be provided if obj is not a msgspec.Struct.")
+            raise BoppArgumentError("target_type must be provided if obj is not a msgspec.Struct.")
     assert target_type is not None
 
     # 1. Handle Struct instances: convert to builtins to strip UNSET keys recursively
@@ -162,5 +195,5 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
     try:
         msgspec.convert(obj, target_type)
     except (msgspec.ValidationError, TypeError) as err:
-        raise BoppError(f"Validation failed for {target_type.__name__}: {err}") from err
+        raise BoppValidationError(f"Validation failed for {target_type.__name__}: {err}") from err
     return True

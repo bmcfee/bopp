@@ -1,5 +1,7 @@
 import msgspec
 
+from .core import BoppArgumentError, BoppArrayLengthMismatchError
+
 
 class BoppBase(msgspec.Struct):
     """Base class for BOPP models.
@@ -27,7 +29,7 @@ class BoppBase(msgspec.Struct):
 
         # Ensure all found arrays have the same length
         if len(set(all_lengths)) > 1:
-            raise ValueError(
+            raise BoppArrayLengthMismatchError(
                 f"Length mismatch: Found multiple array lengths {set(all_lengths)} "
                 "across Extent, Payload, and Confidence facets."
             )
@@ -46,6 +48,8 @@ class BoppBase(msgspec.Struct):
                 lengths.append(len(val))
         
         if not lengths:
-            raise ValueError(f"{facet_name} struct ({type(facet_struct).__name__}) contains no lists to measure.")
+            raise BoppArgumentError(
+                f"{facet_name} struct ({type(facet_struct).__name__}) contains no lists to measure."
+            )
             
         return lengths
