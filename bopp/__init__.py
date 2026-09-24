@@ -1,4 +1,16 @@
 """BOPP: Bounded Observation Payload Protocol."""
+from ._version import (
+    DEFAULT_SCHEMA_VERSION as DEFAULT_SCHEMA_VERSION,
+)
+from ._version import (
+    __version__ as __version__,
+)
+from ._version import (
+    get_current_schema_version as get_current_schema_version,
+)
+from ._version import (
+    get_registry_version as get_registry_version,
+)
 from . import io as io
 from . import models as models
 from . import registries as registries

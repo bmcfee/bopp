@@ -4,6 +4,7 @@ from typing import Any, TypeVar, cast
 
 import msgspec
 
+from ._version import get_current_schema_version
 from .registries import get_registry
 
 __all__ = [
@@ -69,7 +70,7 @@ def create(
     payload_kind: str,
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
-    bopp_version: str = "1.0.0",
+    bopp_version: str | None = None,
     sandbox: Any = msgspec.UNSET,
     **kwargs: Any
 ) -> Any:
@@ -86,8 +87,9 @@ def create(
         Kind identifier registered for the extent struct, if applicable.
     confidence_kind : str or None, optional
         Kind identifier registered for the confidence struct, if applicable.
-    bopp_version : str, default "1.0.0"
+    bopp_version : str or None, optional
         Schema version string to select the underlying type registry.
+        If None, defaults to the current default schema version.
     sandbox : Any, optional
         Unstructured storage area for arbitrary user-defined data.
     **kwargs : Any
@@ -107,6 +109,9 @@ def create(
     BoppArgumentError
         If unused keyword arguments remain.
     """
+    if bopp_version is None:
+        bopp_version = get_current_schema_version()
+
     registry = get_registry(bopp_version)
     
     PAYLOAD_TYPE_REGISTRY = registry["PAYLOAD_TYPE_REGISTRY"]

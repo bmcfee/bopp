@@ -1,5 +1,7 @@
 from typing import Any
 
+from bopp._version import get_registry_version
+
 
 def get_registry(version: str) -> dict[str, Any]:
     """Resolve the target registry and Annotation class based on the bopp_version.
@@ -23,7 +25,9 @@ def get_registry(version: str) -> dict[str, Any]:
     ValueError
         If the provided `version` is not supported.
     """
-    if version in ("1.0", "v1", "1"):
+    registry_key = get_registry_version(version)
+
+    if registry_key == "v1":
         from bopp.models.v1.annotation import Annotation
 
         from . import v1
