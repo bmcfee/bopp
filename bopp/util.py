@@ -162,6 +162,8 @@ def to_dataframe(
     }
     if annotation.metadata:
         attrs["metadata"] = msgspec.to_builtins(annotation.metadata)
+    if annotation.sandbox is not msgspec.UNSET and annotation.sandbox is not None:
+        attrs["sandbox"] = msgspec.to_builtins(annotation.sandbox)
 
     if backend in ("pandas", "pandas-pyarrow"):
         try:
@@ -253,6 +255,8 @@ def from_dataframe(df: Any) -> Annotation:
 
     if "metadata" in attrs:
         bopp_data["metadata"] = attrs["metadata"]
+    if "sandbox" in attrs:
+        bopp_data["sandbox"] = attrs["sandbox"]
     if "annotated_domain" in attrs:
         bopp_data["annotated_domain"] = attrs["annotated_domain"]
 

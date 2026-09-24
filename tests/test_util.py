@@ -27,10 +27,12 @@ def test_extract_header():
         extent_kind="time",
         time=[0.1, 0.2],
         value=[1, 1],
+        sandbox={"experiment": "header_test"},
     )
     header = extract_header(ann)
     assert header["media_id"] == "track:1"
     assert header["bopp_version"] == "1.0.0"
+    assert header["sandbox"] == {"experiment": "header_test"}
     assert "payload" not in header
     assert "extent" not in header
 
@@ -44,15 +46,18 @@ def test_pandas_dataframe_roundtrip():
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
+        sandbox={"info": "pandas_test"},
     )
 
     df = to_dataframe(ann, backend="pandas")
     assert isinstance(df, pd.DataFrame)
     assert df.attrs["media_id"] == "track:1"
+    assert df.attrs["sandbox"] == {"info": "pandas_test"}
 
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == ann.media_id
     assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
+    assert getattr(reconstructed, "sandbox", None) == {"info": "pandas_test"}
 
 
 def test_pandas_pyarrow_dataframe_roundtrip():
@@ -64,15 +69,18 @@ def test_pandas_pyarrow_dataframe_roundtrip():
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
+        sandbox={"info": "pyarrow_test"},
     )
 
     df = to_dataframe(ann, backend="pandas-pyarrow")
     assert isinstance(df, pd.DataFrame)
     assert df.attrs["media_id"] == "track:1"
+    assert df.attrs["sandbox"] == {"info": "pyarrow_test"}
 
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == ann.media_id
     assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
+    assert getattr(reconstructed, "sandbox", None) == {"info": "pyarrow_test"}
 
 
 def test_polars_dataframe_roundtrip():
@@ -84,15 +92,18 @@ def test_polars_dataframe_roundtrip():
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
+        sandbox={"info": "polars_test"},
     )
 
     df = to_dataframe(ann, backend="polars")
     assert isinstance(df, pl.DataFrame)
     assert df.attrs["media_id"] == "track:1"
+    assert df.attrs["sandbox"] == {"info": "polars_test"}
 
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == ann.media_id
     assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
+    assert getattr(reconstructed, "sandbox", None) == {"info": "polars_test"}
 
 
 def test_invalid_backend():

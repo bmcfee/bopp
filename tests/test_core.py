@@ -48,11 +48,13 @@ def test_create_full():
         time=[0.1, 0.5],
         value=[1, 1],
         confidence=[0.9, 0.95],
+        sandbox={"custom_key": "custom_value", "notes": [1, 2, 3]},
     )
     assert ann.extent is not None
     assert ann.extent.__struct_config__.tag == "time"
     assert ann.confidence is not None
     assert ann.confidence.__struct_config__.tag == "likelihood"
+    assert getattr(ann, "sandbox", None) == {"custom_key": "custom_value", "notes": [1, 2, 3]}
 
 
 def test_create_invalid_payload_kind():
@@ -111,6 +113,7 @@ def test_validate_struct():
         extent_kind="time",
         time=[0.1],
         value=[1],
+        sandbox={"experiment_id": "exp-42"},
     )
     assert validate(ann) is True
 
@@ -120,6 +123,7 @@ def test_validate_dict():
         "bopp_version": "1.0.0",
         "media_id": "audio:123",
         "payload": {"payload_type": "onset", "time": [0.1], "value": [1]},
+        "sandbox": {"experiment_id": "exp-42"},
     }
     assert validate(data, target_type=Annotation) is True
 

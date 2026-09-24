@@ -70,6 +70,7 @@ def create(
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
     bopp_version: str = "1.0.0",
+    sandbox: Any = msgspec.UNSET,
     **kwargs: Any
 ) -> Any:
     """
@@ -87,6 +88,8 @@ def create(
         Kind identifier registered for the confidence struct, if applicable.
     bopp_version : str, default "1.0.0"
         Schema version string to select the underlying type registry.
+    sandbox : Any, optional
+        Unstructured storage area for arbitrary user-defined data.
     **kwargs : Any
         Keyword arguments matching fields for the payload, extent, or
         confidence structures.
@@ -149,7 +152,8 @@ def create(
         bopp_version=bopp_version,
         extent=extent_obj,
         payload=payload_obj,
-        confidence=confidence_obj
+        confidence=confidence_obj,
+        sandbox=sandbox,
     )
 
 
