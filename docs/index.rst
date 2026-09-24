@@ -6,9 +6,14 @@
 bopp documentation
 ==================
 
+.. toctree::
+   :maxdepth: 2
+   :caption: API
+
+   api/index
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :caption: Schema
 
    schema_v1.md
