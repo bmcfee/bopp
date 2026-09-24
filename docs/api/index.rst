@@ -26,7 +26,7 @@ API documentation
     load_bopp_msgpack
     save_bopp_msgpack
     load_bopp_csv
-    to_csv
+    save_bopp_csv
 
 .. automodule:: bopp.util
     :no-members:

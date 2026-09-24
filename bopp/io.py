@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import msgspec
 import tomllib
@@ -11,11 +10,8 @@ from .core import BoppArgumentError
 from .models.v1.annotation import Annotation
 from .util import extract_header, from_dataframe, to_dataframe
 
-if TYPE_CHECKING:
-    import pandas as pd
 
-
-def to_csv(ann: Annotation, filepath: str | Path) -> None:
+def save_bopp_csv(ann: Annotation, filepath: str | Path) -> None:
     """
     Write metadata as TOML frontmatter followed by tabular data to a CSV file.
 
@@ -43,7 +39,7 @@ def to_csv(ann: Annotation, filepath: str | Path) -> None:
         # 3. Write the header
         f.writelines(frontmatter)
         
-        # 4. Hand the open file pointer to Pandas!
+        # 4. Hand the open file pointer to Pandas/Polars
         if hasattr(df, 'to_csv'):
             # is this a pandas dataframe?
             df.to_csv(f, index=False)
@@ -140,20 +136,19 @@ def load_bopp_msgpack(filepath: str | Path) -> Annotation:
     return msgspec.msgpack.decode(binary_data, type=Annotation)
 
 
-def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
+def load_bopp_csv(filepath: str | Path) -> Annotation:
     """
-    Read a BOPP CSV file, extract TOML frontmatter into `df.attrs`, and return a Pandas DataFrame.
+    Read a BOPP CSV file directly into a validated Annotation struct.
 
     Parameters
     ----------
     filepath : str or pathlib.Path
-        Path to the BOPP CSV file to read.
+        Path to the BOPP CSV file.
 
     Returns
     -------
-    pandas.DataFrame
-        DataFrame containing tabular content, with metadata attributes
-        stored in `attrs`.
+    Annotation
+        Decoded and validated Annotation instance.
     """
     import pandas as pd
 
@@ -190,22 +185,5 @@ def read_bopp_csv(filepath: str | Path) -> pd.DataFrame:
 
     # Attach the singleton fields directly to the DataFrame attributes
     df.attrs.update(metadata)
-    return df
 
-
-def load_bopp_csv(filepath: str | Path) -> Annotation:
-    """
-    Read a BOPP CSV file directly into a validated Annotation struct.
-
-    Parameters
-    ----------
-    filepath : str or pathlib.Path
-        Path to the BOPP CSV file.
-
-    Returns
-    -------
-    Annotation
-        Decoded and validated Annotation instance.
-    """
-    df = read_bopp_csv(filepath)
     return from_dataframe(df)
