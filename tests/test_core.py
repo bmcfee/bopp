@@ -120,7 +120,7 @@ def test_validate_struct():
 
 def test_validate_dict():
     data = {
-        "bopp_version": "1.0.0",
+        "bopp_version": "1.0",
         "media_id": "audio:123",
         "payload": {"payload_type": "onset", "time": [0.1], "value": [1]},
         "sandbox": {"experiment_id": "exp-42"},

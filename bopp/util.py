@@ -248,7 +248,7 @@ def from_dataframe(df: Any) -> Annotation:
     columns = list(df.columns)
 
     bopp_data: dict[str, Any] = {
-        "bopp_version": attrs.get("bopp_version", "1.0.0"),
+        "bopp_version": attrs.get("bopp_version", "1.0"),
         "media_id": attrs.get("media_id", "unknown:media"),
         "payload": {},
     }

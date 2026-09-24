@@ -31,7 +31,7 @@ def test_extract_header():
     )
     header = extract_header(ann)
     assert header["media_id"] == "track:1"
-    assert header["bopp_version"] == "1.0.0"
+    assert header["bopp_version"] == "1.0"
     assert header["sandbox"] == {"experiment": "header_test"}
     assert "payload" not in header
     assert "extent" not in header

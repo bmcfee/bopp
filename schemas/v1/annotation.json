@@ -10,8 +10,8 @@
     },
     "bopp_version": {
       "type": "string",
-      "pattern": "^1\\.\\d+\\.\\d+$",
-      "description": "The Semantic Version of the BOPP schema (e.g., 1.0.0)"
+      "pattern": "^1\\.\\d+$",
+      "description": "The Semantic Version of the BOPP schema (e.g., 1.0)"
     },
     "metadata": {
         "description": "The metadata describing the annotation",

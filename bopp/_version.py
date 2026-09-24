@@ -2,12 +2,13 @@
 
 from typing import Final
 
-__version__: Final[str] = "0.0.1dev"
+__version__: Final[str] 
 
-DEFAULT_SCHEMA_VERSION: Final[str] = "1.0.0"
+__version__ = "0.0.1dev"
+
+DEFAULT_SCHEMA_VERSION: Final[str] = "1.0"
 
 SCHEMA_TO_REGISTRY: Final[dict[str, str]] = {
-    "1.0.0": "v1",
     "1.0": "v1",
     "1": "v1",
     "v1": "v1",
@@ -20,7 +21,7 @@ def get_current_schema_version() -> str:
 
 
 def get_registry_version(schema_version: str | None = None) -> str:
-    """Map a schema version string to its registry key (e.g. '1.0.0' -> 'v1').
+    """Map a schema version string to its registry key (e.g. '1.0' -> 'v1').
 
     Parameters
     ----------

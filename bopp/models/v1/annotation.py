@@ -23,8 +23,8 @@ class Annotation(BoppBase):
         Annotated[
             str,
             Meta(
-                description="The Semantic Version of the BOPP schema (e.g., 1.0.0)",
-                pattern="^1\\.\\d+\\.\\d+$",
+                description="The Semantic Version of the BOPP schema (e.g., 1.0)",
+                pattern="^1\\.\\d+$",
             ),
         ]
         | UnsetType

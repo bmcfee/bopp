@@ -1,4 +1,8 @@
 """BOPP: Bounded Observation Payload Protocol."""
+from . import io as io
+from . import models as models
+from . import registries as registries
+from . import util as util
 from ._version import (
     DEFAULT_SCHEMA_VERSION as DEFAULT_SCHEMA_VERSION,
 )
@@ -11,10 +15,6 @@ from ._version import (
 from ._version import (
     get_registry_version as get_registry_version,
 )
-from . import io as io
-from . import models as models
-from . import registries as registries
-from . import util as util
 from .core import (
     BoppArgumentError as BoppArgumentError,
 )
