@@ -87,7 +87,6 @@ def save_bopp_json(annotation: Annotation, filepath: str | Path) -> None:
     
     with open(filepath, "wb") as f:
         f.write(json_data)
-    print(f"Successfully saved to {filepath} ({len(json_data)} bytes)")
 
 
 # ==========================================
@@ -109,7 +108,6 @@ def save_bopp_msgpack(annotation: Annotation, filepath: str | Path) -> None:
     
     with open(filepath, "wb") as f:
         f.write(binary_data)
-    print(f"Successfully saved to {filepath} ({len(binary_data)} bytes)")
 
 
 # ==========================================
