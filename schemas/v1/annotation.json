@@ -28,6 +28,9 @@
     "confidence": { 
       "description": "Optional parallel array of likelihoods or votes",
       "$ref": "confidences.json" 
+    },
+    "sandbox": {
+      "description": "Unstructured storage area for arbitrary user-defined data"
     }
   },
   "required": ["media_id", "payload"]
