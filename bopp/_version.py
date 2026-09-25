@@ -2,6 +2,8 @@
 
 from typing import Final
 
+from bopp.exceptions import BoppRegistryError
+
 __version__ = "0.0.1dev"
 
 DEFAULT_SCHEMA_VERSION: Final[str] = "1.0"
@@ -39,14 +41,14 @@ def get_registry_version(schema_version: str | None = None) -> str:
 
     Raises
     ------
-    ValueError
+    BoppRegistryError
         If the schema version is not supported in SCHEMA_TO_REGISTRY.
     """
     version = schema_version or DEFAULT_SCHEMA_VERSION
     try:
         return SCHEMA_TO_REGISTRY[version]
     except KeyError as err:
-        raise ValueError(
+        raise BoppRegistryError(
             f"Unsupported schema version: {version!r}. "
             f"Supported versions: {list(SCHEMA_TO_REGISTRY.keys())}"
         ) from err

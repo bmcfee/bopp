@@ -1,6 +1,7 @@
 from typing import Any
 
 from bopp._version import get_registry_version
+from bopp.exceptions import BoppRegistryError
 
 
 def get_registry(version: str) -> dict[str, Any]:
@@ -22,7 +23,7 @@ def get_registry(version: str) -> dict[str, Any]:
 
     Raises
     ------
-    ValueError
+    BoppRegistryError
         If the provided `version` is not supported.
     """
     registry_key = get_registry_version(version)
@@ -39,4 +40,4 @@ def get_registry(version: str) -> dict[str, Any]:
             "Annotation": Annotation,
         }
 
-    raise ValueError(f"Unsupported BOPP version: {version}")
+    raise BoppRegistryError(f"Unsupported BOPP version: {version}")
