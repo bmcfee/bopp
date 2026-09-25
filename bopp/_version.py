@@ -1,5 +1,6 @@
 """Version information for bopp."""
 
+import re
 from typing import Final
 
 from .exceptions import BoppRegistryError
@@ -8,11 +9,9 @@ __version__ = "0.0.1dev"
 
 DEFAULT_SCHEMA_VERSION: Final[str] = "1.0"
 
-SCHEMA_TO_REGISTRY: Final[dict[str, str]] = {
-    "1.0": "v1",
-    "1": "v1",
-    "v1": "v1",
-}
+SCHEMA_PATTERNS: Final[list[tuple[re.Pattern[str], str]]] = [
+    (re.compile(r"^1(?:\.\d+)*$|^v1$"), "v1"),
+]
 
 
 def get_current_schema_version() -> str:
@@ -42,13 +41,11 @@ def get_registry_version(schema_version: str | None = None) -> str:
     Raises
     ------
     BoppRegistryError
-        If the schema version is not supported in SCHEMA_TO_REGISTRY.
+        If the schema version does not match any known registry pattern.
     """
     version = schema_version or DEFAULT_SCHEMA_VERSION
-    try:
-        return SCHEMA_TO_REGISTRY[version]
-    except KeyError as err:
-        raise BoppRegistryError(
-            f"Unsupported schema version: {version!r}. "
-            f"Supported versions: {list(SCHEMA_TO_REGISTRY.keys())}"
-        ) from err
+    for pattern, registry_key in SCHEMA_PATTERNS:
+        if pattern.match(version):
+            return registry_key
+
+    raise BoppRegistryError(f"Unsupported schema version: {version!r}.")
