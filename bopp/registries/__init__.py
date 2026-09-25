@@ -30,7 +30,6 @@ def get_registry(version: str) -> dict[str, Any]:
 
     if registry_key == "v1":
         from ..models.v1.annotation import Annotation
-
         from . import v1
 
         return {
