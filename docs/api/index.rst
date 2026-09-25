@@ -43,3 +43,20 @@ Utilities
 
     to_dataframe
     from_dataframe
+
+Exceptions
+----------
+
+.. automodule:: bopp.exceptions
+    :no-members:
+.. currentmodule:: bopp.exceptions
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    BoppError
+    BoppValidationError
+    BoppArrayError
+    BoppRegistryError
+    BoppArgumentError
+    BoppIOError
