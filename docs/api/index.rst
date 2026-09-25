@@ -61,3 +61,15 @@ Exceptions
     BoppRegistryError
     BoppArgumentError
     BoppIOError
+
+
+Schema-generated objects
+------------------------
+.. automodule:: bopp.models
+.. currentmodule:: bopp.models
+.. autosummary::
+   :toctree: generated_schema/
+   :nosignatures:
+   :recursive:
+
+   v1
