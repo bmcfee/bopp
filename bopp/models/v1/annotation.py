@@ -50,7 +50,7 @@ class Annotation(BoppBase):
     ) = UNSET
     sandbox: (
         Annotated[
-            Any,
+            dict[str, Any],
             Meta(
                 description="Unstructured storage area for arbitrary user-defined data"
             ),
