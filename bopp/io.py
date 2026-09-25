@@ -6,18 +6,20 @@ from pathlib import Path
 import msgspec
 import tomllib
 
+from ._version import get_current_schema_version
+from .base import BoppBase
 from .core import BoppArgumentError
-from .models.v1.annotation import Annotation
+from .registries import get_registry
 from .util import extract_header, from_dataframe, to_dataframe
 
 
-def save_bopp_csv(ann: Annotation, filepath: str | Path) -> None:
+def save_bopp_csv(ann: BoppBase, filepath: str | Path) -> None:
     """
     Write metadata as TOML frontmatter followed by tabular data to a CSV file.
 
     Parameters
     ----------
-    ann : Annotation
+    ann : BoppBase
         The Annotation struct instance to export.
     filepath : str or pathlib.Path
         Target file path for the output CSV file.
@@ -50,7 +52,7 @@ def save_bopp_csv(ann: Annotation, filepath: str | Path) -> None:
             raise BoppArgumentError(f"Unknown dataframe type: {type(df)}")
 
 
-def load_bopp_json(filepath: str | Path) -> Annotation:
+def load_bopp_json(filepath: str | Path) -> BoppBase:
     """
     Read a BOPP JSON file directly into an Annotation model instance.
 
@@ -61,23 +63,27 @@ def load_bopp_json(filepath: str | Path) -> Annotation:
 
     Returns
     -------
-    Annotation
+    BoppBase
         Decoded and validated Annotation instance.
     """
     # msgspec operates fastest on raw bytes, so we read as "rb"
     with open(filepath, "rb") as f:
         data = f.read()
 
-    return msgspec.json.decode(data, type=Annotation)
+    raw_dict = msgspec.json.decode(data, type=dict)
+    version = raw_dict.get("bopp_version", get_current_schema_version())
+
+    annotation_cls = get_registry(version)["Annotation"]
+    return msgspec.json.decode(data, type=annotation_cls)
 
 
-def save_bopp_json(annotation: Annotation, filepath: str | Path) -> None:
+def save_bopp_json(annotation: BoppBase, filepath: str | Path) -> None:
     """
     Serialize an Annotation instance directly into a JSON file.
 
     Parameters
     ----------
-    annotation : Annotation
+    annotation : BoppBase
         The Annotation instance to serialize.
     filepath : str or pathlib.Path
         Target file path for saving the JSON output.
@@ -92,13 +98,13 @@ def save_bopp_json(annotation: Annotation, filepath: str | Path) -> None:
 # ==========================================
 # 1. Saving (Encoding) to Msgpack
 # ==========================================
-def save_bopp_msgpack(annotation: Annotation, filepath: str | Path) -> None:
+def save_bopp_msgpack(annotation: BoppBase, filepath: str | Path) -> None:
     """
     Serialize an Annotation instance directly into a binary MsgPack file.
 
     Parameters
     ----------
-    annotation : Annotation
+    annotation : BoppBase
         The Annotation instance to serialize.
     filepath : str or pathlib.Path
         Target file path for saving the MsgPack binary output.
@@ -113,7 +119,7 @@ def save_bopp_msgpack(annotation: Annotation, filepath: str | Path) -> None:
 # ==========================================
 # 2. Loading (Decoding) from Msgpack
 # ==========================================
-def load_bopp_msgpack(filepath: str | Path) -> Annotation:
+def load_bopp_msgpack(filepath: str | Path) -> BoppBase:
     """
     Read a binary MsgPack file and decode it into an Annotation struct.
 
@@ -124,17 +130,20 @@ def load_bopp_msgpack(filepath: str | Path) -> Annotation:
 
     Returns
     -------
-    Annotation
+    BoppBase
         Decoded and validated Annotation instance.
     """
     with open(filepath, "rb") as f:
         binary_data = f.read()
-        
-    # Decode and instantly validate against the Annotation schema
-    return msgspec.msgpack.decode(binary_data, type=Annotation)
+
+    raw_dict = msgspec.msgpack.decode(binary_data, type=dict)
+    version = raw_dict.get("bopp_version", get_current_schema_version())
+
+    annotation_cls = get_registry(version)["Annotation"]
+    return msgspec.msgpack.decode(binary_data, type=annotation_cls)
 
 
-def load_bopp_csv(filepath: str | Path) -> Annotation:
+def load_bopp_csv(filepath: str | Path) -> BoppBase:
     """
     Read a BOPP CSV file directly into a validated Annotation struct.
 
@@ -145,7 +154,7 @@ def load_bopp_csv(filepath: str | Path) -> Annotation:
 
     Returns
     -------
-    Annotation
+    BoppBase
         Decoded and validated Annotation instance.
     """
     import pandas as pd

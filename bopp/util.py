@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING, Any, Literal
 import msgspec
 
 from ._version import get_current_schema_version
+from .base import BoppBase
 from .core import BoppArgumentError, BoppIOError
-from .models.v1.annotation import Annotation
+from .registries import get_registry
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -47,7 +48,7 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
     return None
 
 
-def extract_header(annotation: Annotation) -> dict[str, Any]:
+def extract_header(annotation: BoppBase) -> dict[str, Any]:
     """
     Extract all singleton fields from an Annotation for TOML serialization.
 
@@ -55,7 +56,7 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
 
     Parameters
     ----------
-    annotation : Annotation
+    annotation : BoppBase
         The Annotation struct to extract metadata fields from.
 
     Returns
@@ -92,7 +93,7 @@ def extract_header(annotation: Annotation) -> dict[str, Any]:
 
 
 def to_dataframe(
-    annotation: Annotation,
+    annotation: BoppBase,
     backend: Literal["pandas", "pandas-pyarrow", "polars"] = "pandas",
 ) -> pd.DataFrame | pl.DataFrame:
     """
@@ -102,7 +103,7 @@ def to_dataframe(
 
     Parameters
     ----------
-    annotation : Annotation
+    annotation : BoppBase
         The Annotation struct instance to convert.
     backend : {"pandas", "pandas-pyarrow", "polars"}, default "pandas"
         The DataFrame framework and backend to return.
@@ -158,12 +159,12 @@ def to_dataframe(
             data[f"confidence:{conf_type}:{field.name}"] = val
 
     attrs = {
-        "bopp_version": annotation.bopp_version,
+        "bopp_version": getattr(annotation, "bopp_version", get_current_schema_version()),
         "media_id": annotation.media_id,
     }
-    if annotation.metadata:
+    if getattr(annotation, "metadata", None):
         attrs["metadata"] = msgspec.to_builtins(annotation.metadata)
-    if annotation.sandbox is not msgspec.UNSET and annotation.sandbox is not None:
+    if getattr(annotation, "sandbox", msgspec.UNSET) not in (msgspec.UNSET, None):
         attrs["sandbox"] = msgspec.to_builtins(annotation.sandbox)
 
     if backend in ("pandas", "pandas-pyarrow"):
@@ -200,7 +201,7 @@ def to_dataframe(
         raise BoppArgumentError(f"Unsupported backend: {backend}")
 
 
-def from_dataframe(df: Any) -> Annotation:
+def from_dataframe(df: Any) -> BoppBase:
     """
     Reconstitute a strictly typed Annotation struct from a Pandas or Polars DataFrame.
 
@@ -213,7 +214,7 @@ def from_dataframe(df: Any) -> Annotation:
 
     Returns
     -------
-    Annotation
+    BoppBase
         Validated Annotation struct built from the DataFrame data.
 
     See Also
@@ -248,8 +249,12 @@ def from_dataframe(df: Any) -> Annotation:
     attrs = getattr(df, "attrs", {})
     columns = list(df.columns)
 
+    bopp_version = attrs.get("bopp_version", get_current_schema_version())
+    registry = get_registry(bopp_version)
+    annotation_cls = registry["Annotation"]
+
     bopp_data: dict[str, Any] = {
-        "bopp_version": attrs.get("bopp_version", get_current_schema_version()),
+        "bopp_version": bopp_version,
         "media_id": attrs.get("media_id", "unknown:media"),
         "payload": {},
     }
@@ -295,4 +300,4 @@ def from_dataframe(df: Any) -> Annotation:
             field_name = parts[2] if len(parts) > 2 else "confidence"
             bopp_data["confidence"][field_name] = _get_column_list(col)
 
-    return msgspec.convert(bopp_data, type=Annotation)
+    return msgspec.convert(bopp_data, type=annotation_cls)
