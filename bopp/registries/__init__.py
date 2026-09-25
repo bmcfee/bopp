@@ -1,7 +1,7 @@
 from typing import Any
 
-from bopp._version import get_registry_version
-from bopp.exceptions import BoppRegistryError
+from .._version import get_registry_version
+from ..exceptions import BoppRegistryError
 
 
 def get_registry(version: str) -> dict[str, Any]:
