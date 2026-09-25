@@ -1,0 +1,6 @@
+msgspec>=0.18.0
+sphinx
+numpydoc
+pydata-sphinx-theme
+json-schema-for-humans
+myst-parser
