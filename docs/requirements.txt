@@ -1,3 +1,4 @@
+-e .
 msgspec>=0.18.0
 sphinx
 numpydoc
