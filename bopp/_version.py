@@ -2,7 +2,7 @@
 
 from typing import Final
 
-from bopp.exceptions import BoppRegistryError
+from .exceptions import BoppRegistryError
 
 __version__ = "0.0.1dev"
 
