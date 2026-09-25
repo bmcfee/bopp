@@ -17,10 +17,5 @@ help:
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
-	generate-schema-doc \
-		--config template_name=js \
-		--config expand_buttons=True \
-		--config footer_show_time=False \
-		../schemas/v1/annotation.json \
-		_static/schema_v1.html
+	../scripts/generate_schema_doc.sh
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
