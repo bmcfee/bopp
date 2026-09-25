@@ -2,6 +2,7 @@
 
 [![CI Tests](https://github.com/bmcfee/bopp/actions/workflows/ci.yml/badge.svg)](https://github.com/bmcfee/bopp/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/bmcfee/bopp/graph/badge.svg?token=48VE7PS20G)](https://codecov.io/gh/bmcfee/bopp)
+[![Documentation Status](https://readthedocs.org/projects/bopp/badge/?version=latest)](http://bopp.readthedocs.io/en/latest/?badge=latest)
 
 ## Overview
 
