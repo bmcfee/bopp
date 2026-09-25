@@ -15,20 +15,17 @@ from . import metadata as metadata_1
 
 class Annotation(BoppBase):
     media_id: Annotated[str, Meta(pattern="^[a-zA-Z0-9]+:.*$")]
+    bopp_version: Annotated[
+        str,
+        Meta(
+            description="The Semantic Version of the BOPP schema (e.g., 1.0)",
+            pattern="^1\\.\\d+$",
+        ),
+    ]
     payload: Annotated[
         payloads.AnyPayload,
         Meta(description="The parallel array of values (e.g., beat, chord)"),
     ]
-    bopp_version: (
-        Annotated[
-            str,
-            Meta(
-                description="The Semantic Version of the BOPP schema (e.g., 1.0)",
-                pattern="^1\\.\\d+$",
-            ),
-        ]
-        | UnsetType
-    ) = UNSET
     metadata: (
         Annotated[
             metadata_1.AnnotationMetadata,

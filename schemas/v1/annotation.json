@@ -33,5 +33,5 @@
       "description": "Unstructured storage area for arbitrary user-defined data"
     }
   },
-  "required": ["media_id", "payload"]
+  "required": ["media_id", "payload", "bopp_version"]
 }
