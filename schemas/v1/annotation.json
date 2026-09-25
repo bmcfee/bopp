@@ -30,7 +30,8 @@
       "$ref": "confidences.json" 
     },
     "sandbox": {
-      "description": "Unstructured storage area for arbitrary user-defined data"
+      "description": "Unstructured storage area for arbitrary user-defined data",
+      "type": "object"
     }
   },
   "required": ["media_id", "payload", "bopp_version"]
