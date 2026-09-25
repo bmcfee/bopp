@@ -8,7 +8,7 @@
 **BOPP** (Bounded Observation Payload Protocol) is a high-performance, strongly typed annotation framework for audio and music signal processing data built on top of [`msgspec`](https://jcristharif.com/msgspec/). It provides strict schema validation, fast JSON and MessagePack serialization, and seamless conversion to tabular formats.
 
 
-## Design
+### Design
 
 BOPP annotations conform to a flexible but well-defined JSON schema.
 
@@ -22,6 +22,14 @@ Each of these three fields can take one of a selection of pre-defined types as d
 
 All BOPP annotations must contain a `media_id` field to identify the source media being annotated, and a `bopp_version` field to identify the version of the bopp schema used for the annotation.
 BOPP annotations may optionally contain structured annotation metadata (e.g. to identify tools or annotators used to produce the contents) and a sandbox field for unstructured data.
+
+### Python implementation
+
+The `bopp` python package provides a reference implementation of the schema and an API for working with annotations.
+Note that the schema is the authoritative source for defining a correct annotation; the python implementation is partially generated automatically from the schema by
+`datamodel-codegen`.
+The python implementation uses `msgspec.Struct` to implement the annotation objects, though the data can be serialized in a variety of ways (see below).
+In princple, BOPP data encoded as json or msgpack should be self-parsing and directly loadable in any programming language which supports those formats.
 
 ## Examples
 
