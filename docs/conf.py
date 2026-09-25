@@ -31,7 +31,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # -- Options for intersphinx -------------------------------------------------
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'msgspec': ('https://jcristharif.com/msgspec/', None),
+    'msgspec': ('https://msgspec.dev/', None),
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
     'polars': ('https://docs.pola.rs/py-polars/html/', None),
     'pyarrow': ('https://arrow.apache.org/docs/', None),
