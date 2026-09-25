@@ -4,7 +4,6 @@ import pytest
 from bopp.core import (
     BoppArgumentError,
     BoppArrayError,
-    BoppError,
     BoppRegistryError,
     BoppValidationError,
     _extract_kwargs,

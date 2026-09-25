@@ -51,7 +51,6 @@ def test_to_dataframe_partial_facets():
         bopp_version="1.0",
         media_id="track:no_extent",
         payload_kind="onset",
-        time=[0.1, 0.2],
         value=[1, 1],
     )
     df = to_dataframe(ann, backend="pandas")
@@ -63,7 +62,7 @@ def test_to_dataframe_partial_facets():
     # Reconstitute from DataFrame with missing extent & confidence columns
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == "track:no_extent"
-    assert getattr(reconstructed, "extent", None) is None
+    assert getattr(reconstructed, "extent", None) is msgspec.UNSET
 
 
 def test_pandas_dataframe_roundtrip():
@@ -144,13 +143,11 @@ def test_from_dataframe_extra_attrs():
     df.attrs = {
         "bopp_version": "1.0",
         "media_id": "track:extra_attrs",
-        "metadata": {"metadata_type": "other", "data": {"key": "val"}},
-        "annotated_domain": "audio",
+        "metadata": {"metadata_type": "other", "notes": "nonsense"},
     }
 
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == "track:extra_attrs"
-    assert getattr(reconstructed, "annotated_domain", None) == "audio"
 
 
 def test_missing_backend_imports():
@@ -184,14 +181,14 @@ def test_from_dataframe_missing_pandas_and_polars_imports():
 
     # Simulate pandas missing during from_dataframe type check
     with patch.dict("sys.modules", {"pandas": None}):
-        reconstructed = from_dataframe(df)
-        assert reconstructed.media_id == "unknown:media"
+        with pytest.raises(BoppArgumentError):
+            from_dataframe(df)
 
     # Simulate polars missing during from_dataframe type check
     df_pl = pl.DataFrame({"payload:onset:time": [0.1], "payload:onset:value": [1]})
     with patch.dict("sys.modules", {"polars": None}):
-        reconstructed_pl = from_dataframe(df_pl)
-        assert reconstructed_pl.media_id == "unknown:media"
+        with pytest.raises(BoppArgumentError):
+            from_dataframe(df_pl)
 
 
 def test_invalid_backend():
