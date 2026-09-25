@@ -5,3 +5,4 @@ numpydoc
 pydata-sphinx-theme
 json-schema-for-humans
 myst-parser
+linkify-it-py
