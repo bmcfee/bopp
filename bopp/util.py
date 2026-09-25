@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import msgspec
 
+from ._version import get_current_schema_version
 from .core import BoppArgumentError, BoppIOError
 from .models.v1.annotation import Annotation
 
@@ -248,7 +249,7 @@ def from_dataframe(df: Any) -> Annotation:
     columns = list(df.columns)
 
     bopp_data: dict[str, Any] = {
-        "bopp_version": attrs.get("bopp_version", "1.0"),
+        "bopp_version": attrs.get("bopp_version", get_current_schema_version()),
         "media_id": attrs.get("media_id", "unknown:media"),
         "payload": {},
     }
