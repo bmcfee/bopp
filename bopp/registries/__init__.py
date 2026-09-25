@@ -29,7 +29,7 @@ def get_registry(version: str) -> dict[str, Any]:
     registry_key = get_registry_version(version)
 
     if registry_key == "v1":
-        from bopp.models.v1.annotation import Annotation
+        from ..models.v1.annotation import Annotation
 
         from . import v1
 
