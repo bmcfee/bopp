@@ -2,8 +2,6 @@
 
 from typing import Final
 
-__version__: Final[str]
-
 __version__ = "0.0.1dev"
 
 DEFAULT_SCHEMA_VERSION: Final[str] = "1.0"
