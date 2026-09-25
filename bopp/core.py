@@ -51,10 +51,10 @@ def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[s
 def create(
     *,
     media_id: str,
-    bopp_version: str,
     payload_kind: str,
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
+    bopp_version: str | None = None,
     sandbox: Any = msgspec.UNSET,
     **kwargs: Any
 ) -> Any:
