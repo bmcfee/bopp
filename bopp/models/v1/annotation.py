@@ -7,8 +7,7 @@ from typing import Annotated, Any
 
 from msgspec import UNSET, Meta, UnsetType
 
-from bopp.base import BoppBase
-
+from ...base import BoppBase
 from . import confidences, extents, payloads
 from . import metadata as metadata_1
 
