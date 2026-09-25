@@ -132,40 +132,49 @@ def to_dataframe(
     """
     data: dict[str, Any] = {}
 
+    extent = getattr(annotation, "extent", msgspec.UNSET)
+    payload = getattr(annotation, "payload", msgspec.UNSET)
+    confidence = getattr(annotation, "confidence", msgspec.UNSET)
+
     # 1. Parse Extents (Geometry) if present
-    if annotation.extent is not None and annotation.extent is not msgspec.UNSET:
-        ext_type = _get_tag(annotation.extent)
-        for field in msgspec.structs.fields(type(annotation.extent)):
+    if extent is not None and extent is not msgspec.UNSET:
+        ext_type = _get_tag(extent)
+        for field in msgspec.structs.fields(type(extent)):
             if field.name == "extent_type":
                 continue
-            val = getattr(annotation.extent, field.name)
+            val = getattr(extent, field.name)
             data[f"extent:{ext_type}:{field.name}"] = val
 
     # 2. Parse Payload (Passenger Data)
-    payload_type = _get_tag(annotation.payload)
-    for field in msgspec.structs.fields(type(annotation.payload)):
-        if field.name == "payload_type":
-            continue
-        val = getattr(annotation.payload, field.name)
-        data[f"payload:{payload_type}:{field.name}"] = val
+    if payload is not None and payload is not msgspec.UNSET:
+        payload_type = _get_tag(payload)
+        for field in msgspec.structs.fields(type(payload)):
+            if field.name == "payload_type":
+                continue
+            val = getattr(payload, field.name)
+            data[f"payload:{payload_type}:{field.name}"] = val
 
     # 3. Parse Confidence (if present)
-    if annotation.confidence is not None and annotation.confidence is not msgspec.UNSET:
-        conf_type = _get_tag(annotation.confidence)
-        for field in msgspec.structs.fields(type(annotation.confidence)):
+    if confidence is not None and confidence is not msgspec.UNSET:
+        conf_type = _get_tag(confidence)
+        for field in msgspec.structs.fields(type(confidence)):
             if field.name == "confidence_type":
                 continue
-            val = getattr(annotation.confidence, field.name)
+            val = getattr(confidence, field.name)
             data[f"confidence:{conf_type}:{field.name}"] = val
 
     attrs = {
         "bopp_version": getattr(annotation, "bopp_version", get_current_schema_version()),
-        "media_id": annotation.media_id,
+        "media_id": getattr(annotation, "media_id", None),
     }
-    if getattr(annotation, "metadata", None):
-        attrs["metadata"] = msgspec.to_builtins(annotation.metadata)
-    if getattr(annotation, "sandbox", msgspec.UNSET) not in (msgspec.UNSET, None):
-        attrs["sandbox"] = msgspec.to_builtins(annotation.sandbox)
+
+    metadata = getattr(annotation, "metadata", None)
+    if metadata is not None and metadata is not msgspec.UNSET:
+        attrs["metadata"] = msgspec.to_builtins(metadata)
+
+    sandbox = getattr(annotation, "sandbox", msgspec.UNSET)
+    if sandbox not in (msgspec.UNSET, None):
+        attrs["sandbox"] = msgspec.to_builtins(sandbox)
 
     if backend in ("pandas", "pandas-pyarrow"):
         try:
