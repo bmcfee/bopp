@@ -21,7 +21,7 @@ type FreqMaxItem = Annotated[float, Meta(ge=0.0)]
 
 class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequency_box"):
     time: Annotated[
-        list[TimeItem], Meta(description="Array of start time timestamps in seconds.")
+        list[TimeItem], Meta(description="Array of start times in seconds.")
     ]
     duration: Annotated[
         list[DurationItem], Meta(description="Array of box durations in seconds.")

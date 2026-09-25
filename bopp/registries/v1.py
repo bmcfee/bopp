@@ -4,7 +4,7 @@ from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.confidence.variance import VarianceConfidence
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.extent.time_interval import TimeIntervalExtent
-from bopp.models.v1.extent.times import Timestamps
+from bopp.models.v1.extent.times import Times
 from bopp.models.v1.metadata.algorithm import AlgorithmAnnotationMetadata
 from bopp.models.v1.metadata.crowd import CrowdSourcedAnnotationMetadata
 from bopp.models.v1.metadata.derived import DerivedAnnotationMetadata
@@ -32,7 +32,7 @@ CONFIDENCE_TYPE_REGISTRY = {
 }
 
 EXTENT_TYPE_REGISTRY = {
-    'time': Timestamps,
+    'time': Times,
     'time_frequency_box': TimeFrequencyBoxExtent,
     'time_interval': TimeIntervalExtent,
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "extents/times.json",
-  "title": "Timestamps",
+  "title": "Times",
   "type": "object",
   "properties": {
     "extent_type": {
@@ -9,7 +9,7 @@
     },
     "time": {
       "$ref": "../core.json#/$defs/Array",
-      "description": "An N array of time values.",
+      "description": "An array of time values.",
       "items": {
         "type": "number",
         "minimum": 0.0

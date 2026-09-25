@@ -10,5 +10,5 @@ from msgspec import Meta, Struct
 type TimeItem = Annotated[float, Meta(ge=0.0)]
 
 
-class Timestamps(Struct, tag_field="extent_type", tag="time"):
-    time: Annotated[list[TimeItem], Meta(description="An N array of time values.")]
+class Times(Struct, tag_field="extent_type", tag="time"):
+    time: Annotated[list[TimeItem], Meta(description="An array of time values.")]

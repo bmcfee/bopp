@@ -10,7 +10,7 @@ from msgspec import Meta
 from .extent import time_frequency_box, time_interval, times
 
 type AnyExtent = Annotated[
-    times.Timestamps
+    times.Times
     | time_interval.TimeIntervalExtent
     | time_frequency_box.TimeFrequencyBoxExtent,
     Meta(

@@ -15,7 +15,7 @@ type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
     time: Annotated[
-        list[TimeItem], Meta(description="Array of start time timestamps in seconds.")
+        list[TimeItem], Meta(description="Array of interval start times in seconds.")
     ]
     duration: Annotated[
         list[DurationItem], Meta(description="Array of interval durations in seconds.")
