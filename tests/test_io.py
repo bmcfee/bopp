@@ -12,6 +12,7 @@ from bopp.util import _get_tag
 
 def test_json_roundtrip(tmp_path):
     ann = create(
+        bopp_version="1.0",
         media_id="track:json_test",
         payload_kind="onset",
         extent_kind="time",
@@ -31,6 +32,7 @@ def test_json_roundtrip(tmp_path):
 
 def test_msgpack_roundtrip(tmp_path):
     ann = create(
+        bopp_version="1.0",
         media_id="track:msgpack_test",
         payload_kind="onset",
         extent_kind="time",
@@ -50,6 +52,7 @@ def test_msgpack_roundtrip(tmp_path):
 
 def test_csv_roundtrip(tmp_path):
     ann = create(
+        bopp_version="1.0",
         media_id="track:csv_test",
         payload_kind="onset",
         extent_kind="time",

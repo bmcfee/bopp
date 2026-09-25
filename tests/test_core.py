@@ -28,6 +28,7 @@ def test_extract_kwargs():
 
 def test_create_minimal():
     ann = create(
+        bopp_version="1.0",
         media_id="audio:123",
         payload_kind="onset",
         extent_kind="time",
@@ -41,6 +42,7 @@ def test_create_minimal():
 
 def test_create_full():
     ann = create(
+        bopp_version="1.0",
         media_id="audio:456",
         payload_kind="onset",
         extent_kind="time",
@@ -59,12 +61,13 @@ def test_create_full():
 
 def test_create_invalid_payload_kind():
     with pytest.raises(BoppRegistryError, match="Unrecognized kind identifier"):
-        create(media_id="audio:123", payload_kind="non_existent_kind")
+        create(bopp_version="1.0", media_id="audio:123", payload_kind="non_existent_kind")
 
 
 def test_create_invalid_extent_kind():
     with pytest.raises(BoppRegistryError, match="Unrecognized extent kind"):
         create(
+            bopp_version="1.0",
             media_id="audio:123",
             payload_kind="onset",
             extent_kind="non_existent_extent",
@@ -76,6 +79,7 @@ def test_create_invalid_extent_kind():
 def test_create_invalid_confidence_kind():
     with pytest.raises(BoppRegistryError, match="Unrecognized confidence kind"):
         create(
+            bopp_version="1.0",
             media_id="audio:123",
             payload_kind="onset",
             confidence_kind="non_existent_conf",
@@ -87,6 +91,7 @@ def test_create_invalid_confidence_kind():
 def test_create_unconsumed_kwargs():
     with pytest.raises(BoppArgumentError, match="Unconsumed keyword arguments"):
         create(
+            bopp_version="1.0",
             media_id="audio:123",
             payload_kind="onset",
             time=[0.1],
@@ -98,6 +103,7 @@ def test_create_unconsumed_kwargs():
 def test_create_mismatched_array_lengths():
     with pytest.raises(BoppArrayError, match="Length mismatch"):
         create(
+            bopp_version="1.0",
             media_id="audio:123",
             payload_kind="onset",
             extent_kind="time",
@@ -108,6 +114,7 @@ def test_create_mismatched_array_lengths():
 
 def test_validate_struct():
     ann = create(
+        bopp_version="1.0",
         media_id="audio:123",
         payload_kind="onset",
         extent_kind="time",

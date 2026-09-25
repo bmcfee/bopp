@@ -22,6 +22,7 @@ def test_get_tag():
 
 def test_extract_header():
     ann = create(
+        bopp_version="1.0",
         media_id="track:1",
         payload_kind="onset",
         extent_kind="time",
@@ -39,6 +40,7 @@ def test_extract_header():
 
 def test_pandas_dataframe_roundtrip():
     ann = create(
+        bopp_version="1.0",
         media_id="track:1",
         payload_kind="onset",
         extent_kind="time",
@@ -62,6 +64,7 @@ def test_pandas_dataframe_roundtrip():
 
 def test_pandas_pyarrow_dataframe_roundtrip():
     ann = create(
+        bopp_version="1.0",
         media_id="track:1",
         payload_kind="onset",
         extent_kind="time",
@@ -85,6 +88,7 @@ def test_pandas_pyarrow_dataframe_roundtrip():
 
 def test_polars_dataframe_roundtrip():
     ann = create(
+        bopp_version="1.0",
         media_id="track:1",
         payload_kind="onset",
         extent_kind="time",
@@ -108,6 +112,7 @@ def test_polars_dataframe_roundtrip():
 
 def test_invalid_backend():
     ann = create(
+        bopp_version="1.0",
         media_id="track:1",
         payload_kind="onset",
         extent_kind="time",
