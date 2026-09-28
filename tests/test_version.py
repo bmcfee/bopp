@@ -14,7 +14,6 @@ def test_get_registry_version_valid():
     assert get_registry_version("1.1") == "v1"
     assert get_registry_version("1.12") == "v1"
     assert get_registry_version("1") == "v1"
-    assert get_registry_version("v1") == "v1"
 
 
 def test_get_registry_version_invalid():

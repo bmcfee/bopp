@@ -10,7 +10,7 @@ __version__ = "0.0.1dev"
 DEFAULT_SCHEMA_VERSION: Final[str] = "1.0"
 
 SCHEMA_PATTERNS: Final[list[tuple[re.Pattern[str], str]]] = [
-    (re.compile(r"^1(?:\.\d+)*$|^v1$"), "v1"),
+    (re.compile(r"^1(?:\.\d+)*$"), "v1"),
 ]
 
 
