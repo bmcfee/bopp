@@ -6,7 +6,7 @@ import msgspec
 
 from ._version import get_current_schema_version
 from .base import BoppBase
-from .core import BoppArgumentError, BoppIOError
+from .exceptions import BoppArgumentError, BoppIOError, BoppValidationError
 from .registries import get_registry
 
 if TYPE_CHECKING:
@@ -16,6 +16,13 @@ if TYPE_CHECKING:
 # ==========================================
 # 1. Struct <-> DataFrame Translators
 # ==========================================
+
+FACET_REGISTRY_KEYS = {
+    "extent": "EXTENT_TYPE_REGISTRY",
+    "payload": "PAYLOAD_TYPE_REGISTRY",
+    "confidence": "CONFIDENCE_TYPE_REGISTRY",
+}
+
 
 def _get_tag(struct: msgspec.Struct) -> str | None:
     """
@@ -90,6 +97,57 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
             header_data[field.name] = msgspec.to_builtins(value)
 
     return header_data
+
+
+def _validate_dataframe_columns(columns: list[str], bopp_version: str) -> None:
+    """Validate DataFrame column headers according to BOPP rules.
+
+    Rules:
+    1) Every column must have exactly three fields separated by : (facet:type:field).
+    2) All columns belonging to the same facet must have a single type.
+    3) The facet and type must exist in the registry for the given version.
+    4) The field must exist for the type struct.
+    """
+    registry = get_registry(bopp_version)
+    facet_types: dict[str, str] = {}
+
+    for col in columns:
+        parts = col.split(":")
+        # Rule 1: Must have exactly 3 fields (facet:type:field)
+        if len(parts) != 3:
+            raise BoppValidationError(
+                f"Invalid column format '{col}'. Expected exactly 3 colon-separated fields 'facet:type:field'."
+            )
+
+        facet, type_tag, field_name = parts[0], parts[1], parts[2]
+
+        # Rule 2: Single type per facet
+        if facet in facet_types and facet_types[facet] != type_tag:
+            raise BoppValidationError(
+                f"Mixed types for facet '{facet}': found '{facet_types[facet]}' and '{type_tag}'."
+            )
+        facet_types[facet] = type_tag
+
+        # Rule 3: Valid facet and type in registry
+        if facet not in FACET_REGISTRY_KEYS:
+            raise BoppValidationError(
+                f"Invalid facet '{facet}' in column '{col}'. Valid facets are {list(FACET_REGISTRY_KEYS.keys())}."
+            )
+
+        reg_key = FACET_REGISTRY_KEYS[facet]
+        type_registry = registry[reg_key]
+        if type_tag not in type_registry:
+            raise BoppValidationError(
+                f"Unrecognized type '{type_tag}' for facet '{facet}' in column '{col}'."
+            )
+
+        # Rule 4: Field exists on target type struct
+        struct_cls = type_registry[type_tag]
+        valid_fields = {f.name for f in msgspec.structs.fields(struct_cls)}
+        if field_name not in valid_fields:
+            raise BoppValidationError(
+                f"Field '{field_name}' in column '{col}' does not exist on type '{type_tag}'."
+            )
 
 
 def to_dataframe(
@@ -259,6 +317,9 @@ def from_dataframe(df: Any) -> BoppBase:
     columns = list(df.columns)
 
     bopp_version = attrs.get("bopp_version", get_current_schema_version())
+
+    _validate_dataframe_columns(columns, bopp_version)
+
     registry = get_registry(bopp_version)
     annotation_cls = registry["Annotation"]
 
@@ -290,7 +351,7 @@ def from_dataframe(df: Any) -> BoppBase:
         bopp_data["extent"] = {"extent_type": ext_type}
         for col in coord_cols:
             parts = col.split(":")
-            field_name = parts[2] if len(parts) > 2 else "values"
+            field_name = parts[2]
             bopp_data["extent"][field_name] = _get_column_list(col)
 
     if payload_cols:
@@ -298,7 +359,7 @@ def from_dataframe(df: Any) -> BoppBase:
         bopp_data["payload"]["payload_type"] = payload_type
         for col in payload_cols:
             parts = col.split(":")
-            field_name = parts[2] if len(parts) > 2 else "values"
+            field_name = parts[2]
             bopp_data["payload"][field_name] = _get_column_list(col)
 
     if conf_cols:
@@ -306,7 +367,7 @@ def from_dataframe(df: Any) -> BoppBase:
         bopp_data["confidence"] = {"confidence_type": conf_type}
         for col in conf_cols:
             parts = col.split(":")
-            field_name = parts[2] if len(parts) > 2 else "confidence"
+            field_name = parts[2]
             bopp_data["confidence"][field_name] = _get_column_list(col)
 
     return msgspec.convert(bopp_data, type=annotation_cls)
