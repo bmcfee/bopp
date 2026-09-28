@@ -4,6 +4,8 @@ Benchmarks
 In this section, we'll compare loading and validating annotations between different
 serialization formats for BOPP, as well as JAMS (with and without validation) as a baseline
 reference.
+Comparisons to direct CSV loading via pandas (`pd`) and polars (`pl`) are also included.
+
 All comparisons are implemented on the author's development machine (intel core i7-1360P, 32GB
 ram, ubuntu 26.04.01-LTS, python 3.13.0 conda).
 
@@ -22,13 +24,19 @@ In [3]: %timeit jams.load("longbeats.jams");
 In [4]: %timeit jams.load("longbeats.jams", validate=False);
 1.58 ms ± 28.3 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
-In [5]: %timeit bopp.io.load_bopp_csv("longbeats.bopp.csv");
+In [5]: %timeit pd.read_csv("longbeats.bopp.csv", comment='#')
+774 μs ± 15.4 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+
+In [6]: %timeit pl.read_csv("longbeats.bopp.csv", comment_prefix="#")
+296 μs ± 64.9 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+
+In [7]: %timeit bopp.io.load_bopp_csv("longbeats.bopp.csv");
 1.75 ms ± 72.9 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
-In [6]: %timeit bopp.io.load_bopp_json("longbeats.bopp");
+In [8]: %timeit bopp.io.load_bopp_json("longbeats.bopp");
 252 μs ± 12.2 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
-In [7]: %timeit bopp.io.load_bopp_msgpack("longbeats.bopp.msgpack");
+In [9]: %timeit bopp.io.load_bopp_msgpack("longbeats.bopp.msgpack");
 215 μs ± 8.19 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 ```
 
@@ -42,18 +50,24 @@ Extents are time intervals in seconds, payloads are chord strings under the Hart
 likelihoods are probabilities (floats in `[0, 1]`).
 
 ```
-In [8]: %timeit jams.load("drive.jams");
+In [3]: %timeit jams.load("drive.jams");
 3.68 ms ± 142 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 
-In [9]: %timeit jams.load("drive.jams", validate=False);
+In [4]: %timeit jams.load("drive.jams", validate=False);
 324 μs ± 9.04 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
-In [10]: %timeit bopp.io.load_bopp_csv("drive.csv")
+In [5]: %timeit pd.read_csv("drive.csv", comment='#')
+861 μs ± 40.2 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+
+In [6]: %timeit pl.read_csv("drive.csv", comment_prefix="#")
+281 μs ± 63 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+
+In [7]: %timeit bopp.io.load_bopp_csv("drive.csv")
 2.28 ms ± 144 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 
-In [11]: %timeit bopp.io.load_bopp_json("drive.bopp")
+In [8]: %timeit bopp.io.load_bopp_json("drive.bopp")
 319 μs ± 11.6 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
-In [12]: %timeit bopp.io.load_bopp_msgpack("drive.bopp.msgpack")
+In [9]: %timeit bopp.io.load_bopp_msgpack("drive.bopp.msgpack")
 314 μs ± 11.2 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 ```
