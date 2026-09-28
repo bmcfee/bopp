@@ -118,11 +118,24 @@ BOPP annotations can be converted to dataframes using either pandas or polars.
 Payload, extent, and confidence data are rendered as columns using a structured naming convention to reflect the types and field names (`facet:type:field`).
 For example, the chord annotation given above converts to the following tabular representation:
 
-|    |   extent:time_interval:time |   extent:time_interval:duration | payload:chord:value   |   confidence:likelihood:confidence |
-|---:|----------------------------:|--------------------------------:|:----------------------|-----------------------------------:|
-|  0 |                         0   |                             1.5 | C:maj                 |                               0.65 |
-|  1 |                         1.5 |                             3   | F:min7                |                               0.32 |
-|  2 |                         4.5 |                             1.5 | G:7                   |                               0.77 |
+|   extent:time_interval:time |   extent:time_interval:duration | payload:chord:value   |   confidence:likelihood:confidence |
+|----------------------------:|--------------------------------:|:----------------------|-----------------------------------:|
+|                         0   |                             1.5 | C:maj                 |                               0.65 |
+|                         1.5 |                             3   | F:min7                |                               0.32 |
+|                         4.5 |                             1.5 | G:7                   |                               0.77 |
+
+and the beat annotation example given above converts as 
+
+|   extent:time:time |   payload:beat:value |
+|-------------------:|---------------------:|
+|               0.45 |                    1 |
+|               0.98 |                    2 |
+|               1.48 |                    3 |
+|               2.01 |                    4 |
+|               2.5  |                    1 |
+|               2.99 |                    2 |
+|               3.47 |                    3 |
+|               3.98 |                    4 |
 
 Additional information in the BOPP object (`metadata`, `media_id`, etc) are attached as attributes to the dataframe.
 
