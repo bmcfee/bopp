@@ -20,6 +20,8 @@ The primary contents of a BOPP annotation are the following arrays:
 
 Each of these three fields can take one of a selection of pre-defined types as described in the schema, and their types are identified by the
 `payload_type`, `extent_type`, and `confidence_type` fields, as illustrated by the examples below.
+All array contents between `payload`, `extent`, and `confidence` are constrained at runtime
+(though not in the schema) to have equal length and an implied common index.
 
 All BOPP annotations must contain a `media_id` field to identify the source media being annotated, and a `bopp_version` field to identify the version of the bopp schema used for the annotation.
 BOPP annotations may optionally contain structured annotation metadata (e.g. to identify tools or annotators used to produce the contents) and a sandbox field for unstructured data.
