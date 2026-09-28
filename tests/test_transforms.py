@@ -14,7 +14,7 @@ from bopp.transforms import trim
 
 
 def test_trim_invalid_arguments():
-    ann = bopp.create(media_id="test_media", payload_kind="tag_open", tags=["rock"])
+    ann = bopp.create(media_id="test_media", payload_kind="tag_open", value=["rock"])
 
     # No start or end provided
     with pytest.raises(BoppArgumentError, match="At least one of 'start' or 'end'"):
@@ -30,38 +30,35 @@ def test_trim_invalid_arguments():
 
 
 def test_trim_no_extent():
-    metadata = HumanAnnotationMetadata(annotator_id="user_1")
+    metadata = HumanAnnotationMetadata(annotator_id="user_1", tool="manual")
     ann = Annotation(
         media_id="test_media",
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(tags=["pop"]),
+        payload=TagOpenPayload(value=["pop"]),
     )
     result = trim(ann, start=1.0, end=5.0)
     assert result.extent is msgspec.UNSET
-    assert result.payload.tags == ["pop"]
+    assert result.payload.value == ["pop"]
     assert result is not ann
 
 
 def test_trim_time_extent():
-    extent = Times(time=[1.0, 3.0, 5.0, 8.0])
-    payload = TagOpenPayload(tags=["a", "b", "c", "d"])
-    confidence = LikelihoodConfidence(value=[0.1, 0.3, 0.5, 0.8])
     ann = bopp.create(
         media_id="test_media",
         payload_kind="tag_open",
         extent_kind="time",
         confidence_kind="likelihood",
         time=[1.0, 3.0, 5.0, 8.0],
-        tags=["a", "b", "c", "d"],
-        value=[0.1, 0.3, 0.5, 0.8],
+        value=["a", "b", "c", "d"],
+        confidence=[0.1, 0.3, 0.5, 0.8],
     )
 
     trimmed = trim(ann, start=2.0, end=6.0, reset_time=True)
     assert trimmed.extent.time == [1.0, 3.0]  # 3.0 - 2.0, 5.0 - 2.0
-    assert trimmed.payload.tags == ["b", "c"]
-    assert trimmed.confidence.value == [0.3, 0.5]
+    assert trimmed.payload.value == ["b", "c"]
+    assert trimmed.confidence.confidence == [0.3, 0.5]
 
 
 def test_trim_time_interval_non_strict():
@@ -73,8 +70,8 @@ def test_trim_time_interval_non_strict():
         confidence_kind="likelihood",
         time=[0.0, 2.0, 5.0],
         duration=[2.0, 4.0, 4.0],
-        tags=["first", "second", "third"],
-        value=[0.2, 0.4, 0.6],
+        value=["first", "second", "third"],
+        confidence=[0.2, 0.4, 0.6],
     )
 
     # Trim to [1.0, 6.0] non-strict
@@ -84,8 +81,8 @@ def test_trim_time_interval_non_strict():
     # [5, 9] -> [5, 6] (dur 1)
     assert trimmed.extent.time == [1.0, 2.0, 5.0]
     assert trimmed.extent.duration == [1.0, 4.0, 1.0]
-    assert trimmed.payload.tags == ["first", "second", "third"]
-    assert trimmed.confidence.value == [0.2, 0.4, 0.6]
+    assert trimmed.payload.value == ["first", "second", "third"]
+    assert trimmed.confidence.confidence == [0.2, 0.4, 0.6]
 
     # With reset_time=True
     trimmed_reset = trim(ann, start=1.0, end=6.0, strict=False, reset_time=True)
@@ -101,28 +98,28 @@ def test_trim_time_interval_strict():
         extent_kind="time_interval",
         time=[0.0, 2.0, 5.0],
         duration=[2.0, 4.0, 4.0],
-        tags=["first", "second", "third"],
+        value=["first", "second", "third"],
     )
 
     # Trim to [1.0, 6.0] strict (only [2, 6] is strictly contained)
     trimmed = trim(ann, start=1.0, end=6.0, strict=True, reset_time=False)
     assert trimmed.extent.time == [2.0]
     assert trimmed.extent.duration == [4.0]
-    assert trimmed.payload.tags == ["second"]
+    assert trimmed.payload.value == ["second"]
 
 
 def test_trim_time_frequency_box():
     ann = Annotation(
         media_id="test_media",
         bopp_version="1.0.0",
-        metadata=HumanAnnotationMetadata(annotator_id="user_1"),
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=TimeFrequencyBoxExtent(
             time=[0.0, 4.0],
             duration=[3.0, 5.0],
             freq_min=[100.0, 200.0],
             freq_max=[500.0, 800.0],
         ),
-        payload=TagOpenPayload(tags=["low", "high"]),
+        payload=TagOpenPayload(value=["low", "high"]),
     )
 
     trimmed = trim(ann, start=1.0, end=5.0, strict=False, reset_time=True)
@@ -132,4 +129,4 @@ def test_trim_time_frequency_box():
     assert trimmed.extent.duration == [2.0, 1.0]
     assert trimmed.extent.freq_min == [100.0, 200.0]
     assert trimmed.extent.freq_max == [500.0, 800.0]
-    assert trimmed.payload.tags == ["low", "high"]
+    assert trimmed.payload.value == ["low", "high"]
