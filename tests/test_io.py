@@ -1,3 +1,4 @@
+import msgspec
 import pandas as pd
 import pytest
 
@@ -34,6 +35,16 @@ def test_json_roundtrip(tmp_path):
     assert getattr(loaded, "sandbox", None) == {"user_note": "json_test", "flag": True}
 
 
+def test_load_bopp_json_invalid_schema(tmp_path):
+    # Valid JSON but invalid structure (missing required 'media_id')
+    invalid_json_data = '{"bopp_version": "1.0", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+    file_path = tmp_path / "invalid.json"
+    file_path.write_text(invalid_json_data, encoding="utf-8")
+
+    with pytest.raises((msgspec.ValidationError, BoppValidationError)):
+        load_bopp_json(file_path)
+
+
 def test_msgpack_roundtrip(tmp_path):
     ann = create(
         bopp_version="1.0",
@@ -52,6 +63,17 @@ def test_msgpack_roundtrip(tmp_path):
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == _get_tag(ann.payload)
     assert getattr(loaded, "sandbox", None) == {"user_note": "msgpack_test", "flag": False}
+
+
+def test_load_bopp_msgpack_invalid_schema(tmp_path):
+    # Valid msgpack encoding but missing required fields
+    invalid_data = {"media_id": "track:msgpack_test"}
+    encoded = msgspec.msgpack.encode(invalid_data)
+    file_path = tmp_path / "invalid.msgpack"
+    file_path.write_bytes(encoded)
+
+    with pytest.raises((msgspec.ValidationError, BoppValidationError)):
+        load_bopp_msgpack(file_path)
 
 
 def test_csv_roundtrip(tmp_path):
@@ -73,6 +95,23 @@ def test_csv_roundtrip(tmp_path):
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == _get_tag(ann.payload)
     assert getattr(loaded, "sandbox", None) == {"user_note": "csv_test", "count": 10}
+
+
+def test_load_bopp_csv_invalid_schema(tmp_path):
+    # Valid CSV with frontmatter, but columns fail BOPP schema validation (format rule failure)
+    csv_content = (
+        "# +++\n"
+        '# bopp_version = "1.0"\n'
+        '# media_id = "track:csv_invalid"\n'
+        "# +++\n"
+        "payload:onset,extent:time:time\n"
+        "1,0.1\n"
+    )
+    file_path = tmp_path / "invalid.csv"
+    file_path.write_text(csv_content, encoding="utf-8")
+
+    with pytest.raises(BoppValidationError, match="Invalid column format"):
+        load_bopp_csv(file_path)
 
 
 def test_csv_column_validation_rules():
