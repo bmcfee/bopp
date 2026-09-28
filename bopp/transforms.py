@@ -84,8 +84,6 @@ def trim(
 
     if extent_tag == "time":
         time_vals = getattr(extent, "time", None)
-        if time_vals is None:
-            raise BoppArgumentError("Extent 'time' structure missing 'time' field.")
 
         n_obs = len(time_vals)
         new_time: list[float] = []
@@ -103,9 +101,6 @@ def trim(
     elif extent_tag in ("time_interval", "time_frequency_box"):
         time_vals = getattr(extent, "time", None)
         duration_vals = getattr(extent, "duration", None)
-
-        if time_vals is None or duration_vals is None:
-            raise BoppArgumentError(f"Extent '{extent_tag}' structure missing 'time' or 'duration' field.")
 
         n_obs = len(time_vals)
 
@@ -145,13 +140,10 @@ def trim(
 
     # Filter payload parallel fields
     payload = annotation.payload
-    if payload is not msgspec.UNSET and payload is not None:
-        payload_updates = {}
-        for fname, fval in _get_list_fields_with_length(payload, n_obs).items():
-            payload_updates[fname] = [fval[idx] for idx in kept_indices]
-        new_payload = msgspec.structs.replace(payload, **payload_updates)
-    else:
-        new_payload = payload
+    payload_updates = {}
+    for fname, fval in _get_list_fields_with_length(payload, n_obs).items():
+        payload_updates[fname] = [fval[idx] for idx in kept_indices]
+    new_payload = msgspec.structs.replace(payload, **payload_updates)
 
     # Filter confidence parallel fields
     confidence = annotation.confidence
