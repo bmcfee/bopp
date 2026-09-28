@@ -2,6 +2,7 @@
 from . import io as io
 from . import models as models
 from . import registries as registries
+from . import transforms as transforms
 from . import util as util
 from ._version import (
     DEFAULT_SCHEMA_VERSION as DEFAULT_SCHEMA_VERSION,
@@ -38,4 +39,7 @@ from .core import (
 )
 from .core import (
     validate as validate,
+)
+from .transforms import (
+    trim as trim,
 )
