@@ -5,8 +5,8 @@ from typing import Any
 
 import msgspec
 
-from .base import BoppBase
 from .exceptions import BoppArgumentError
+from .models.v1.annotation import Annotation
 from .util import _get_tag
 
 
@@ -21,19 +21,19 @@ def _get_list_fields_with_length(struct: msgspec.Struct, expected_length: int) -
 
 
 def trim(
-    annotation: BoppBase,
+    annotation: Annotation,
     *,
     start: float | None = None,
     end: float | None = None,
     strict: bool = False,
     reset_time: bool = False,
-) -> BoppBase:
+) -> Annotation:
     """
     Trim an Annotation to a specific time range [start, end].
 
     Parameters
     ----------
-    annotation : BoppBase
+    annotation : Annotation
         The input Annotation model instance to trim.
     start : float or None, optional
         Start time in seconds. If None, no lower bound trimming is applied.
@@ -48,7 +48,7 @@ def trim(
 
     Returns
     -------
-    BoppBase
+    Annotation
         A new Annotation instance with trimmed extents, payloads, and confidences.
 
     Raises
@@ -82,11 +82,12 @@ def trim(
 
     extent_updates: dict[str, list[Any]] = {}
 
+    new_time: list[float] = []
+
     if extent_tag == "time":
-        time_vals = getattr(extent, "time", None)
+        time_vals = extent.time
 
         n_obs = len(time_vals)
-        new_time: list[float] = []
 
         for i, t in enumerate(time_vals):
             if start is not None and t < start:
@@ -99,12 +100,11 @@ def trim(
         extent_updates["time"] = new_time
 
     elif extent_tag in ("time_interval", "time_frequency_box"):
-        time_vals = getattr(extent, "time", None)
-        duration_vals = getattr(extent, "duration", None)
+        time_vals = extent.time
+        duration_vals = extent.duration  # type: ignore[union-attr]
 
         n_obs = len(time_vals)
 
-        new_time: list[float] = []
         new_duration: list[float] = []
 
         for i, (t_min, dur) in enumerate(zip(time_vals, duration_vals)):
@@ -147,13 +147,12 @@ def trim(
 
     # Filter confidence parallel fields
     confidence = annotation.confidence
+    kwargs = {}
     if confidence is not msgspec.UNSET and confidence is not None:
         confidence_updates = {}
         for fname, fval in _get_list_fields_with_length(confidence, n_obs).items():
             confidence_updates[fname] = [fval[idx] for idx in kept_indices]
-        new_confidence = msgspec.structs.replace(confidence, **confidence_updates)
-    else:
-        new_confidence = confidence
+            kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
 
     new_sandbox = copy.deepcopy(annotation.sandbox) if annotation.sandbox is not msgspec.UNSET else msgspec.UNSET
 
@@ -161,6 +160,6 @@ def trim(
         annotation,
         extent=new_extent,
         payload=new_payload,
-        confidence=new_confidence,
         sandbox=new_sandbox,
+        **kwargs
     )
