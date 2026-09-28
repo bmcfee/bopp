@@ -83,35 +83,36 @@ def trim(
     extent_updates: dict[str, list[Any]] = {}
 
     if extent_tag == "time":
-        if not hasattr(extent, "times") or getattr(extent, "times") is None:
-            raise BoppArgumentError("Extent 'time' structure missing 'times' field.")
+        time_vals = getattr(extent, "time", None)
+        if time_vals is None:
+            raise BoppArgumentError("Extent 'time' structure missing 'time' field.")
 
-        times: list[float] = getattr(extent, "times")
-        n_obs = len(times)
-        new_times: list[float] = []
+        n_obs = len(time_vals)
+        new_time: list[float] = []
 
-        for i, t in enumerate(times):
+        for i, t in enumerate(time_vals):
             if start is not None and t < start:
                 continue
             if end is not None and t > end:
                 continue
             kept_indices.append(i)
-            new_times.append(t - shift)
+            new_time.append(t - shift)
 
-        extent_updates["times"] = new_times
+        extent_updates["time"] = new_time
 
     elif extent_tag in ("time_interval", "time_frequency_box"):
-        if not hasattr(extent, "times") or not hasattr(extent, "durations"):
-            raise BoppArgumentError(f"Extent '{extent_tag}' structure missing 'times' or 'durations' field.")
+        time_vals = getattr(extent, "time", None)
+        duration_vals = getattr(extent, "duration", None)
 
-        times: list[float] = getattr(extent, "times")
-        durations: list[float] = getattr(extent, "durations")
-        n_obs = len(times)
+        if time_vals is None or duration_vals is None:
+            raise BoppArgumentError(f"Extent '{extent_tag}' structure missing 'time' or 'duration' field.")
 
-        new_times: list[float] = []
-        new_durations: list[float] = []
+        n_obs = len(time_vals)
 
-        for i, (t_min, dur) in enumerate(zip(times, durations)):
+        new_time: list[float] = []
+        new_duration: list[float] = []
+
+        for i, (t_min, dur) in enumerate(zip(time_vals, duration_vals)):
             t_max = t_min + dur
 
             if strict:
@@ -129,11 +130,11 @@ def trim(
                 c_max = min(t_max, end) if end is not None else t_max
 
             kept_indices.append(i)
-            new_times.append(c_min - shift)
-            new_durations.append(c_max - c_min)
+            new_time.append(c_min - shift)
+            new_duration.append(c_max - c_min)
 
-        extent_updates["times"] = new_times
-        extent_updates["durations"] = new_durations
+        extent_updates["time"] = new_time
+        extent_updates["duration"] = new_duration
 
     # Filter remaining parallel list fields in extent
     for fname, fval in _get_list_fields_with_length(extent, n_obs).items():
