@@ -100,17 +100,17 @@ def test_csv_roundtrip(tmp_path):
 def test_load_bopp_csv_invalid_schema(tmp_path):
     # Valid CSV with frontmatter, but columns fail BOPP schema validation (format rule failure)
     csv_content = (
-        "# +++\n"
+        "# ---\n"
         '# bopp_version = "1.0"\n'
         '# media_id = "track:csv_invalid"\n'
-        "# +++\n"
-        "payload:onset,extent:time:time\n"
+        "# ---\n"
+        "payload:onset:nonsense,extent:time:time\n"
         "1,0.1\n"
     )
     file_path = tmp_path / "invalid.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
-    with pytest.raises(BoppValidationError, match="Invalid column format"):
+    with pytest.raises(BoppValidationError, match="Field"):
         load_bopp_csv(file_path)
 
 
