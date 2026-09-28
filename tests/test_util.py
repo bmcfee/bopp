@@ -139,7 +139,7 @@ def test_polars_dataframe_roundtrip():
 
 def test_from_dataframe_extra_attrs():
     # Test metadata and annotated_domain attributes handling in from_dataframe
-    df = pd.DataFrame({"payload:onset:time": [0.1], "payload:onset:value": [1]})
+    df = pd.DataFrame({"extent:time:time": [0.1], "payload:onset:value": [1]})
     df.attrs = {
         "bopp_version": "1.0",
         "media_id": "track:extra_attrs",
