@@ -31,6 +31,18 @@ Input / Output
     load_bopp_csv
     save_bopp_csv
 
+Transforms
+----------
+
+.. automodule:: bopp.transforms
+    :no-members:
+.. currentmodule:: bopp.transforms
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    trim
+
 Utilities
 ---------
 
