@@ -77,25 +77,18 @@ def trim(
             "Extent must be 'time', 'time_interval', or 'time_frequency_box'."
         )
 
-    # Determine original observation count and primary time field
     kept_indices: list[int] = []
-    updated_time_data: list[Any] = []
-
     shift = start if (reset_time and start is not None) else 0.0
 
+    extent_updates: dict[str, list[Any]] = {}
+
     if extent_tag == "time":
-        time_field = None
-        for f in msgspec.structs.fields(type(extent)):
-            val = getattr(extent, f.name)
-            if isinstance(val, list):
-                time_field = f.name
-                break
+        if not hasattr(extent, "times") or getattr(extent, "times") is None:
+            raise BoppArgumentError("Extent 'time' structure missing 'times' field.")
 
-        if time_field is None:
-            raise BoppArgumentError("Extent 'time' structure contains no list field.")
-
-        times: list[float] = getattr(extent, time_field)
+        times: list[float] = getattr(extent, "times")
         n_obs = len(times)
+        new_times: list[float] = []
 
         for i, t in enumerate(times):
             if start is not None and t < start:
@@ -103,24 +96,24 @@ def trim(
             if end is not None and t > end:
                 continue
             kept_indices.append(i)
-            updated_time_data.append(t - shift)
+            new_times.append(t - shift)
 
-    elif extent_tag == "time_interval":
-        interval_field = None
-        for f in msgspec.structs.fields(type(extent)):
-            val = getattr(extent, f.name)
-            if isinstance(val, list):
-                interval_field = f.name
-                break
+        extent_updates["times"] = new_times
 
-        if interval_field is None:
-            raise BoppArgumentError("Extent 'time_interval' structure contains no list field.")
+    elif extent_tag in ("time_interval", "time_frequency_box"):
+        if not hasattr(extent, "times") or not hasattr(extent, "durations"):
+            raise BoppArgumentError(f"Extent '{extent_tag}' structure missing 'times' or 'durations' field.")
 
-        intervals: list[list[float]] = getattr(extent, interval_field)
-        n_obs = len(intervals)
+        times: list[float] = getattr(extent, "times")
+        durations: list[float] = getattr(extent, "durations")
+        n_obs = len(times)
 
-        for i, interval in enumerate(intervals):
-            t_min, t_max = interval[0], interval[1]
+        new_times: list[float] = []
+        new_durations: list[float] = []
+
+        for i, (t_min, dur) in enumerate(zip(times, durations)):
+            t_max = t_min + dur
+
             if strict:
                 if start is not None and t_min < start:
                     continue
@@ -136,49 +129,17 @@ def trim(
                 c_max = min(t_max, end) if end is not None else t_max
 
             kept_indices.append(i)
-            updated_time_data.append([c_min - shift, c_max - shift])
+            new_times.append(c_min - shift)
+            new_durations.append(c_max - c_min)
 
-    elif extent_tag == "time_frequency_box":
-        box_field = None
-        for f in msgspec.structs.fields(type(extent)):
-            val = getattr(extent, f.name)
-            if isinstance(val, list):
-                box_field = f.name
-                break
+        extent_updates["times"] = new_times
+        extent_updates["durations"] = new_durations
 
-        if box_field is None:
-            raise BoppArgumentError("Extent 'time_frequency_box' structure contains no list field.")
-
-        boxes: list[list[float]] = getattr(extent, box_field)
-        n_obs = len(boxes)
-
-        for i, box in enumerate(boxes):
-            t_min, t_max = box[0], box[1]
-            f_min, f_max = box[2], box[3]
-            if strict:
-                if start is not None and t_min < start:
-                    continue
-                if end is not None and t_max > end:
-                    continue
-                c_min, c_max = t_min, t_max
-            else:
-                if start is not None and t_max <= start:
-                    continue
-                if end is not None and t_min >= end:
-                    continue
-                c_min = max(t_min, start) if start is not None else t_min
-                c_max = min(t_max, end) if end is not None else t_max
-
-            kept_indices.append(i)
-            updated_time_data.append([c_min - shift, c_max - shift, f_min, f_max])
-
-    # Filter extent parallel fields
-    extent_updates = {}
+    # Filter remaining parallel list fields in extent
     for fname, fval in _get_list_fields_with_length(extent, n_obs).items():
-        if fname in (time_field if extent_tag == "time" else (interval_field if extent_tag == "time_interval" else box_field),):
-            extent_updates[fname] = updated_time_data
-        else:
+        if fname not in extent_updates:
             extent_updates[fname] = [fval[idx] for idx in kept_indices]
+
     new_extent = msgspec.structs.replace(extent, **extent_updates)
 
     # Filter payload parallel fields
