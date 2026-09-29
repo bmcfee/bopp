@@ -26,7 +26,7 @@ def trim(
     start: float | None = None,
     end: float | None = None,
     strict: bool = False,
-    reset_time: bool = False,
+    reset: bool = False,
 ) -> Annotation:
     """
     Trim an Annotation to a specific time range [start, end].
@@ -42,7 +42,7 @@ def trim(
     strict : bool, default False
         If True, only observations entirely contained within [start, end] persist.
         If False, intervals/boxes overlapping boundary are clipped to bounds.
-    reset_time : bool, default False
+    reset : bool, default False
         If True, adjusts all time fields relative to `start` (t -> t - start).
         Requires `start` to be non-None when True.
 
@@ -62,8 +62,8 @@ def trim(
     if start is not None and end is not None and start > end:
         raise BoppArgumentError(f"start ({start}) must be <= end ({end}).")
 
-    if reset_time and start is None:
-        raise BoppArgumentError("reset_time=True requires 'start' to be specified.")
+    if reset and start is None:
+        raise BoppArgumentError("reset=True requires 'start' to be specified.")
 
     extent = annotation.extent
     if extent is msgspec.UNSET or extent is None:
@@ -78,14 +78,14 @@ def trim(
         )
 
     kept_indices: list[int] = []
-    shift = start if (reset_time and start is not None) else 0.0
+    shift = start if (reset and start is not None) else 0.0
 
     extent_updates: dict[str, list[Any]] = {}
 
     new_time: list[float] = []
 
     if extent_tag == "time":
-        time_vals = extent.time
+        time_vals = extent.time  # type: ignore[union-attr]
 
         n_obs = len(time_vals)
 
@@ -100,7 +100,7 @@ def trim(
         extent_updates["time"] = new_time
 
     elif extent_tag in ("time_interval", "time_frequency_box"):
-        time_vals = extent.time
+        time_vals = extent.time  # type: ignore[union-attr]
         duration_vals = extent.duration  # type: ignore[union-attr]
 
         n_obs = len(time_vals)
