@@ -7,21 +7,24 @@
     "payload_type": {
       "const": "mood_thayer"
     },
-    "value": {
+    "valence": {
       "$ref": "../core.json#/$defs/Array",
-      "description": "Thayer mood model: (valence, arousal)",
+      "description": "Valence",
       "items": {
-        "type": "array",
-        "items": {
-          "type": "number"
-        },
-        "minItems": 2,
-        "maxItems": 2
+        "type": "number"
+      }
+    },
+    "arousal": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Arousal",
+      "items": {
+        "type": "number"
       }
     }
   },
   "required": [
     "payload_type",
-    "value"
+    "valence",
+    "arousal"
   ]
 }

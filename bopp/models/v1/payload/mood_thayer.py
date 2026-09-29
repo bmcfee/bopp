@@ -7,10 +7,7 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type ValueItem = Annotated[list[float], Meta(max_length=2, min_length=2)]
-
 
 class MoodThayerPayload(Struct, tag_field="payload_type", tag="mood_thayer"):
-    value: Annotated[
-        list[ValueItem], Meta(description="Thayer mood model: (valence, arousal)")
-    ]
+    valence: Annotated[list[float], Meta(description="Valence")]
+    arousal: Annotated[list[float], Meta(description="Arousal")]

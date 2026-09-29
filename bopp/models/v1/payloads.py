@@ -15,8 +15,6 @@ from .payload import (
     note_hz,
     note_midi,
     onset,
-    pattern_jku,
-    pitch_class,
     pitch_contour_hz,
     segment_multi,
     segment_open,
@@ -32,8 +30,6 @@ type AnyPayload = Annotated[
     | note_hz.NoteHzPayload
     | note_midi.NoteMidiPayload
     | onset.OnsetPayload
-    | pattern_jku.PatternJkuPayload
-    | pitch_class.PitchClassPayload
     | pitch_contour_hz.PitchContourPayload
     | segment_multi.MultiSegmentPayload
     | segment_open.SegmentOpenPayload

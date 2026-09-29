@@ -20,8 +20,6 @@ from ..models.v1.payload.mood_thayer import MoodThayerPayload
 from ..models.v1.payload.note_hz import NoteHzPayload
 from ..models.v1.payload.note_midi import NoteMidiPayload
 from ..models.v1.payload.onset import OnsetPayload
-from ..models.v1.payload.pattern_jku import PatternJkuPayload
-from ..models.v1.payload.pitch_class import PitchClassPayload
 from ..models.v1.payload.pitch_contour_hz import PitchContourPayload
 from ..models.v1.payload.segment_multi import MultiSegmentPayload
 from ..models.v1.payload.segment_open import SegmentOpenPayload
@@ -59,8 +57,6 @@ PAYLOAD_TYPE_REGISTRY = {
     'note_hz': NoteHzPayload,
     'note_midi': NoteMidiPayload,
     'onset': OnsetPayload,
-    'pattern_jku': PatternJkuPayload,
-    'pitch_class': PitchClassPayload,
     'pitch_contour': PitchContourPayload,
     'segment_open': SegmentOpenPayload,
     'tag_open': TagOpenPayload,
