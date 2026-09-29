@@ -7,8 +7,6 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type TimeItem = Annotated[float, Meta(ge=0.0)]
-
 
 class Times(Struct, tag_field="extent_type", tag="time"):
-    time: Annotated[list[TimeItem], Meta(description="An array of time values.")]
+    time: Annotated[list[float], Meta(description="An array of time values.")]

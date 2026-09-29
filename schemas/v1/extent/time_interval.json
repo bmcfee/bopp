@@ -11,8 +11,7 @@
       "$ref": "../core.json#/$defs/Array",
       "description": "Array of interval start times in seconds.",
       "items": {
-        "type": "number",
-        "minimum": 0.0
+        "type": "number"
       }
     },
     "duration": {

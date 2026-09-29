@@ -7,12 +7,14 @@ from typing import Annotated
 
 from msgspec import Meta
 
-from .extent import time_frequency_box, time_interval, times
+from .extent import midi_interval, midi_tick, time_frequency_box, time_interval, times
 
 type AnyExtent = Annotated[
     times.Times
     | time_interval.TimeIntervalExtent
-    | time_frequency_box.TimeFrequencyBoxExtent,
+    | time_frequency_box.TimeFrequencyBoxExtent
+    | midi_tick.MidiTicks
+    | midi_interval.MidiInterval,
     Meta(
         description="A discriminated union of all supported columnar extent types.",
         title="Any Extent",

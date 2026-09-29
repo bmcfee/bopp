@@ -11,8 +11,7 @@
       "$ref": "../core.json#/$defs/Array",
       "description": "An array of time values.",
       "items": {
-        "type": "number",
-        "minimum": 0.0
+        "type": "number"
       }
     }
   },

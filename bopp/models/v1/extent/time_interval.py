@@ -7,15 +7,12 @@ from typing import Annotated
 
 from msgspec import Meta, Struct
 
-type TimeItem = Annotated[float, Meta(ge=0.0)]
-
-
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 
 class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
     time: Annotated[
-        list[TimeItem], Meta(description="Array of interval start times in seconds.")
+        list[float], Meta(description="Array of interval start times in seconds.")
     ]
     duration: Annotated[
         list[DurationItem], Meta(description="Array of interval durations in seconds.")
