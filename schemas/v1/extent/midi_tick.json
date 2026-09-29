@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/midi_tick.json",
+  "title": "MIDI Ticks",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "midi_tick"
+    },
+    "tick": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "An array of MIDI tick values.",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["extent_type", "tick"]
+}
