@@ -36,3 +36,26 @@ type Fraction = Annotated[
 """
 Rational number encoded as numerator and non-zero denominator
 """
+
+
+type FractionNonnegativeItem = Annotated[
+    int, Meta(description="Numerator, non-negative integer", ge=0)
+]
+
+
+type FractionNonnegativeItem1 = Annotated[
+    int,
+    Meta(
+        description="Denominator. Strictly positive to prevent zero-division and negative bases.",
+        ge=1,
+    ),
+]
+
+
+type FractionNonnegative = Annotated[
+    list[FractionNonnegativeItem | FractionNonnegativeItem1],
+    Meta(description="Non-negative rational number", max_length=2, min_length=2),
+]
+"""
+Non-negative rational number
+"""

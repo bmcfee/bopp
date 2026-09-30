@@ -8,6 +8,7 @@
     { "$ref": "extent/time_interval.json" },
     { "$ref": "extent/time_frequency_box.json" },
     { "$ref": "extent/score_quarter.json" },
+    { "$ref": "extent/score_interval.json" },
     { "$ref": "extent/midi_tick.json" },
     { "$ref": "extent/midi_interval.json" }
   ],

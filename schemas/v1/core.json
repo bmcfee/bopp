@@ -23,6 +23,25 @@
               "description": "Denominator. Strictly positive to prevent zero-division and negative bases."
             }
         ]
+    },
+    "FractionNonnegative": {
+        "type": "array",
+        "description": "Non-negative rational number",
+        "minLength": 2,
+        "maxLength": 2,
+        "items": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Numerator, non-negative integer"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Denominator. Strictly positive to prevent zero-division and negative bases."
+            }
+        ]
     }
+
   }
 }

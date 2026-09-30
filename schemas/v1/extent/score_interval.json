@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/score_interval.json",
+  "title": "Score Interval",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "score_interval"
+    },
+    "quarter": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval start times in fractional quarter notes.",
+      "items": {
+        "$ref": "../core.json#/$defs/Fraction"
+      }
+    },
+    "duration": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval durations in fractional quarter notes.",
+      "items": {
+        "$ref": "../core.json#/$defs/FractionNonnegative"
+      }
+    }
+  },
+  "required": ["extent_type", "quarter", "duration"]
+}
