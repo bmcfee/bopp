@@ -185,10 +185,12 @@ def load_bopp_csv(filepath: str | Path) -> BoppBase:
     # 3. Handle Polyphonic / List Data safely
     # If a payload contains lists (e.g., ["C", "E", "G"]), the CSV writer saves them 
     # as literal strings. We evaluate them back to actual Python lists here.
-    payload_cols = [c for c in df.columns if c.startswith("payload:")]
-    for col in payload_cols:
-        if df[col].dtype == object and df[col].astype(str).str.startswith('[').any():
-            df[col] = df[col].apply(ast.literal_eval)
+    target_cols = [c for c in df.columns if c.startswith("extent:")]
+    for col in target_cols:
+        if df[col].dtype.type is str: 
+            strcol = df[col].astype(str)
+            if strcol.str.startswith('[').any() or strcol.str.startswith('(').any():
+                df[col] = df[col].apply(ast.literal_eval)
 
     # Attach the singleton fields directly to the DataFrame attributes
     df.attrs.update(metadata)
