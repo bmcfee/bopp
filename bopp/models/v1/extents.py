@@ -7,12 +7,20 @@ from typing import Annotated
 
 from msgspec import Meta
 
-from .extent import midi_interval, midi_tick, time_frequency_box, time_interval, times
+from .extent import (
+    midi_interval,
+    midi_tick,
+    score_quarter,
+    time_frequency_box,
+    time_interval,
+    times,
+)
 
 type AnyExtent = Annotated[
     times.Times
     | time_interval.TimeIntervalExtent
     | time_frequency_box.TimeFrequencyBoxExtent
+    | score_quarter.ScoreQuarterNotes
     | midi_tick.MidiTicks
     | midi_interval.MidiInterval,
     Meta(

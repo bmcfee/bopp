@@ -14,3 +14,25 @@ type Array = Annotated[list[Any], Meta(description="A dense columnar array buffe
 """
 A dense columnar array buffer.
 """
+
+
+type FractionItem = Annotated[
+    int,
+    Meta(
+        description="Denominator. Strictly positive to prevent zero-division and negative bases.",
+        ge=1,
+    ),
+]
+
+
+type Fraction = Annotated[
+    list[int | FractionItem],
+    Meta(
+        description="Rational number encoded as numerator and non-zero denominator",
+        max_length=2,
+        min_length=2,
+    ),
+]
+"""
+Rational number encoded as numerator and non-zero denominator
+"""

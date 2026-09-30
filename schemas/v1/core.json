@@ -6,6 +6,23 @@
     "Array": {
       "type": "array",
       "description": "A dense columnar array buffer."
+    },
+    "Fraction": {
+        "type": "array",
+        "description": "Rational number encoded as numerator and non-zero denominator",
+        "minLength": 2,
+        "maxLength": 2,
+        "items": [
+            {
+              "type": "integer",
+              "description": "Numerator, signed integer"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Denominator. Strictly positive to prevent zero-division and negative bases."
+            }
+        ]
     }
   }
 }
