@@ -14,6 +14,7 @@ from .payload import (
     mood_thayer,
     note_hz,
     note_midi,
+    object,
     onset,
     pitch_contour_hz,
     segment_multi,
@@ -29,6 +30,7 @@ type AnyPayload = Annotated[
     | mood_thayer.MoodThayerPayload
     | note_hz.NoteHzPayload
     | note_midi.NoteMidiPayload
+    | object.ObjectPayload
     | onset.OnsetPayload
     | pitch_contour_hz.PitchContourPayload
     | segment_multi.MultiSegmentPayload
