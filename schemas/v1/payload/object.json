@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/object.json",
+  "title": "Object Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "object"
+    },
+    "value": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Annotations consisting of structured object data",
+      "items": {
+        "type": "object"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "value"
+  ]
+}
