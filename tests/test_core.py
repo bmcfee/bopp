@@ -1,14 +1,19 @@
+import uuid
+
 import msgspec
 import pytest
 
 from bopp.core import (
+    BOPP_NAMESPACE,
     BoppArgumentError,
     BoppArrayError,
     BoppRegistryError,
     BoppValidationError,
     _extract_kwargs,
+    compute_annotation_id,
     create,
     validate,
+    validate_and_set_annotation_id,
 )
 from bopp.models.v1.annotation import Annotation
 
@@ -37,6 +42,9 @@ def test_create_minimal():
     assert isinstance(ann, Annotation)
     assert ann.media_id == "audio:123"
     assert ann.payload.__struct_config__.tag == "onset"
+    assert getattr(ann, "id", None) is not None
+    val = uuid.UUID(ann.id)
+    assert val.version == 5
 
 
 def test_create_full():
@@ -56,6 +64,40 @@ def test_create_full():
     assert ann.confidence is not None
     assert ann.confidence.__struct_config__.tag == "likelihood"
     assert getattr(ann, "sandbox", None) == {"custom_key": "custom_value", "notes": [1, 2, 3]}
+
+
+def test_uuid5_idempotence_and_mutation():
+    ann = create(
+        bopp_version="1.0",
+        media_id="audio:123",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=[1, 1],
+    )
+    initial_id = ann.id
+
+    # Verify idempotency
+    assert validate_and_set_annotation_id(ann) == initial_id
+
+    # Mutate payload and verify failure when validate_and_set_annotation_id checks the existing ID
+    ann.payload.value = [1, 2]
+    with pytest.raises(ValueError, match="Annotation ID mismatch"):
+        validate_and_set_annotation_id(ann)
+
+
+def test_create_with_parents():
+    parent_id = str(uuid.uuid4())
+    ann = create(
+        bopp_version="1.0",
+        media_id="audio:123",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1],
+        value=[1],
+        parents=[parent_id],
+    )
+    assert getattr(ann, "parents", None) == [parent_id]
 
 
 def test_create_invalid_payload_kind():

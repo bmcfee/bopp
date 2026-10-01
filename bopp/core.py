@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any, TypeVar, cast
 
 import msgspec
@@ -15,16 +16,69 @@ from .exceptions import (
 )
 from .registries import get_registry
 
+BOPP_NAMESPACE = uuid.UUID("a9b3e1c0-42f8-4e89-8d62-b9123456789a")
+
 __all__ = [
+    "BOPP_NAMESPACE",
     "BoppArgumentError",
     "BoppArrayError",
     "BoppError",
     "BoppIOError",
     "BoppRegistryError",
     "BoppValidationError",
+    "compute_annotation_id",
     "create",
     "validate",
+    "validate_and_set_annotation_id",
 ]
+
+
+def compute_annotation_id(annotation: Any) -> str:
+    """
+    Compute deterministic UUIDv5 for an annotation based on its content excluding 'id'.
+    """
+    if isinstance(annotation, msgspec.Struct):
+        data = {
+            f: getattr(annotation, f)
+            for f in annotation.__struct_fields__
+            if f != "id"
+        }
+    elif isinstance(annotation, dict):
+        data = {k: v for k, v in annotation.items() if k != "id"}
+    else:
+        raise BoppArgumentError("annotation must be a msgspec.Struct or dict.")
+
+    canonical_bytes = msgspec.json.encode(
+        data,
+        order="sorted",
+        omit_defaults=True,
+    )
+    return str(uuid.uuid5(BOPP_NAMESPACE, canonical_bytes))
+
+
+def validate_and_set_annotation_id(annotation: Any) -> str:
+    """
+    Compute and validate/set the UUIDv5 ID for an annotation instance or dict.
+    """
+    computed_id = compute_annotation_id(annotation)
+
+    existing_id = (
+        getattr(annotation, "id", None)
+        if isinstance(annotation, msgspec.Struct)
+        else annotation.get("id")
+    )
+
+    if existing_id is None or existing_id is msgspec.UNSET:
+        if isinstance(annotation, msgspec.Struct):
+            setattr(annotation, "id", computed_id)
+        else:
+            annotation["id"] = computed_id
+    elif existing_id != computed_id:
+        raise ValueError(
+            f"Annotation ID mismatch: object has '{existing_id}', computed '{computed_id}'"
+        )
+
+    return computed_id
 
 
 def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -54,6 +108,7 @@ def create(
     payload_kind: str,
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
+    parents: list[str] | Any = msgspec.UNSET,
     bopp_version: str | None = None,
     sandbox: Any = msgspec.UNSET,
     **kwargs: Any
@@ -71,6 +126,8 @@ def create(
         Kind identifier registered for the extent struct, if applicable.
     confidence_kind : str or None, optional
         Kind identifier registered for the confidence struct, if applicable.
+    parents : list of str, optional
+        List of parent annotation UUIDs from which this annotation was derived.
     bopp_version : str or None, optional
         Schema version string to select the underlying type registry.
         If None, defaults to the current default schema version.
@@ -83,7 +140,7 @@ def create(
     Returns
     -------
     Annotation
-        An instantiated Annotation structure.
+        An instantiated Annotation structure with computed UUIDv5 id.
 
     Raises
     ------
@@ -136,14 +193,18 @@ def create(
     if kwargs:
         raise BoppArgumentError(f"Unconsumed keyword arguments: {list(kwargs.keys())}")
 
-    return Annotation(
+    ann = Annotation(
         media_id=media_id,
+        parents=parents,
         bopp_version=bopp_version,
         extent=extent_obj,
         payload=payload_obj,
         confidence=confidence_obj,
         sandbox=sandbox,
     )
+
+    validate_and_set_annotation_id(ann)
+    return ann
 
 
 T = TypeVar("T")
