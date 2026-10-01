@@ -35,7 +35,20 @@ __all__ = [
 
 def compute_annotation_id(annotation: Any) -> str:
     """
-    Compute deterministic UUIDv5 for an annotation based on its content excluding 'id'.
+    Compute a deterministic UUIDv5 identifier for an annotation.
+
+    The UUID is calculated over the canonical JSON serialization of the
+    annotation content, excluding any existing 'id' field.
+
+    Parameters
+    ----------
+    annotation : Any
+        An Annotation struct instance or dictionary representation of an annotation.
+
+    Returns
+    -------
+    str
+        The computed UUIDv5 string representation.
     """
 
     data = msgspec.to_builtins(annotation, order="deterministic")
@@ -47,7 +60,26 @@ def compute_annotation_id(annotation: Any) -> str:
 
 def validate_and_set_annotation_id(annotation: Any) -> str:
     """
-    Compute and validate/set the UUIDv5 ID for an annotation instance or dict.
+    Compute and validate or set the UUIDv5 identifier for an annotation.
+
+    If the annotation already has an 'id' set, it is validated against the
+    computed UUIDv5 ID. If no 'id' is set, the computed ID is assigned.
+
+    Parameters
+    ----------
+    annotation : Any
+        An Annotation struct instance or dictionary representation of an annotation
+        to validate or update in place.
+
+    Returns
+    -------
+    str
+        The validated or assigned UUIDv5 identifier.
+
+    Raises
+    ------
+    ValueError
+        If an existing 'id' on the annotation does not match the computed ID.
     """
     computed_id = compute_annotation_id(annotation)
 
