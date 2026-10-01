@@ -1,5 +1,6 @@
 # AUTO-GENERATED: Do not edit manually.
 
+from ..models.v1.annotation import Annotation
 from ..models.v1.confidence.likelihood import LikelihoodConfidence
 from ..models.v1.confidence.variance import VarianceConfidence
 from ..models.v1.extent.midi_interval import MidiInterval
@@ -28,6 +29,8 @@ from ..models.v1.payload.segment_multi import MultiSegmentPayload
 from ..models.v1.payload.segment_open import SegmentOpenPayload
 from ..models.v1.payload.tag_open import TagOpenPayload
 from ..models.v1.payload.tempo import TempoPayload
+
+Annotation = Annotation
 
 CONFIDENCE_TYPE_REGISTRY = {
     'likelihood': LikelihoodConfidence,
