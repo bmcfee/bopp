@@ -1,3 +1,5 @@
+import copy
+
 import msgspec
 import pytest
 
@@ -38,10 +40,13 @@ def test_trim_no_extent():
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["pop"]),
     )
+    bopp.validate_and_set_annotation_id(ann)
+
     result = trim(ann, start=1.0, end=5.0)
     assert result.extent is msgspec.UNSET
     assert result.payload.value == ["pop"]
     assert result is not ann
+    assert result.parents == [ann.id]
 
 
 def test_trim_time_extent():
@@ -121,6 +126,7 @@ def test_trim_time_frequency_box():
         ),
         payload=TagOpenPayload(value=["low", "high"]),
     )
+    bopp.validate_and_set_annotation_id(ann)
 
     trimmed = trim(ann, start=1.0, end=5.0, strict=False, reset=True)
     # Box 1: [0, 3] -> clipped to [1, 3] (duration 2). reset_time shifts to [0, 2]
@@ -130,3 +136,32 @@ def test_trim_time_frequency_box():
     assert trimmed.extent.freq_min == [100.0, 200.0]
     assert trimmed.extent.freq_max == [500.0, 800.0]
     assert trimmed.payload.value == ["low", "high"]
+
+
+def test_trim_transitive_parents_and_immutability():
+    ann1 = bopp.create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 3.0, 5.0, 8.0],
+        value=["a", "b", "c", "d"],
+    )
+    ann1_copy = copy.deepcopy(ann1)
+
+    ann2 = trim(ann1, start=2.0, end=7.0)
+    assert ann2.parents == [ann1.id]
+    assert ann2.id != ann1.id
+
+    # Verify original annotation was not mutated
+    assert ann1 == ann1_copy
+
+    ann2_copy = copy.deepcopy(ann2)
+    ann3 = trim(ann2, start=2.5, end=6.0)
+
+    # Transitive parent chain check
+    assert ann3.parents == [ann1.id, ann2.id]
+    assert ann3.id != ann2.id
+    assert ann3.id != ann1.id
+
+    # Verify second annotation was not mutated
+    assert ann2 == ann2_copy

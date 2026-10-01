@@ -5,6 +5,7 @@ from typing import Any
 
 import msgspec
 
+from .core import validate_and_set_annotation_id
 from .exceptions import BoppArgumentError
 from .models.v1.annotation import Annotation
 from .util import _get_tag
@@ -65,10 +66,24 @@ def trim(
     if reset and start is None:
         raise BoppArgumentError("reset=True requires 'start' to be specified.")
 
+    # Transitively accumulate parent IDs
+    existing_parents = getattr(annotation, "parents", None)
+    if existing_parents is None or existing_parents is msgspec.UNSET:
+        new_parents = [annotation.id]
+    else:
+        new_parents = list(existing_parents) + [annotation.id]
+
     extent = annotation.extent
     if extent is msgspec.UNSET or extent is None:
-        # Return deep copy of annotation if no extent present
-        return copy.deepcopy(annotation)
+        # Return copy of annotation with updated parent lineage
+        new_ann = msgspec.structs.replace(
+            annotation,
+            id=msgspec.UNSET,
+            parents=new_parents,
+            sandbox=copy.deepcopy(annotation.sandbox) if annotation.sandbox is not msgspec.UNSET else msgspec.UNSET,
+        )
+        validate_and_set_annotation_id(new_ann)
+        return new_ann
 
     extent_tag = _get_tag(extent)
     if extent_tag not in ("time", "time_interval", "time_frequency_box"):
@@ -156,10 +171,14 @@ def trim(
 
     new_sandbox = copy.deepcopy(annotation.sandbox) if annotation.sandbox is not msgspec.UNSET else msgspec.UNSET
 
-    return msgspec.structs.replace(
+    new_ann = msgspec.structs.replace(
         annotation,
+        id=msgspec.UNSET,
+        parents=new_parents,
         extent=new_extent,
         payload=new_payload,
         sandbox=new_sandbox,
         **kwargs
     )
+    validate_and_set_annotation_id(new_ann)
+    return new_ann
