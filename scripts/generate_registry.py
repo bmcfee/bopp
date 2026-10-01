@@ -9,6 +9,7 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
     registries = defaultdict(dict)
     # Imports structure: { submodule_import_path: set(class_names) }
     imports_by_module = defaultdict(set)
+    annotation_class_info = None
 
     # Walk all .py files recursively in the generated schema tree
     for py_file in sorted(input_dir.rglob("*.py")):
@@ -36,6 +37,9 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                 if tag_field and tag_value:
                     registries[tag_field][tag_value] = node.name
                     imports_by_module[submodule].add(node.name)
+                elif node.name == "Annotation":
+                    annotation_class_info = (submodule, node.name)
+                    imports_by_module[submodule].add(node.name)
 
     with output_file.open("w", encoding="utf-8") as f:
         f.write("# AUTO-GENERATED: Do not edit manually.\n\n")
@@ -45,6 +49,10 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
             classes = ", ".join(sorted(imports_by_module[mod_path]))
             f.write(f"from {mod_path} import {classes}\n")
         f.write("\n")
+
+        # Emit explicit Annotation reference if found
+        if annotation_class_info:
+            f.write(f"Annotation = {annotation_class_info[1]}\n\n")
 
         # Emit dictionary registries per tag_field
         for tag_field in sorted(registries.keys()):

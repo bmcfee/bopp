@@ -6,6 +6,7 @@ from typing import Any, TypeVar, cast
 import msgspec
 
 from ._version import get_current_schema_version
+from .base import BoppBase
 from .exceptions import (
     BoppArgumentError,
     BoppArrayError,
@@ -85,12 +86,12 @@ def validate_and_set_annotation_id(annotation: Any) -> str:
 
     existing_id = (
         getattr(annotation, "id", None)
-        if isinstance(annotation, msgspec.Struct)
+        if isinstance(annotation, BoppBase)
         else annotation.get("id")
     )
 
     if existing_id is None or existing_id is msgspec.UNSET:
-        if isinstance(annotation, msgspec.Struct):
+        if isinstance(annotation, BoppBase):
             annotation.id = computed_id
         else:
             annotation["id"] = computed_id
