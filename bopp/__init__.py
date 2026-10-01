@@ -35,10 +35,16 @@ from .core import (
     BoppValidationError as BoppValidationError,
 )
 from .core import (
+    compute_annotation_id as compute_annotation_id,
+)
+from .core import (
     create as create,
 )
 from .core import (
     validate as validate,
+)
+from .core import (
+    validate_and_set_annotation_id as validate_and_set_annotation_id,
 )
 from .transforms import (
     trim as trim,
