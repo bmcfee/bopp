@@ -37,22 +37,11 @@ def compute_annotation_id(annotation: Any) -> str:
     """
     Compute deterministic UUIDv5 for an annotation based on its content excluding 'id'.
     """
-    if isinstance(annotation, msgspec.Struct):
-        data = {
-            f: getattr(annotation, f)
-            for f in annotation.__struct_fields__
-            if f != "id"
-        }
-    elif isinstance(annotation, dict):
-        data = {k: v for k, v in annotation.items() if k != "id"}
-    else:
-        raise BoppArgumentError("annotation must be a msgspec.Struct or dict.")
 
-    canonical_bytes = msgspec.json.encode(
-        data,
-        order="sorted",
-        omit_defaults=True,
-    )
+    data = msgspec.to_builtins(annotation, order="deterministic")
+    if 'id' in data:
+        del data['id']
+    canonical_bytes = msgspec.json.encode(data, order="deterministic")
     return str(uuid.uuid5(BOPP_NAMESPACE, canonical_bytes))
 
 
@@ -70,7 +59,7 @@ def validate_and_set_annotation_id(annotation: Any) -> str:
 
     if existing_id is None or existing_id is msgspec.UNSET:
         if isinstance(annotation, msgspec.Struct):
-            setattr(annotation, "id", computed_id)
+            annotation.id = computed_id
         else:
             annotation["id"] = computed_id
     elif existing_id != computed_id:

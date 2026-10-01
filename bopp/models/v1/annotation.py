@@ -25,6 +25,25 @@ class Annotation(BoppBase):
         payloads.AnyPayload,
         Meta(description="The parallel array of values (e.g., beat, chord)"),
     ]
+    id: (
+        Annotated[
+            str,
+            Meta(
+                description="Unique identifier generated via UUIDv5 based on canonical annotation content",
+                pattern="^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-5[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+            ),
+        ]
+        | UnsetType
+    ) = UNSET
+    parents: (
+        Annotated[
+            list[str],
+            Meta(
+                description="List of parent annotation IDs from which this annotation was derived"
+            ),
+        ]
+        | UnsetType
+    ) = UNSET
     metadata: (
         Annotated[
             metadata_1.AnnotationMetadata,
