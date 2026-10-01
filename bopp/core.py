@@ -92,7 +92,7 @@ def validate_and_set_annotation_id(annotation: Any) -> str:
 
     if existing_id is None or existing_id is msgspec.UNSET:
         if isinstance(annotation, BoppBase):
-            annotation.id = computed_id
+            annotation.id = computed_id  # type: ignore[attr-defined]
         else:
             annotation["id"] = computed_id
     elif existing_id != computed_id:
