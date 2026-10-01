@@ -50,10 +50,6 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
             f.write(f"from {mod_path} import {classes}\n")
         f.write("\n")
 
-        # Emit explicit Annotation reference if found
-        if annotation_class_info:
-            f.write(f"Annotation = {annotation_class_info[1]}\n\n")
-
         # Emit dictionary registries per tag_field
         for tag_field in sorted(registries.keys()):
             tags = registries[tag_field]

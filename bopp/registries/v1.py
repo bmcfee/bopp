@@ -30,8 +30,6 @@ from ..models.v1.payload.segment_open import SegmentOpenPayload
 from ..models.v1.payload.tag_open import TagOpenPayload
 from ..models.v1.payload.tempo import TempoPayload
 
-Annotation = Annotation
-
 CONFIDENCE_TYPE_REGISTRY = {
     'likelihood': LikelihoodConfidence,
     'variance': VarianceConfidence,
