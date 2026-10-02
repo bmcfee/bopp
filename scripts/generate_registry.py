@@ -10,20 +10,18 @@ from typing import Any, get_args, get_origin
 
 def _has_bopp_complex_ast(node: ast.AnnAssign) -> bool:
     """Check if an AnnAssign node contains bopp_complex in msgspec.field or Meta extra dict."""
-    # Check if value call is msgspec.field(...) or field(...)
     if isinstance(node.value, ast.Call):
         for kw in node.value.keywords:
             if kw.arg == "extra" and isinstance(kw.value, ast.Dict):
                 for k, v in zip(kw.value.keys, kw.value.values):
                     if (
                         isinstance(k, ast.Constant)
-                        and k.value == "bopp_complex"
+                        and k.value in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
                         and isinstance(v, ast.Constant)
                         and bool(v.value)
                     ):
                         return True
 
-    # Check for Annotated[..., Meta(extra={...})] or Meta(extra={"bopp_complex": True})
     for child in ast.walk(node.annotation):
         if isinstance(child, ast.Call):
             for kw in child.keywords:
@@ -31,7 +29,7 @@ def _has_bopp_complex_ast(node: ast.AnnAssign) -> bool:
                     for k, v in zip(kw.value.keys, kw.value.values):
                         if (
                             isinstance(k, ast.Constant)
-                            and k.value == "bopp_complex"
+                            and k.value in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
                             and isinstance(v, ast.Constant)
                             and bool(v.value)
                         ):
@@ -56,7 +54,9 @@ def _is_complex_type(tp: Any) -> bool:
     if hasattr(tp, "__metadata__"):
         for meta in getattr(tp, "__metadata__", []):
             extra = getattr(meta, "extra", {})
-            if isinstance(extra, dict) and extra.get("bopp_complex"):
+            if isinstance(extra, dict) and any(
+                extra.get(k) for k in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
+            ):
                 return True
 
     # Handle Union / Optional
@@ -94,7 +94,9 @@ def _is_complex_field(type_hint: Any) -> bool:
     if hasattr(type_hint, "__metadata__"):
         for meta in getattr(type_hint, "__metadata__", []):
             extra = getattr(meta, "extra", {})
-            if isinstance(extra, dict) and extra.get("bopp_complex"):
+            if isinstance(extra, dict) and any(
+                extra.get(k) for k in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
+            ):
                 return True
         args = get_args(type_hint)
         if args:
