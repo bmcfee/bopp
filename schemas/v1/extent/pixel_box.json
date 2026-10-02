@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/pixel_box.json",
+  "title": "Pixel Box Extent",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "pixel_box"
+    },
+    "x": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of x-coordinates in pixels.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "width": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of box widths in pixels.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
+    "y": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of y-coordinates in pixels.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "height": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of box heights in pixels.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    }
+  },
+  "required": ["extent_type", "x", "width", "y", "height"]
+}
