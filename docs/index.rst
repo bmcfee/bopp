@@ -3,13 +3,6 @@
 
 .. toctree::
    :maxdepth: 1
-   :caption: Architecture
-   :hidden:
-
-   design.md
-
-.. toctree::
-   :maxdepth: 1
    :caption: API
    :hidden:
 
@@ -21,6 +14,13 @@
    :hidden:
 
    benchmarks.md
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Architecture
+   :hidden:
+
+   design.md
 
 .. toctree::
    :maxdepth: 1

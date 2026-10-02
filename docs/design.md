@@ -1,4 +1,4 @@
-# Repository Design & Code Generation
+# Design and development
 
 This document provides an overview of the architecture and design of the `bopp` repository, including its code generation processes and guidance on how to make schema updates.
 
