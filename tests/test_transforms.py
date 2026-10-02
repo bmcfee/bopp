@@ -1,4 +1,5 @@
 import copy
+import warnings
 
 import msgspec
 import pytest
@@ -10,7 +11,16 @@ from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.tag_open import TagOpenPayload
-from bopp.transforms import trim
+from bopp.transforms import _get_list_fields_with_length, trim
+
+
+def test_get_list_fields_with_length_empty():
+    class EmptyStruct(msgspec.Struct):
+        field_a: int = 1
+        field_b: str = "test"
+
+    s = EmptyStruct()
+    assert _get_list_fields_with_length(s, 2) == {}
 
 
 def test_trim_invalid_arguments():
@@ -33,6 +43,43 @@ def test_trim_invalid_arguments():
     # reset=True with start=None
     with pytest.raises(BoppArgumentError, match="reset=True requires 'start'"):
         trim(ann, end=5.0, reset=True)
+
+    # Unsupported target_field for valid extent_tag
+    with pytest.raises(BoppArgumentError, match="Unsupported target_field 'invalid'"):
+        trim(ann, start=1.0, end=2.0, target_field="invalid")
+
+
+def test_trim_warning_no_id():
+    metadata = HumanAnnotationMetadata(annotator_id="user_1", tool="manual")
+    ann = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["pop"]),
+    )
+
+    with pytest.warns(UserWarning, match="Trimming an annotation with no ID"):
+        result = trim(ann, start=1.0, end=5.0)
+
+    assert result.parents == []
+
+
+def test_trim_invalid_extent_tag():
+    class UntaggedExtent(msgspec.Struct):
+        time: list[float]
+
+    ann = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=UntaggedExtent(time=[1.0, 2.0]),
+        payload=TagOpenPayload(value=["a", "b"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    with pytest.raises(BoppArgumentError, match="has no valid schema tag"):
+        trim(ann, start=1.0, end=2.0)
 
 
 def test_trim_no_extent():
@@ -139,21 +186,23 @@ def test_trim_time_frequency_box():
 
 def test_trim_time_frequency_box_along_frequency():
     extent = TimeFrequencyBoxExtent(
-        time=[0.0, 1.0, 2.0],
-        duration=[1.0, 1.0, 1.0],
-        freq_min=[100.0, 200.0, 500.0],
-        freq_max=[300.0, 400.0, 800.0],
+        time=[0.0, 1.0, 2.0, 3.0],
+        duration=[1.0, 1.0, 1.0, 1.0],
+        freq_min=[100.0, 200.0, 500.0, 900.0],
+        freq_max=[300.0, 400.0, 800.0, 1000.0],
     )
     ann = Annotation(
         media_id="audio",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=extent,
-        payload=TagOpenPayload(value=["low", "mid", "high"]),
+        payload=TagOpenPayload(value=["low", "mid", "high", "ultra"]),
     )
     bopp.validate_and_set_annotation_id(ann)
 
-    # Trim frequency axis non-strict
+    # Trim frequency axis non-strict [250..600]
+    # Boxes: [100..300] (keep, clipped to [250..300]), [200..400] (keep, clipped to [250..400]),
+    #        [500..800] (keep, clipped to [500..600]), [900..1000] (dropped: p_min >= end)
     trimmed_freq = trim(ann, start=250.0, end=600.0, target_field="frequency", reset=True)
     assert trimmed_freq.extent.freq_min == [0.0, 0.0, 250.0]
     assert trimmed_freq.extent.freq_max == [50.0, 150.0, 350.0]
