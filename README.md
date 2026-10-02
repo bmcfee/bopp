@@ -122,7 +122,7 @@ For symbolic MIDI data, extents can be defined in MIDI ticks using `midi_ticks` 
   "bopp_version": "1.0",
   "extent": {
     "extent_type": "midi_interval",
-    "time": [0, 480, 960],
+    "tick": [0, 480, 960],
     "duration": [480, 480, 960]
   },
   "payload": {
@@ -142,7 +142,7 @@ Musical scores and sheet music annotations can use score-based extents like `sco
   "bopp_version": "1.0",
   "extent": {
     "extent_type": "score_quarter",
-    "time": [0.0, 1.0, 2.0, 3.0]
+    "quarter": [[1, 4], [2, 4], [3, 4], [4, 4]]
   },
   "payload": {
     "payload_type": "lyrics",
@@ -168,7 +168,8 @@ For visual annotations on sheet music or audio spectrogram images, the `pixel_bo
   },
   "payload": {
     "payload_type": "object",
-    "value": ["treble_clef", "quarter_note"]
+    "value": [{"label": "car", "moving": false, "color": "red"},
+              {"label": "tree", "moving": false, "color": "green"}]
   }
 }
 ```
