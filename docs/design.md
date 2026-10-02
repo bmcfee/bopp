@@ -36,31 +36,16 @@ To update existing schema definitions or add new payload/extent types:
 Edit or add JSON Schema files under `schemas/v1/` (or the relevant version directory).
 
 ### 2. Run Code Generation Scripts
-Use Hatch to execute the `codegen` environment scripts:
+Use Hatch to execute the `codegen` environment scripts.
+```bash
+hatch run codegen:build
+```
 
-* **Compile Models**:
-  Wipe old models and compile `msgspec.Struct` definitions from `schemas/`:
-  ```bash
-  hatch run codegen:compile
-  ```
-
-* **Generate Registries**:
-  Generate `bopp/registries/v1.py` from compiled Python models:
-  ```bash
-  hatch run codegen:register
-  ```
-
-* **Clean Generated Models**:
-  Wipe existing compiled models in `bopp/models/v1/`:
-  ```bash
-  hatch run codegen:clean
-  ```
-
-* **Build All**:
-  Run clean, compile, and register in sequence:
-  ```bash
-  hatch run codegen:build
-  ```
+This will automatically convert the json schema definitions into Python source code, and
+generate auxiliary registry code used by the `bopp` library to map schema versions to different
+class definitions.
+If you update the schema wihtout running the code generation step, your changes will not be
+reflected in the library code.
 
 ---
 
