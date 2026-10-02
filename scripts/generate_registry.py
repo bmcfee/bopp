@@ -148,9 +148,9 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                 f.write(f"    {repr(tag)}: {tags[tag]},\n")
             f.write("}\n\n")
 
-        # Emit COMPLEX_FIELDS_REGISTRY
+        # Emit COMPLEX_FIELDS_REGISTRY with type annotation
         all_exports.append("COMPLEX_FIELDS_REGISTRY")
-        f.write("COMPLEX_FIELDS_REGISTRY = {\n")
+        f.write("COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {\n")
         for tag_field in sorted(complex_fields.keys()):
             f.write(f"    {repr(tag_field)}: {{\n")
             for tag, fields in sorted(complex_fields[tag_field].items()):
