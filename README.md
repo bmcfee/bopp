@@ -30,34 +30,31 @@ BOPP annotations may optionally contain structured annotation metadata (e.g. to 
 
 BOPP annotations include automatic identification and provenance tracking:
 
-- **Annotation ID**: Annotation objects automatically generate a deterministic `annotation_id` based on a UUIDv5 digest computed from the core contents (`media_id`, `bopp_version`, `extent`, `payload`, `confidence`, `metadata`, `sandbox`, and `parents`). Any change to these contents results in a new unique identifier. If you mutate an annotation object or transform it (e.g., via `bopp.transforms.trim`), its `annotation_id` is updated automatically.
-- **Parent Linkage**: You can track derivation and lineage across processing pipelines using the `parents` field, which takes a list of parent `annotation_id` strings. Transitive relationships are preserved when deriving or trimming annotations.
+- **Annotation ID**: Annotation objects automatically generate a deterministic `annotation_id` based on a UUIDv5 digest computed from the core contents. Any change to the annotation's contents results in a new unique identifier.
+- **Parent Linkage**: You can track derivation and lineage across processing pipelines using the `parents` field, which takes a list of parent `annotation_id` strings. Transitive relationships are preserved when deriving annotations through the bopp API (e.g. by trimming or converting between exttent types).
 
 ```python
-import bopp
+>>> import bopp
 
-# Create a parent annotation
-parent_ann = bopp.create(
-    media_id="track:123",
-    payload_kind="onset",
-    extent_kind="time",
-    time=[0.1, 0.5, 0.9],
-    value=[1, 1, 1],
-)
+>>> # Create a parent annotation
+>>> parent_ann = bopp.create(
+...     media_id="track:123",
+...     payload_kind="onset",
+...     extent_kind="time",
+...     time=[0.1, 0.5, 0.9],
+...     value=[1, 1, 1],
+... )
 
-# Create a derived annotation linked to the parent
-child_ann = bopp.create(
-    media_id="track:123",
-    payload_kind="tempo",
-    extent_kind="time_interval",
-    time=[0.1],
-    duration=[0.8],
-    value=[120.0],
-    parents=[parent_ann.annotation_id],
-)
+>>> bopp.core.validate_and_set_annotation_id(parent_ann)
+'d9a1b46c-38d5-56bc-aacb-0e8641382d1a'
 
-print(child_ann.annotation_id)  # Deterministic UUIDv5 string
-print(child_ann.parents)        # List containing parent_ann.annotation_id
+>>> child_ann = bopp.transforms.trim(parent_ann, start=0.25)
+
+>>> print(child_ann.parents)
+['d9a1b46c-38d5-56bc-aacb-0e8641382d1a']
+
+>>> print(child_ann.id)
+a9be57d4-7f27-5d84-9e9b-b365112921af
 ```
 
 ### Python implementation
