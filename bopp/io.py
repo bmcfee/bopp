@@ -215,15 +215,27 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
         # 2. Hand the open file pointer directly to Pandas
         df = pd.read_csv(f)
 
-    # 3. Handle Polyphonic / List Data safely
-    # If a payload contains lists (e.g., ["C", "E", "G"]), the CSV writer saves them
-    # as literal strings. We evaluate them back to actual Python lists here.
-    target_cols = [c for c in df.columns if c.startswith("extent:")]
+    # 3. Handle Polyphonic / List / Object Data safely
+    # If a column contains lists, tuples, or objects/dicts (e.g. ["C", "E", "G"] or {"a": 1}),
+    # the CSV writer saves them as literal strings. We evaluate them back to actual Python objects here.
+    target_cols = [
+        c
+        for c in df.columns
+        if c.startswith("extent:") or c.startswith("payload:") or c.startswith("confidence:")
+    ]
     for col in target_cols:
-        if df[col].dtype.type is str:
+        if df[col].dtype.type is str or df[col].dtype == "object":
             strcol = df[col].astype(str)
-            if strcol.str.startswith("[").any() or strcol.str.startswith("(").any():
-                df[col] = df[col].apply(ast.literal_eval)
+            if (
+                strcol.str.startswith("[").any()
+                or strcol.str.startswith("(").any()
+                or strcol.str.startswith("{").any()
+            ):
+                df[col] = df[col].apply(
+                    lambda x: ast.literal_eval(x)
+                    if isinstance(x, str) and x.startswith(("[", "(", "{"))
+                    else x
+                )
 
     # Attach the singleton fields directly to the DataFrame attributes
     df.attrs.update(metadata)
