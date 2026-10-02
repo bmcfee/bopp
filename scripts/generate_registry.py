@@ -16,6 +16,10 @@ def _is_complex_type(tp: Any) -> bool:
 
     origin = get_origin(tp)
 
+    # If the type is directly a container (list, dict, tuple, set), it is complex
+    if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
+        return True
+
     # Unwrap Annotated[T, ...] to inspect the underlying base type T
     if origin is not None and hasattr(tp, "__metadata__"):
         args = get_args(tp)
@@ -26,9 +30,6 @@ def _is_complex_type(tp: Any) -> bool:
     if origin is getattr(type(int | str), "__origin__", None) or origin is Any:
         args = get_args(tp)
         return any(_is_complex_type(arg) for arg in args if arg is not type(None))
-
-    if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
-        return True
 
     if origin is not None:
         args = get_args(tp)
