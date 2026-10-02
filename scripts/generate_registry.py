@@ -38,7 +38,7 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                     registries[tag_field][tag_value] = node.name
                     imports_by_module[submodule].add(node.name)
                 elif node.name == "Annotation":
-                    annotation_class_info = (submodule, node.name)
+                    annotation_class_info = node.name
                     imports_by_module[submodule].add(node.name)
 
     with output_file.open("w", encoding="utf-8") as f:
@@ -50,14 +50,23 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
             f.write(f"from {mod_path} import {classes}\n")
         f.write("\n")
 
+        all_exports = []
+
+        if annotation_class_info:
+            f.write(f"ANNOTATION_CLASS = {annotation_class_info}\n\n")
+            all_exports.append("ANNOTATION_CLASS")
+
         # Emit dictionary registries per tag_field
         for tag_field in sorted(registries.keys()):
             tags = registries[tag_field]
             dict_name = f"{tag_field.upper()}_REGISTRY"
+            all_exports.append(dict_name)
             f.write(f"{dict_name} = {{\n")
             for tag in sorted(tags.keys()):
                 f.write(f"    {repr(tag)}: {tags[tag]},\n")
             f.write("}\n\n")
+
+        f.write(f"__all__ = {all_exports!r}\n")
 
 def main():
     parser = argparse.ArgumentParser()

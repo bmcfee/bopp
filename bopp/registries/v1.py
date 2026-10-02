@@ -30,6 +30,8 @@ from ..models.v1.payload.segment_open import SegmentOpenPayload
 from ..models.v1.payload.tag_open import TagOpenPayload
 from ..models.v1.payload.tempo import TempoPayload
 
+ANNOTATION_CLASS = Annotation
+
 CONFIDENCE_TYPE_REGISTRY = {
     'likelihood': LikelihoodConfidence,
     'variance': VarianceConfidence,
@@ -70,3 +72,10 @@ PAYLOAD_TYPE_REGISTRY = {
     'tempo': TempoPayload,
 }
 
+__all__ = [
+    'ANNOTATION_CLASS',
+    'CONFIDENCE_TYPE_REGISTRY',
+    'EXTENT_TYPE_REGISTRY',
+    'METADATA_TYPE_REGISTRY',
+    'PAYLOAD_TYPE_REGISTRY',
+]
