@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-import warnings
 from typing import Any, TypeVar, cast
 
 import msgspec
@@ -66,7 +65,6 @@ def validate_annotation_id(annotation: Any) -> bool:
     Validate the UUIDv5 identifier of an annotation without silently mutating it.
 
     If an 'id' is present, validates it against the computed UUIDv5.
-    If no 'id' is present, issues a UserWarning.
 
     Parameters
     ----------
@@ -76,7 +74,7 @@ def validate_annotation_id(annotation: Any) -> bool:
     Returns
     -------
     bool
-        True if the ID is present and valid, False if ID is missing (with warning).
+        True if the ID is present and valid, False if ID is missing.
 
     Raises
     ------
@@ -92,11 +90,6 @@ def validate_annotation_id(annotation: Any) -> bool:
     )
 
     if existing_id is None or existing_id is msgspec.UNSET:
-        warnings.warn(
-            "Annotation is missing an 'id' field.",
-            UserWarning,
-            stacklevel=2,
-        )
         return False
 
     if existing_id != computed_id:

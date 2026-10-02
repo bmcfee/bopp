@@ -37,14 +37,13 @@ def test_json_roundtrip(tmp_path):
     assert getattr(loaded, "sandbox", None) == {"user_note": "json_test", "flag": True}
 
 
-def test_load_bopp_json_missing_id_warning(tmp_path):
+def test_load_bopp_json_missing_id(tmp_path):
     # Valid JSON without an 'id' field
     json_data = '{"bopp_version": "1.0", "media_id": "track:123", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
     file_path = tmp_path / "missing_id.json"
     file_path.write_text(json_data, encoding="utf-8")
 
-    with pytest.warns(UserWarning, match="missing an 'id' field"):
-        loaded = load_bopp_json(file_path, validate_id=True)
+    loaded = load_bopp_json(file_path, validate_id=True)
     assert getattr(loaded, "id", msgspec.UNSET) is msgspec.UNSET
 
 
@@ -203,16 +202,15 @@ def test_csv_column_validation_rules():
 
 
 def test_save_and_load_with_validate_id_false(tmp_path):
-    with pytest.warns(UserWarning, match="missing an 'id' field"):
-        ann = create(
-            bopp_version="1.0",
-            media_id="track:no_id_val",
-            payload_kind="onset",
-            extent_kind="time",
-            time=[0.1],
-            value=[1],
-            generate_id=False,
-        )
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:no_id_val",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1],
+        value=[1],
+        generate_id=False,
+    )
 
     json_path = tmp_path / "test_no_val.json"
     msgpack_path = tmp_path / "test_no_val.msgpack"
@@ -279,8 +277,7 @@ def test_load_bopp_csv_without_frontmatter(tmp_path):
     file_path = tmp_path / "no_frontmatter.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
-    with pytest.warns(UserWarning, match="missing an 'id' field"):
-        loaded = load_bopp_csv(file_path, validate_id=True)
+    loaded = load_bopp_csv(file_path, validate_id=True)
     assert loaded.media_id == "track:no_frontmatter"
 
 
@@ -312,6 +309,5 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
     file_path = tmp_path / "extra_col.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
-    with pytest.warns(UserWarning, match="missing an 'id' field"):
-        loaded = load_bopp_csv(file_path, validate_id=True)
+    loaded = load_bopp_csv(file_path, validate_id=True)
     assert loaded.media_id == "track:extra_col"

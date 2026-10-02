@@ -50,16 +50,15 @@ def test_create_minimal():
 
 
 def test_create_generate_id_false():
-    with pytest.warns(UserWarning, match="missing an 'id' field"):
-        ann = create(
-            bopp_version="1.0",
-            media_id="audio:123",
-            payload_kind="onset",
-            extent_kind="time",
-            time=[0.1, 0.5],
-            value=[1, 1],
-            generate_id=False,
-        )
+    ann = create(
+        bopp_version="1.0",
+        media_id="audio:123",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=[1, 1],
+        generate_id=False,
+    )
     assert getattr(ann, "id", msgspec.UNSET) is msgspec.UNSET
 
 
@@ -113,8 +112,7 @@ def test_validate_annotation_id_missing():
         value=[1, 1],
         generate_id=False,
     )
-    with pytest.warns(UserWarning, match="missing an 'id' field"):
-        assert validate_annotation_id(ann) is False
+    assert validate_annotation_id(ann) is False
 
 
 def test_create_with_parents():
