@@ -102,13 +102,7 @@ def test_csv_roundtrip_object_payload(tmp_path):
         bopp_version="1.0",
         media_id="track:csv_obj_test",
         payload_kind="object",
-        extent_kind="pixel_box",
-        x=[10, 20],
-        y=[10, 20],
-        w=[100, 100],
-        h=[100, 100],
-        label=["cat", "dog"],
-        detail=[{"color": "brown"}, {"color": "white"}],
+        value=[{"color": "brown"}, {"color": "white"}],
     )
     file_path = tmp_path / "test_obj.csv"
 
@@ -117,7 +111,7 @@ def test_csv_roundtrip_object_payload(tmp_path):
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == "object"
-    assert getattr(loaded.payload, "detail") == [{"color": "brown"}, {"color": "white"}]
+    assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
 
 
 def test_load_bopp_csv_invalid_schema(tmp_path):
