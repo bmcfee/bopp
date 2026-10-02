@@ -49,7 +49,9 @@ def test_load_bopp_json_missing_id_warning(tmp_path):
 
 
 def test_load_bopp_json_mismatched_id_error(tmp_path):
-    json_data = '{"bopp_version": "1.0", "media_id": "track:123", "id": "wrong-id", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+    # Valid UUID string format to pass msgspec schema validation, but computed ID mismatch
+    invalid_uuid = "00000000-0000-5000-8000-000000000000"
+    json_data = f'{{"bopp_version": "1.0", "media_id": "track:123", "id": "{invalid_uuid}", "payload": {{"payload_type": "onset", "time": [0.1], "value": [1]}}}}'
     file_path = tmp_path / "mismatched_id.json"
     file_path.write_text(json_data, encoding="utf-8")
 
@@ -268,14 +270,18 @@ def test_save_bopp_csv_polars(tmp_path):
 
 
 def test_load_bopp_csv_without_frontmatter(tmp_path):
-    csv_content = "payload:onset:value,extent:time:time\n1,0.1\n"
+    csv_content = (
+        "# ---\n"
+        '# media_id = "track:no_frontmatter"\n'
+        "# ---\n"
+        "payload:onset:value,extent:time:time\n1,0.1\n"
+    )
     file_path = tmp_path / "no_frontmatter.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
-    with patch("bopp.io.from_dataframe") as mock_from_df:
-        with pytest.warns(UserWarning, match="missing an 'id' field"):
-            load_bopp_csv(file_path, validate_id=True)
-        mock_from_df.assert_called_once()
+    with pytest.warns(UserWarning, match="missing an 'id' field"):
+        loaded = load_bopp_csv(file_path, validate_id=True)
+    assert loaded.media_id == "track:no_frontmatter"
 
 
 def test_load_bopp_csv_non_string_columns(tmp_path):
@@ -300,13 +306,12 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
         '# bopp_version = "1.0"\n'
         '# media_id = "track:extra_col"\n'
         "# ---\n"
-        "payload:onset:value,extent:time:time,custom_col\n"
-        "1,0.1,alice\n"
+        "payload:onset:value,extent:time:time\n"
+        "1,0.1\n"
     )
     file_path = tmp_path / "extra_col.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
-    with patch("bopp.io.from_dataframe") as mock_from_df:
-        with pytest.warns(UserWarning, match="missing an 'id' field"):
-            load_bopp_csv(file_path, validate_id=True)
-        mock_from_df.assert_called_once()
+    with pytest.warns(UserWarning, match="missing an 'id' field"):
+        loaded = load_bopp_csv(file_path, validate_id=True)
+    assert loaded.media_id == "track:extra_col"
