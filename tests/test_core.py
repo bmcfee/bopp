@@ -12,8 +12,10 @@ from bopp.core import (
     _extract_kwargs,
     compute_annotation_id,
     create,
+    ensure_annotation_id,
     validate,
     validate_and_set_annotation_id,
+    validate_annotation_id,
 )
 from bopp.models.v1.annotation import Annotation
 
@@ -47,6 +49,20 @@ def test_create_minimal():
     assert val.version == 5
 
 
+def test_create_generate_id_false():
+    with pytest.warns(UserWarning, match="missing an 'id' field"):
+        ann = create(
+            bopp_version="1.0",
+            media_id="audio:123",
+            payload_kind="onset",
+            extent_kind="time",
+            time=[0.1, 0.5],
+            value=[1, 1],
+            generate_id=False,
+        )
+    assert getattr(ann, "id", msgspec.UNSET) is msgspec.UNSET
+
+
 def test_create_full():
     ann = create(
         bopp_version="1.0",
@@ -78,12 +94,27 @@ def test_uuid5_idempotence_and_mutation():
     initial_id = ann.id
 
     # Verify idempotency
-    assert validate_and_set_annotation_id(ann) == initial_id
+    assert ensure_annotation_id(ann) == initial_id
+    assert validate_annotation_id(ann) is True
 
-    # Mutate payload and verify failure when validate_and_set_annotation_id checks the existing ID
+    # Mutate payload and verify failure when validate_annotation_id checks the existing ID
     ann.payload.value = [1, 2]
-    with pytest.raises(ValueError, match="Annotation ID mismatch"):
-        validate_and_set_annotation_id(ann)
+    with pytest.raises(BoppValidationError, match="Annotation ID mismatch"):
+        validate_annotation_id(ann)
+
+
+def test_validate_annotation_id_missing():
+    ann = create(
+        bopp_version="1.0",
+        media_id="audio:123",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=[1, 1],
+        generate_id=False,
+    )
+    with pytest.warns(UserWarning, match="missing an 'id' field"):
+        assert validate_annotation_id(ann) is False
 
 
 def test_create_with_parents():

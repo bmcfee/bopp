@@ -37,6 +37,26 @@ def test_json_roundtrip(tmp_path):
     assert getattr(loaded, "sandbox", None) == {"user_note": "json_test", "flag": True}
 
 
+def test_load_bopp_json_missing_id_warning(tmp_path):
+    # Valid JSON without an 'id' field
+    json_data = '{"bopp_version": "1.0", "media_id": "track:123", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+    file_path = tmp_path / "missing_id.json"
+    file_path.write_text(json_data, encoding="utf-8")
+
+    with pytest.warns(UserWarning, match="missing an 'id' field"):
+        loaded = load_bopp_json(file_path, validate_id=True)
+    assert getattr(loaded, "id", msgspec.UNSET) is msgspec.UNSET
+
+
+def test_load_bopp_json_mismatched_id_error(tmp_path):
+    json_data = '{"bopp_version": "1.0", "media_id": "track:123", "id": "wrong-id", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+    file_path = tmp_path / "mismatched_id.json"
+    file_path.write_text(json_data, encoding="utf-8")
+
+    with pytest.raises(BoppValidationError, match="Annotation ID mismatch"):
+        load_bopp_json(file_path, validate_id=True)
+
+
 def test_load_bopp_json_invalid_schema(tmp_path):
     # Valid JSON but invalid structure (missing required 'media_id')
     invalid_json_data = '{"bopp_version": "1.0", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
@@ -181,22 +201,24 @@ def test_csv_column_validation_rules():
 
 
 def test_save_and_load_with_validate_id_false(tmp_path):
-    ann = create(
-        bopp_version="1.0",
-        media_id="track:no_id_val",
-        payload_kind="onset",
-        extent_kind="time",
-        time=[0.1],
-        value=[1],
-    )
+    with pytest.warns(UserWarning, match="missing an 'id' field"):
+        ann = create(
+            bopp_version="1.0",
+            media_id="track:no_id_val",
+            payload_kind="onset",
+            extent_kind="time",
+            time=[0.1],
+            value=[1],
+            generate_id=False,
+        )
 
     json_path = tmp_path / "test_no_val.json"
     msgpack_path = tmp_path / "test_no_val.msgpack"
     csv_path = tmp_path / "test_no_val.csv"
 
-    save_bopp_json(ann, json_path, validate_id=False)
-    save_bopp_msgpack(ann, msgpack_path, validate_id=False)
-    save_bopp_csv(ann, csv_path, validate_id=False)
+    save_bopp_json(ann, json_path, validate_id=False, generate_id=False)
+    save_bopp_msgpack(ann, msgpack_path, validate_id=False, generate_id=False)
+    save_bopp_csv(ann, csv_path, validate_id=False, generate_id=False)
 
     loaded_json = load_bopp_json(json_path, validate_id=False)
     loaded_msgpack = load_bopp_msgpack(msgpack_path, validate_id=False)
@@ -251,7 +273,8 @@ def test_load_bopp_csv_without_frontmatter(tmp_path):
     file_path.write_text(csv_content, encoding="utf-8")
 
     with patch("bopp.io.from_dataframe") as mock_from_df:
-        load_bopp_csv(file_path, validate_id=False)
+        with pytest.warns(UserWarning, match="missing an 'id' field"):
+            load_bopp_csv(file_path, validate_id=True)
         mock_from_df.assert_called_once()
 
 
@@ -284,5 +307,6 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
     file_path.write_text(csv_content, encoding="utf-8")
 
     with patch("bopp.io.from_dataframe") as mock_from_df:
-        load_bopp_csv(file_path, validate_id=False)
+        with pytest.warns(UserWarning, match="missing an 'id' field"):
+            load_bopp_csv(file_path, validate_id=True)
         mock_from_df.assert_called_once()

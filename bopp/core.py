@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import warnings
 from typing import Any, TypeVar, cast
 
 import msgspec
@@ -28,8 +29,10 @@ __all__ = [
     "BoppValidationError",
     "compute_annotation_id",
     "create",
+    "ensure_annotation_id",
     "validate",
     "validate_and_set_annotation_id",
+    "validate_annotation_id",
 ]
 
 
@@ -58,28 +61,71 @@ def compute_annotation_id(annotation: Any) -> str:
     return str(uuid.uuid5(BOPP_NAMESPACE, canonical_bytes))
 
 
-def validate_and_set_annotation_id(annotation: Any) -> str:
+def validate_annotation_id(annotation: Any) -> bool:
     """
-    Compute and validate or set the UUIDv5 identifier for an annotation.
+    Validate the UUIDv5 identifier of an annotation without silently mutating it.
 
-    If the annotation already has an 'id' set, it is validated against the
-    computed UUIDv5 ID. If no 'id' is set, the computed ID is assigned.
+    If an 'id' is present, validates it against the computed UUIDv5.
+    If no 'id' is present, issues a UserWarning.
 
     Parameters
     ----------
     annotation : Any
-        An Annotation struct instance or dictionary representation of an annotation
-        to validate or update in place.
+        An Annotation struct instance or dictionary representation of an annotation.
+
+    Returns
+    -------
+    bool
+        True if the ID is present and valid, False if ID is missing (with warning).
+
+    Raises
+    ------
+    BoppValidationError
+        If an existing 'id' on the annotation does not match the computed ID.
+    """
+    computed_id = compute_annotation_id(annotation)
+
+    existing_id = (
+        getattr(annotation, "id", None)
+        if isinstance(annotation, msgspec.Struct)
+        else annotation.get("id")
+    )
+
+    if existing_id is None or existing_id is msgspec.UNSET:
+        warnings.warn(
+            "Annotation is missing an 'id' field.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return False
+
+    if existing_id != computed_id:
+        raise BoppValidationError(
+            f"Annotation ID mismatch: object has '{existing_id}', computed '{computed_id}'"
+        )
+
+    return True
+
+
+def ensure_annotation_id(annotation: Any) -> str:
+    """
+    Compute and set the UUIDv5 identifier for an annotation if missing,
+    or validate it if present.
+
+    Parameters
+    ----------
+    annotation : Any
+        An Annotation struct instance or dictionary representation.
 
     Returns
     -------
     str
-        The validated or assigned UUIDv5 identifier.
+        The assigned or validated UUIDv5 identifier.
 
     Raises
     ------
-    ValueError
-        If an existing 'id' on the annotation does not match the computed ID.
+    BoppValidationError
+        If an existing 'id' does not match the computed ID.
     """
     computed_id = compute_annotation_id(annotation)
 
@@ -95,11 +141,18 @@ def validate_and_set_annotation_id(annotation: Any) -> str:
         else:
             annotation["id"] = computed_id
     elif existing_id != computed_id:
-        raise ValueError(
+        raise BoppValidationError(
             f"Annotation ID mismatch: object has '{existing_id}', computed '{computed_id}'"
         )
 
     return computed_id
+
+
+def validate_and_set_annotation_id(annotation: Any) -> str:
+    """
+    Deprecated alias for ensure_annotation_id.
+    """
+    return ensure_annotation_id(annotation)
 
 
 def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -132,6 +185,7 @@ def create(
     parents: list[str] | Any = msgspec.UNSET,
     bopp_version: str | None = None,
     sandbox: Any = msgspec.UNSET,
+    generate_id: bool = True,
     **kwargs: Any
 ) -> Any:
     """
@@ -154,6 +208,8 @@ def create(
         If None, defaults to the current default schema version.
     sandbox : Any, optional
         Unstructured storage area for arbitrary user-defined data.
+    generate_id : bool, default True
+        If True, computes and assigns deterministic UUIDv5 `id` to the annotation.
     **kwargs : Any
         Keyword arguments matching fields for the payload, extent, or
         confidence structures.
@@ -161,7 +217,7 @@ def create(
     Returns
     -------
     Annotation
-        An instantiated Annotation structure with computed UUIDv5 id.
+        An instantiated Annotation structure.
 
     Raises
     ------
@@ -224,7 +280,11 @@ def create(
         sandbox=sandbox,
     )
 
-    validate_and_set_annotation_id(ann)
+    if generate_id:
+        ensure_annotation_id(ann)
+    else:
+        validate_annotation_id(ann)
+
     return ann
 
 

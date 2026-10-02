@@ -8,20 +8,28 @@ import tomllib
 
 from ._version import get_current_schema_version
 from .base import BoppBase
-from .core import validate_and_set_annotation_id
+from .core import compute_annotation_id, ensure_annotation_id, validate_annotation_id
 from .exceptions import BoppArgumentError
 from .registries import get_registry
 from .util import extract_header, from_dataframe, to_dataframe
 
 
-def _prepare_annotation(ann: BoppBase, validate_id: bool) -> None:
-    """Helper to validate or compute the annotation ID prior to serialization."""
-    if validate_id:
-        validate_and_set_annotation_id(ann)
+def _prepare_annotation_for_save(
+    ann: BoppBase, *, validate_id: bool, generate_id: bool
+) -> None:
+    """Helper to generate or validate the annotation ID prior to serialization."""
+    if generate_id and getattr(ann, "id", msgspec.UNSET) in (msgspec.UNSET, None):
+        ensure_annotation_id(ann)
+    elif validate_id:
+        validate_annotation_id(ann)
 
 
 def save_bopp_csv(
-    ann: BoppBase, filepath: str | Path, *, validate_id: bool = True
+    ann: BoppBase,
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    generate_id: bool = True,
 ) -> None:
     """
     Write metadata as TOML frontmatter followed by tabular data to a CSV file.
@@ -33,9 +41,11 @@ def save_bopp_csv(
     filepath : str or pathlib.Path
         Target file path for the output CSV file.
     validate_id : bool, default True
-        If True, validates or sets the deterministic UUIDv5 ID before saving.
+        If True, validates the deterministic UUIDv5 ID before saving.
+    generate_id : bool, default True
+        If True, computes and assigns an ID if missing before saving.
     """
-    _prepare_annotation(ann, validate_id)
+    _prepare_annotation_for_save(ann, validate_id=validate_id, generate_id=generate_id)
 
     df = to_dataframe(ann)
     metadata = extract_header(ann)
@@ -74,7 +84,8 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBas
     filepath : str or pathlib.Path
         Path to the BOPP JSON file to read.
     validate_id : bool, default True
-        If True, validates or sets the deterministic UUIDv5 ID after loading.
+        If True, validates the deterministic UUIDv5 ID after loading.
+        Emits a warning if missing.
 
     Returns
     -------
@@ -92,13 +103,17 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBas
     ann = msgspec.json.decode(data, type=annotation_cls)
 
     if validate_id:
-        validate_and_set_annotation_id(ann)
+        validate_annotation_id(ann)
 
     return ann
 
 
 def save_bopp_json(
-    annotation: BoppBase, filepath: str | Path, *, validate_id: bool = True
+    annotation: BoppBase,
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    generate_id: bool = True,
 ) -> None:
     """
     Serialize an Annotation instance directly into a JSON file.
@@ -110,9 +125,11 @@ def save_bopp_json(
     filepath : str or pathlib.Path
         Target file path for saving the JSON output.
     validate_id : bool, default True
-        If True, validates or sets the deterministic UUIDv5 ID before saving.
+        If True, validates the deterministic UUIDv5 ID before saving.
+    generate_id : bool, default True
+        If True, computes and assigns an ID if missing before saving.
     """
-    _prepare_annotation(annotation, validate_id)
+    _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
 
     # msgspec encodes structs natively without needing conversion dicts
     json_data = msgspec.json.encode(annotation)
@@ -122,7 +139,11 @@ def save_bopp_json(
 
 
 def save_bopp_msgpack(
-    annotation: BoppBase, filepath: str | Path, *, validate_id: bool = True
+    annotation: BoppBase,
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    generate_id: bool = True,
 ) -> None:
     """
     Serialize an Annotation instance directly into a binary MsgPack file.
@@ -134,9 +155,11 @@ def save_bopp_msgpack(
     filepath : str or pathlib.Path
         Target file path for saving the MsgPack binary output.
     validate_id : bool, default True
-        If True, validates or sets the deterministic UUIDv5 ID before saving.
+        If True, validates the deterministic UUIDv5 ID before saving.
+    generate_id : bool, default True
+        If True, computes and assigns an ID if missing before saving.
     """
-    _prepare_annotation(annotation, validate_id)
+    _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
 
     binary_data = msgspec.msgpack.encode(annotation)
 
@@ -153,7 +176,8 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
     filepath : str or pathlib.Path
         Path to the binary MsgPack file.
     validate_id : bool, default True
-        If True, validates or sets the deterministic UUIDv5 ID after loading.
+        If True, validates the deterministic UUIDv5 ID after loading.
+        Emits a warning if missing.
 
     Returns
     -------
@@ -170,7 +194,7 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
     ann = msgspec.msgpack.decode(binary_data, type=annotation_cls)
 
     if validate_id:
-        validate_and_set_annotation_id(ann)
+        validate_annotation_id(ann)
 
     return ann
 
@@ -184,7 +208,8 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
     filepath : str or pathlib.Path
         Path to the BOPP CSV file.
     validate_id : bool, default True
-        If True, validates or sets the deterministic UUIDv5 ID after loading.
+        If True, validates the deterministic UUIDv5 ID after loading.
+        Emits a warning if missing.
 
     Returns
     -------
@@ -247,6 +272,6 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
     ann = from_dataframe(df)
 
     if validate_id:
-        validate_and_set_annotation_id(ann)
+        validate_annotation_id(ann)
 
     return ann
