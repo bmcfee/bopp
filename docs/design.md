@@ -10,7 +10,7 @@ This document provides an overview of the architecture and design of the `bopp` 
 
 Key modules and their roles:
 
-* **`bopp.models`**: Contains hand-written or generated `msgspec.Struct` classes defining the models (Annotation root, Payloads, Extents, Confidences, and Metadata).
+* **`bopp.models`**: Contains automatically generated `msgspec.Struct` classes defining the models (Annotation root, Payloads, Extents, Confidences, and Metadata).
 * **`bopp.registries`**: Auto-generated registry files (`registry_v1.py`, etc.) mapping string tags/identifiers to Python class types for dynamic parsing and validation.
 * **`bopp.core`**: High-level factory (`create`) and validation functions.
 * **`bopp.io`**: I/O routines for JSON, MsgPack, and CSV serialization/deserialization.
