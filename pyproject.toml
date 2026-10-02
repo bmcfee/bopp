@@ -69,6 +69,7 @@ exclude_files = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["bopp"]
+force-include = { "bopp/py.typed" = "bopp/py.typed" }
 
 [tool.hatch.envs.codegen]
 # Isolate the generator dependencies from your main app
