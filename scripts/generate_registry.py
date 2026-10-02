@@ -158,6 +158,7 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
             f.write("    },\n")
         f.write("}\n\n")
 
+        all_exports.sort()
         f.write(f"__all__ = {all_exports!r}\n")
 
 
