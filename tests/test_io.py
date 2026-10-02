@@ -260,8 +260,8 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
         '# bopp_version = "1.0"\n'
         '# media_id = "track:extra_col"\n'
         "# ---\n"
-        "payload:onset:value,extent:time:time,extra_metadata_col\n"
-        "1,0.1,foo\n"
+        "payload:onset:value,extent:time:time,metadata:human:annotator_id\n"
+        "1,0.1,alice\n"
     )
     file_path = tmp_path / "extra_col.csv"
     file_path.write_text(csv_content, encoding="utf-8")
