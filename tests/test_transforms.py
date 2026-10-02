@@ -251,6 +251,52 @@ def test_trim_min_max_strict_and_non_strict():
     assert trimmed_strict.payload.value == ["mid"]
 
 
+def test_trim_min_max_empty_and_no_bounds():
+    # Empty min_max lists to test loop jump branch 205->236
+    extent_empty = TimeFrequencyBoxExtent(
+        time=[],
+        duration=[],
+        freq_min=[],
+        freq_max=[],
+    )
+    ann_empty = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=extent_empty,
+        payload=TagOpenPayload(value=[]),
+    )
+    bopp.validate_and_set_annotation_id(ann_empty)
+
+    trimmed_empty = trim(ann_empty, start=100.0, end=200.0, target_field="frequency", strict=True)
+    assert trimmed_empty.extent.freq_min == []
+    assert trimmed_empty.extent.freq_max == []
+
+    # Non-empty min_max with no bounds (start=None, end=None impossible per validation, but start=None or end=None)
+    extent = TimeFrequencyBoxExtent(
+        time=[0.0],
+        duration=[1.0],
+        freq_min=[200.0],
+        freq_max=[400.0],
+    )
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=extent,
+        payload=TagOpenPayload(value=["mid"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    # Trim min_max with only start specified in strict mode
+    trimmed_only_start = trim(ann, start=100.0, target_field="frequency", strict=True)
+    assert trimmed_only_start.extent.freq_min == [200.0]
+
+    # Trim min_max with only end specified in strict mode
+    trimmed_only_end = trim(ann, end=500.0, target_field="frequency", strict=True)
+    assert trimmed_only_end.extent.freq_min == [200.0]
+
+
 def test_trim_pixel_box():
     ann = create(
         media_id="test_image",
