@@ -81,8 +81,6 @@ def validate_annotation_id(annotation: Any) -> bool:
     BoppValidationError
         If an existing 'id' on the annotation does not match the computed ID.
     """
-    computed_id = compute_annotation_id(annotation)
-
     existing_id = (
         getattr(annotation, "id", None)
         if isinstance(annotation, msgspec.Struct)
@@ -91,6 +89,8 @@ def validate_annotation_id(annotation: Any) -> bool:
 
     if existing_id is None or existing_id is msgspec.UNSET:
         return False
+
+    computed_id = compute_annotation_id(annotation)
 
     if existing_id != computed_id:
         raise BoppValidationError(

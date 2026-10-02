@@ -31,13 +31,13 @@ In [6]: %timeit pl.read_csv("longbeats.bopp.csv", comment_prefix="#")
 296 μs ± 64.9 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
 In [7]: %timeit bopp.io.load_bopp_csv("longbeats.bopp.csv");
-1.75 ms ± 72.9 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+1.64 ms ± 103 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 
 In [8]: %timeit bopp.io.load_bopp_json("longbeats.bopp");
-252 μs ± 12.2 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+180 μs ± 4.01 μs per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
 
 In [9]: %timeit bopp.io.load_bopp_msgpack("longbeats.bopp.msgpack");
-215 μs ± 8.19 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+163 μs ± 5.7 μs per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
 ```
 
 
@@ -63,11 +63,11 @@ In [6]: %timeit pl.read_csv("drive.csv", comment_prefix="#")
 281 μs ± 63 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
 In [7]: %timeit bopp.io.load_bopp_csv("drive.csv")
-2.28 ms ± 144 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+2.12 ms ± 65.4 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 
 In [8]: %timeit bopp.io.load_bopp_json("drive.bopp")
-319 μs ± 11.6 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+282 μs ± 9.35 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
 In [9]: %timeit bopp.io.load_bopp_msgpack("drive.bopp.msgpack")
-314 μs ± 11.2 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+335 μs ± 11.8 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 ```
