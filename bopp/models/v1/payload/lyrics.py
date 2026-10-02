@@ -3,11 +3,10 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated
 
 from msgspec import Meta, Struct
 
 
-class LyricsPayload(Struct):
-    payload_type: Literal["lyrics"]
+class LyricsPayload(Struct, tag_field="payload_type", tag="lyrics"):
     value: Annotated[list[str], Meta(description="Open strings for lyrics annotations")]

@@ -11,6 +11,7 @@ from .payload import (
     beat,
     chord,
     key_mode,
+    lyrics,
     mood_thayer,
     note_hz,
     note_midi,
@@ -27,6 +28,7 @@ type AnyPayload = Annotated[
     beat.BeatPositionPayload
     | chord.ChordPayload
     | key_mode.KeyModePayload
+    | lyrics.LyricsPayload
     | mood_thayer.MoodThayerPayload
     | note_hz.NoteHzPayload
     | note_midi.NoteMidiPayload
