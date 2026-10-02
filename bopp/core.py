@@ -102,8 +102,7 @@ def validate_annotation_id(annotation: Any) -> bool:
 
 def ensure_annotation_id(annotation: Any) -> str:
     """
-    Compute and set the UUIDv5 identifier for an annotation if missing,
-    or validate it if present.
+    Compute and set the UUIDv5 identifier for an annotation if missing, or validate it if present.
 
     Parameters
     ----------
