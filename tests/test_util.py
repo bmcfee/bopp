@@ -5,8 +5,12 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from bopp.core import BoppArgumentError, BoppIOError, create
-from bopp.util import _get_tag, extract_header, from_dataframe, to_dataframe
+from bopp.core import BoppArgumentError, BoppIOError, BoppValidationError, create
+from bopp.models.v1.annotation import Annotation
+from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
+from bopp.models.v1.extent.times import Times
+from bopp.models.v1.payload.onset import OnsetPayload
+from bopp.util import _get_tag, _validate_dataframe_columns, extract_header, from_dataframe, to_dataframe
 
 
 class TaggedStruct(msgspec.Struct, tag="tagged_sample"):
@@ -45,6 +49,12 @@ def test_extract_header():
     assert "extent" not in header
 
 
+def test_validate_dataframe_columns_invalid_format():
+    # Covers line 133 (part length != 3)
+    with pytest.raises(BoppValidationError, match="Expected exactly 3 colon-separated fields"):
+        _validate_dataframe_columns(["invalid_column_format"], "1.0")
+
+
 def test_to_dataframe_partial_facets():
     # Test annotation without extent or confidence
     ann = create(
@@ -63,6 +73,28 @@ def test_to_dataframe_partial_facets():
     reconstructed = from_dataframe(df)
     assert reconstructed.media_id == "track:no_extent"
     assert getattr(reconstructed, "extent", None) is msgspec.UNSET
+
+
+def test_to_dataframe_field_skips_and_unset_metadata():
+    # Covers lines 202, 207, 211, 216, 220, 231
+    # Directly instantiating structs ensures tag fields are present and skipped.
+    ann = Annotation(
+        media_id="track:skip_test",
+        bopp_version="1.0",
+        metadata=msgspec.UNSET,
+        extent=Times(time=[0.1, 0.2]),
+        payload=OnsetPayload(time=[0.1, 0.2], value=[1, 1]),
+        confidence=LikelihoodConfidence(confidence=[0.8, 0.9]),
+    )
+
+    df = to_dataframe(ann, backend="pandas")
+    assert "extent:time:time" in df.columns
+    assert "extent:time:extent_type" not in df.columns
+    assert "payload:onset:value" in df.columns
+    assert "payload:onset:payload_type" not in df.columns
+    assert "confidence:likelihood:confidence" in df.columns
+    assert "confidence:likelihood:confidence_type" not in df.columns
+    assert "metadata" not in df.attrs
 
 
 def test_pandas_dataframe_roundtrip():
@@ -135,6 +167,19 @@ def test_polars_dataframe_roundtrip():
     assert reconstructed.media_id == ann.media_id
     assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
     assert getattr(reconstructed, "sandbox", None) == {"info": "polars_test"}
+
+
+def test_from_dataframe_no_payload_columns():
+    # Covers branch 354->362 (payload_cols is empty)
+    df = pd.DataFrame({"extent:time:time": [0.1, 0.2]})
+    df.attrs = {
+        "bopp_version": "1.0",
+        "media_id": "track:no_payload",
+    }
+
+    reconstructed = from_dataframe(df)
+    assert reconstructed.media_id == "track:no_payload"
+    assert getattr(reconstructed, "payload", None) is msgspec.UNSET
 
 
 def test_from_dataframe_extra_attrs():
