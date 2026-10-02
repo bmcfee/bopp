@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import msgspec
 
-from .core import BoppArgumentError, BoppArrayError
+from .exceptions import BoppArgumentError, BoppArrayError
 
 
 class BoppBase(msgspec.Struct):
