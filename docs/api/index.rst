@@ -13,6 +13,9 @@ Core
 
     create
     validate
+    compute_annotation_id
+    ensure_annotation_id
+    validate_annotation_id
 
 Input / Output
 --------------
