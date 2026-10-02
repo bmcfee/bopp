@@ -44,7 +44,7 @@ hatch run codegen:build
 This will automatically convert the json schema definitions into Python source code, and
 generate auxiliary registry code used by the `bopp` library to map schema versions to different
 class definitions.
-If you update the schema wihtout running the code generation step, your changes will not be
+If you update the schema without running the code generation step, your changes will not be
 reflected in the library code.
 
 ---
