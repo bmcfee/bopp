@@ -177,9 +177,8 @@ def test_from_dataframe_no_payload_columns():
         "media_id": "track:no_payload",
     }
 
-    reconstructed = from_dataframe(df)
-    assert reconstructed.media_id == "track:no_payload"
-    assert getattr(reconstructed, "payload", None) is msgspec.UNSET
+    with pytest.raises(msgspec.ValidationError, match="Object missing required field `payload`"):
+        from_dataframe(df)
 
 
 def test_from_dataframe_extra_attrs():
