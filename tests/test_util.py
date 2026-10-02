@@ -181,6 +181,16 @@ def test_from_dataframe_no_payload_columns():
         from_dataframe(df)
 
 
+def test_from_dataframe_missing_media_id():
+    df = pd.DataFrame({"payload:onset:value": [1, 2]})
+    df.attrs = {
+        "bopp_version": "1.0",
+    }
+
+    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+        from_dataframe(df)
+
+
 def test_from_dataframe_extra_attrs():
     # Test metadata and annotated_domain attributes handling in from_dataframe
     df = pd.DataFrame({"extent:time:time": [0.1], "payload:onset:value": [1]})

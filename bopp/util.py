@@ -323,9 +323,15 @@ def from_dataframe(df: Any) -> BoppBase:
     registry = get_registry(bopp_version)
     annotation_cls = registry["Annotation"]
 
+    media_id = attrs.get("media_id")
+    if not media_id or not isinstance(media_id, str):
+        raise BoppValidationError(
+            "Missing or invalid required 'media_id' in DataFrame attributes (df.attrs)."
+        )
+
     bopp_data: dict[str, Any] = {
         "bopp_version": bopp_version,
-        "media_id": attrs.get("media_id", "unknown:media"),
+        "media_id": media_id,
     }
 
     for key in ("metadata", "sandbox", "annotated_domain", "id", "parents"):
