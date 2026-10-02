@@ -215,18 +215,25 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
         # 2. Hand the open file pointer directly to Pandas
         df = pd.read_csv(f)
 
-    # 3. Handle Polyphonic / List / Object Data safely
-    # If a column contains lists, tuples, or objects/dicts (e.g. ["C", "E", "G"] or {"a": 1}),
-    # the CSV writer saves them as literal strings. We evaluate them back to actual Python objects here.
+    # 3. Safely evaluate complex columns (lists, fractions, objects) using schema registry metadata
+    bopp_version = metadata.get("bopp_version", get_current_schema_version())
+    registry = get_registry(bopp_version)
+    complex_fields_registry = registry.get("COMPLEX_FIELDS_REGISTRY", {})
+
     target_cols = [
         c
         for c in df.columns
         if c.startswith(("extent:", "payload:", "confidence:"))
     ]
+
     for col in target_cols:
-        if df[col].dtype.type is str or df[col].dtype == "object":
-            strcol = df[col].astype(str)
-            if strcol.str.startswith(("[", "(", "{")).any():
+        parts = col.split(":")
+        if len(parts) == 3:
+            facet_name, tag_value, field_name = parts[0], parts[1], parts[2]
+            tag_field = f"{facet_name}_type"
+
+            is_complex = field_name in complex_fields_registry.get(tag_field, {}).get(tag_value, [])
+            if is_complex and (df[col].dtype.type is str or df[col].dtype == "object"):
                 df[col] = df[col].apply(
                     lambda x: ast.literal_eval(x)
                     if isinstance(x, str) and x.startswith(("[", "(", "{"))

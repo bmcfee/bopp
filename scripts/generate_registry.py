@@ -1,12 +1,75 @@
 #!/usr/bin/env python
 import argparse
 import ast
+import importlib
+import inspect
 from collections import defaultdict
 from pathlib import Path
+from typing import Any, get_args, get_origin
+
+
+def _is_complex_type(tp: Any) -> bool:
+    """Determine if a type hint represents a complex structure (list, dict, tuple, Fraction, Any, etc.)."""
+    if tp is Any:
+        return True
+
+    origin = get_origin(tp)
+
+    # Handle Annotated[T, ...]
+    if origin is not None and hasattr(tp, "__metadata__"):
+        args = get_args(tp)
+        if args:
+            return _is_complex_type(args[0])
+
+    # Handle Union / Optional
+    if origin is getattr(type(int | str), "__origin__", None) or origin is Any:  # UnionType or Union
+        args = get_args(tp)
+        return any(_is_complex_type(arg) for arg in args if arg is not type(None))
+
+    if origin in (list, dict, tuple, set, frozenSet := getattr(__builtins__, "frozenset", set)):
+        return True
+
+    # If it's a class or type alias
+    if isinstance(tp, type):
+        if issubclass(tp, (int, float, str, bool, bytes)):
+            return False
+        # Custom structs, lists, dicts, fractions, etc.
+        return True
+
+    # Check string representations for forward refs or type aliases like Fraction
+    tp_str = str(tp)
+    if any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any")):
+        return True
+
+    return False
+
+
+def _is_complex_field(type_hint: Any) -> bool:
+    """Check if the inner element type of a list array field is complex."""
+    origin = get_origin(type_hint)
+
+    # Handle Annotated[list[...], Meta(...)]
+    if hasattr(type_hint, "__metadata__"):
+        args = get_args(type_hint)
+        if args:
+            type_hint = args[0]
+            origin = get_origin(type_hint)
+
+    # Outer layer is typically list[...] for BOPP columnar arrays
+    if origin in (list, Sequence := getattr(importlib.import_module("typing"), "Sequence", list)):
+        args = get_args(type_hint)
+        if args:
+            inner_type = args[0]
+            return _is_complex_type(inner_type)
+
+    return _is_complex_type(type_hint)
+
 
 def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> None:
     # Registries structure: { tag_field: { tag_value: class_name } }
     registries = defaultdict(dict)
+    # Complex fields structure: { (tag_field, tag_value): [field_names] }
+    complex_fields = defaultdict(dict)
     # Imports structure: { submodule_import_path: set(class_names) }
     imports_by_module = defaultdict(set)
     annotation_class_info = None
@@ -37,6 +100,25 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                 if tag_field and tag_value:
                     registries[tag_field][tag_value] = node.name
                     imports_by_module[submodule].add(node.name)
+
+                    # Import the module to inspect runtime type annotations for fields
+                    try:
+                        mod = importlib.import_module(submodule)
+                        cls = getattr(mod, node.name)
+                        type_hints = inspect.get_annotations(cls, eval_str=True)
+
+                        complex_cols = []
+                        for field_name, hint in type_hints.items():
+                            if field_name == tag_field:
+                                continue
+                            if _is_complex_field(hint):
+                                complex_cols.append(field_name)
+
+                        if complex_cols:
+                            complex_fields[tag_field][tag_value] = complex_cols
+                    except Exception:
+                        pass
+
                 elif node.name == "Annotation":
                     annotation_class_info = node.name
                     imports_by_module[submodule].add(node.name)
@@ -66,7 +148,18 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                 f.write(f"    {repr(tag)}: {tags[tag]},\n")
             f.write("}\n\n")
 
+        # Emit COMPLEX_FIELDS_REGISTRY
+        all_exports.append("COMPLEX_FIELDS_REGISTRY")
+        f.write("COMPLEX_FIELDS_REGISTRY = {\n")
+        for tag_field in sorted(complex_fields.keys()):
+            f.write(f"    {repr(tag_field)}: {{\n")
+            for tag, fields in sorted(complex_fields[tag_field].items()):
+                f.write(f"        {repr(tag)}: {fields!r},\n")
+            f.write("    },\n")
+        f.write("}\n\n")
+
         f.write(f"__all__ = {all_exports!r}\n")
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -76,6 +169,7 @@ def main():
     args = parser.parse_args()
 
     generate_registry(args.input_dir, args.output, args.base_module)
+
 
 if __name__ == "__main__":
     main()
