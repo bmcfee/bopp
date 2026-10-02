@@ -45,7 +45,7 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
     Examples
     --------
     >>> from bopp.models.v1.payload.beat import BeatPositionPayload
-    >>> payload = BeatPositionPayload(position=[1, 2], beat=[1.0, 2.0])
+    >>> payload = BeatPositionPayload(value=[1.0, 2.0])
     >>> _get_tag(payload)
     'beat'
     """
