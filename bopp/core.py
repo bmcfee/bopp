@@ -144,6 +144,16 @@ def ensure_annotation_id(annotation: Any) -> str:
 def validate_and_set_annotation_id(annotation: Any) -> str:
     """
     Deprecated alias for ensure_annotation_id.
+
+    Parameters
+    ----------
+    annotation : Any
+        An Annotation struct instance or dictionary representation.
+
+    Returns
+    -------
+    str
+        The assigned or validated UUIDv5 identifier.
     """
     return ensure_annotation_id(annotation)
 
@@ -156,13 +166,13 @@ def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[s
     ----------
     cls : type of msgspec.Struct
         Target class whose valid field names will be extracted.
-    kwargs : dict of str to Any
+    kwargs : dict
         Dictionary of keyword arguments to extract matching keys from.
         This dictionary is mutated in place.
 
     Returns
     -------
-    dict of str to Any
+    dict
         Dictionary of extracted keyword arguments relevant to `cls`.
     """
     valid_keys = {f.name for f in msgspec.structs.fields(cls)}
