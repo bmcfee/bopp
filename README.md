@@ -112,6 +112,67 @@ produced by models.
 }
 ```
 
+### MIDI intervals
+
+For symbolic MIDI data, extents can be defined in MIDI ticks using `midi_ticks` or `midi_interval`. In this example, note pitch values are defined over MIDI tick intervals.
+
+```json
+{
+  "media_id": "file:midi/song.mid",
+  "bopp_version": "1.0",
+  "extent": {
+    "extent_type": "midi_interval",
+    "time": [0, 480, 960],
+    "duration": [480, 480, 960]
+  },
+  "payload": {
+    "payload_type": "note_midi",
+    "value": [60, 64, 67]
+  }
+}
+```
+
+### Score position
+
+Musical scores and sheet music annotations can use score-based extents like `score_quarter` (quarter note offsets) or `score_interval`. This example places lyric syllables at musical quarter note positions.
+
+```json
+{
+  "media_id": "musicxml:score_001",
+  "bopp_version": "1.0",
+  "extent": {
+    "extent_type": "score_quarter",
+    "time": [0.0, 1.0, 2.0, 3.0]
+  },
+  "payload": {
+    "payload_type": "lyrics",
+    "value": ["Hello", "world", "how", "are"]
+  }
+}
+```
+
+### Optical / visual bounding boxes
+
+For visual annotations on sheet music or audio spectrogram images, the `pixel_box` extent defines 2D bounding boxes using `x`, `y`, `width`, and `height` pixel coordinates.
+
+```json
+{
+  "media_id": "image:page_01.png",
+  "bopp_version": "1.0",
+  "extent": {
+    "extent_type": "pixel_box",
+    "x": [120, 250],
+    "y": [340, 340],
+    "width": [45, 50],
+    "height": [60, 60]
+  },
+  "payload": {
+    "payload_type": "object",
+    "value": ["treble_clef", "quarter_note"]
+  }
+}
+```
+
 ## Dataframe conversion
 
 BOPP annotations can be converted to dataframes using either pandas or polars.
