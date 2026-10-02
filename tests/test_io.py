@@ -209,6 +209,25 @@ def test_save_bopp_csv_unknown_dataframe_type(tmp_path):
             save_bopp_csv(ann, file_path)
 
 
+def test_save_bopp_csv_polars(tmp_path):
+    polars = pytest.importorskip("polars")
+
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:polars_test",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1],
+        value=[1],
+    )
+    file_path = tmp_path / "polars_test.csv"
+
+    with patch("bopp.io.to_dataframe", return_value=polars.DataFrame({"payload:onset:value": [1]})):
+        save_bopp_csv(ann, file_path)
+
+    assert file_path.exists()
+
+
 def test_load_bopp_csv_without_frontmatter(tmp_path):
     csv_content = "payload:onset:value,extent:time:time\n1,0.1\n"
     file_path = tmp_path / "no_frontmatter.csv"
@@ -233,3 +252,18 @@ def test_load_bopp_csv_non_string_columns(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.payload.value == [1, 2]
+
+
+def test_load_bopp_csv_non_target_columns(tmp_path):
+    csv_content = (
+        "# ---\n"
+        '# bopp_version = "1.0"\n'
+        '# media_id = "track:extra_col"\n'
+        "# ---\n"
+        "payload:onset:value,extent:time:time,extra_metadata_col\n"
+        "1,0.1,foo\n"
+    )
+    file_path = tmp_path / "extra_col.csv"
+    file_path.write_text(csv_content, encoding="utf-8")
+
+    load_bopp_csv(file_path, validate_id=False)
