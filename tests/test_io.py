@@ -1,9 +1,11 @@
+from unittest.mock import patch
+
 import msgspec
 import pandas as pd
 import pytest
 
 from bopp.core import create
-from bopp.exceptions import BoppValidationError
+from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.io import (
     load_bopp_csv,
     load_bopp_json,
@@ -159,3 +161,75 @@ def test_csv_column_validation_rules():
     })
     with pytest.raises(BoppValidationError, match="Field 'invalid_field_name' in column .* does not exist"):
         from_dataframe(df_invalid_field)
+
+
+def test_save_and_load_with_validate_id_false(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:no_id_val",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1],
+        value=[1],
+    )
+
+    json_path = tmp_path / "test_no_val.json"
+    msgpack_path = tmp_path / "test_no_val.msgpack"
+    csv_path = tmp_path / "test_no_val.csv"
+
+    save_bopp_json(ann, json_path, validate_id=False)
+    save_bopp_msgpack(ann, msgpack_path, validate_id=False)
+    save_bopp_csv(ann, csv_path, validate_id=False)
+
+    loaded_json = load_bopp_json(json_path, validate_id=False)
+    loaded_msgpack = load_bopp_msgpack(msgpack_path, validate_id=False)
+    loaded_csv = load_bopp_csv(csv_path, validate_id=False)
+
+    assert loaded_json.media_id == ann.media_id
+    assert loaded_msgpack.media_id == ann.media_id
+    assert loaded_csv.media_id == ann.media_id
+
+
+def test_save_bopp_csv_unknown_dataframe_type(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:unknown_df",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1],
+        value=[1],
+    )
+    file_path = tmp_path / "unknown_df.csv"
+
+    class MockUnsupportedDataFrame:
+        pass
+
+    with patch("bopp.io.to_dataframe", return_value=MockUnsupportedDataFrame()):
+        with pytest.raises(BoppArgumentError, match="Unknown dataframe type"):
+            save_bopp_csv(ann, file_path)
+
+
+def test_load_bopp_csv_without_frontmatter(tmp_path):
+    csv_content = "payload:onset:value,extent:time:time\n1,0.1\n"
+    file_path = tmp_path / "no_frontmatter.csv"
+    file_path.write_text(csv_content, encoding="utf-8")
+
+    with patch("bopp.io.from_dataframe") as mock_from_df:
+        load_bopp_csv(file_path, validate_id=False)
+        mock_from_df.assert_called_once()
+
+
+def test_load_bopp_csv_non_string_columns(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:numeric_cols",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1, 0.2],
+        value=[1, 2],
+    )
+    file_path = tmp_path / "numeric.csv"
+    save_bopp_csv(ann, file_path)
+
+    loaded = load_bopp_csv(file_path)
+    assert loaded.payload.value == [1, 2]
