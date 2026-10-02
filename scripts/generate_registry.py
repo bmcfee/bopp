@@ -16,6 +16,12 @@ def _is_complex_type(tp: Any) -> bool:
 
     origin = get_origin(tp)
 
+    # Unwrap Annotated[T, ...] to inspect the underlying base type T
+    if origin is not None and hasattr(tp, "__metadata__"):
+        args = get_args(tp)
+        if args:
+            return _is_complex_type(args[0])
+
     # Handle Union / Optional
     if origin is getattr(type(int | str), "__origin__", None) or origin is Any:
         args = get_args(tp)
@@ -45,6 +51,13 @@ def _is_complex_type(tp: Any) -> bool:
 def _is_complex_field(type_hint: Any) -> bool:
     """Check if the inner element type of a list array field is complex."""
     origin = get_origin(type_hint)
+
+    # Unwrap top-level Annotated if present
+    if origin is not None and hasattr(type_hint, "__metadata__"):
+        args = get_args(type_hint)
+        if args:
+            type_hint = args[0]
+            origin = get_origin(type_hint)
 
     # Outer layer is typically list[...] for BOPP columnar arrays
     if origin in (list, getattr(importlib.import_module("typing"), "Sequence", list)):
