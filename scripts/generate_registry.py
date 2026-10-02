@@ -14,19 +14,19 @@ def _is_complex_type(tp: Any) -> bool:
     if tp is Any:
         return True
 
-    origin = get_origin(tp)
-
-    # If the type is directly a container (list, dict, tuple, set), it is complex
-    if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
-        return True
-
-    # Unwrap Annotated[T, ...] to inspect the underlying base type T
-    if origin is not None and hasattr(tp, "__metadata__"):
+    # 1. Unwrap Annotated[T, ...] first to inspect the underlying type T
+    if hasattr(tp, "__metadata__"):
         args = get_args(tp)
         if args:
             return _is_complex_type(args[0])
 
-    # Handle Union / Optional
+    origin = get_origin(tp)
+
+    # 2. Check if the unwrapped origin/type is a container (list, dict, tuple, set)
+    if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
+        return True
+
+    # 3. Handle Union / Optional
     if origin is getattr(type(int | str), "__origin__", None) or origin is Any:
         args = get_args(tp)
         return any(_is_complex_type(arg) for arg in args if arg is not type(None))
@@ -35,30 +35,26 @@ def _is_complex_type(tp: Any) -> bool:
         args = get_args(tp)
         return any(_is_complex_type(arg) for arg in args if arg is not type(None))
 
-    # Handles classes like dict, list, Struct subclasses, Fraction, etc.
+    # 4. Check primitive scalar classes vs complex classes
     if isinstance(tp, type):
         if issubclass(tp, (int, float, str, bool, bytes)):
             return False
         return True
 
-    # Check string representations for forward refs or type aliases like Fraction / dict
+    # 5. Check string representations for forward refs or type aliases like Fraction / dict
     tp_str = str(tp)
-    if any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any")):
-        return True
-
-    return False
+    return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
 
 
 def _is_complex_field(type_hint: Any) -> bool:
     """Check if the inner element type of a list array field is complex."""
-    origin = get_origin(type_hint)
-
     # Unwrap top-level Annotated if present
-    if origin is not None and hasattr(type_hint, "__metadata__"):
+    if hasattr(type_hint, "__metadata__"):
         args = get_args(type_hint)
         if args:
             type_hint = args[0]
-            origin = get_origin(type_hint)
+
+    origin = get_origin(type_hint)
 
     # Outer layer is typically list[...] for BOPP columnar arrays
     if origin in (list, getattr(importlib.import_module("typing"), "Sequence", list)):
