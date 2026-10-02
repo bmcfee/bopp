@@ -4,19 +4,24 @@ import msgspec
 import pytest
 
 import bopp
+from bopp.core import create
 from bopp.exceptions import BoppArgumentError
 from bopp.models.v1.annotation import Annotation
-from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
+from bopp.models.v1.extent.pixel_box import PixelBoxExtent
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
-from bopp.models.v1.extent.time_interval import TimeIntervalExtent
-from bopp.models.v1.extent.times import Times
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.tag_open import TagOpenPayload
 from bopp.transforms import trim
 
 
 def test_trim_invalid_arguments():
-    ann = bopp.create(media_id="test_media", payload_kind="tag_open", value=["rock"])
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 2.0],
+        value=["rock", "pop"],
+    )
 
     # No start or end provided
     with pytest.raises(BoppArgumentError, match="At least one of 'start' or 'end'"):
@@ -50,7 +55,7 @@ def test_trim_no_extent():
 
 
 def test_trim_time_extent():
-    ann = bopp.create(
+    ann = create(
         media_id="test_media",
         payload_kind="tag_open",
         extent_kind="time",
@@ -68,7 +73,7 @@ def test_trim_time_extent():
 
 def test_trim_time_interval_non_strict():
     # Intervals: [0, 2], [2, 6], [5, 9]
-    ann = bopp.create(
+    ann = create(
         media_id="test_media",
         payload_kind="tag_open",
         extent_kind="time_interval",
@@ -81,9 +86,6 @@ def test_trim_time_interval_non_strict():
 
     # Trim to [1.0, 6.0] non-strict
     trimmed = trim(ann, start=1.0, end=6.0, strict=False, reset=False)
-    # [0, 2] -> [1, 2] (dur 1)
-    # [2, 6] -> [2, 6] (dur 4)
-    # [5, 9] -> [5, 6] (dur 1)
     assert trimmed.extent.time == [1.0, 2.0, 5.0]
     assert trimmed.extent.duration == [1.0, 4.0, 1.0]
     assert trimmed.payload.value == ["first", "second", "third"]
@@ -97,7 +99,7 @@ def test_trim_time_interval_non_strict():
 
 def test_trim_time_interval_strict():
     # Intervals: [0, 2], [2, 6], [5, 9]
-    ann = bopp.create(
+    ann = create(
         media_id="test_media",
         payload_kind="tag_open",
         extent_kind="time_interval",
@@ -121,25 +123,82 @@ def test_trim_time_frequency_box():
         extent=TimeFrequencyBoxExtent(
             time=[0.0, 4.0],
             duration=[3.0, 5.0],
-            freq_min=[100.0, 200.0],
-            freq_max=[500.0, 800.0],
+            frequency_min=[100.0, 200.0],
+            frequency_max=[500.0, 800.0],
         ),
         payload=TagOpenPayload(value=["low", "high"]),
     )
     bopp.validate_and_set_annotation_id(ann)
 
     trimmed = trim(ann, start=1.0, end=5.0, strict=False, reset=True)
-    # Box 1: [0, 3] -> clipped to [1, 3] (duration 2). reset_time shifts to [0, 2]
-    # Box 2: [4, 9] -> clipped to [4, 5] (duration 1). reset_time shifts to [3, 1]
     assert trimmed.extent.time == [0.0, 3.0]
     assert trimmed.extent.duration == [2.0, 1.0]
-    assert trimmed.extent.freq_min == [100.0, 200.0]
-    assert trimmed.extent.freq_max == [500.0, 800.0]
+    assert trimmed.extent.frequency_min == [100.0, 200.0]
+    assert trimmed.extent.frequency_max == [500.0, 800.0]
     assert trimmed.payload.value == ["low", "high"]
 
 
+def test_trim_time_frequency_box_along_frequency():
+    extent = TimeFrequencyBoxExtent(
+        time=[0.0, 1.0, 2.0],
+        duration=[1.0, 1.0, 1.0],
+        frequency_min=[100.0, 200.0, 500.0],
+        frequency_max=[300.0, 400.0, 800.0],
+    )
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        value=["low", "mid", "high"],
+        extent=extent,
+    )
+
+    # Trim frequency axis non-strict
+    trimmed_freq = trim(ann, start=250.0, end=600.0, target_field="frequency", reset=True)
+    assert trimmed_freq.extent.frequency_min == [0.0, 0.0, 250.0]
+    assert trimmed_freq.extent.frequency_max == [50.0, 150.0, 350.0]
+    assert trimmed_freq.payload.value == ["low", "mid", "high"]
+
+    # Trim frequency axis strict
+    trimmed_freq_strict = trim(ann, start=250.0, end=600.0, target_field="frequency", strict=True)
+    assert trimmed_freq_strict.extent.frequency_min == [200.0]
+    assert trimmed_freq_strict.extent.frequency_max == [400.0]
+    assert trimmed_freq_strict.payload.value == ["mid"]
+
+
+def test_trim_pixel_box():
+    extent = PixelBoxExtent(
+        x=[10.0, 50.0, 100.0],
+        width=[20.0, 30.0, 40.0],
+        y=[100.0, 200.0, 300.0],
+        height=[50.0, 50.0, 50.0],
+    )
+    ann = create(
+        media_id="test_image",
+        payload_kind="tag_open",
+        value=["obj1", "obj2", "obj3"],
+        extent=extent,
+    )
+
+    # Requiring target_field for pixel_box
+    with pytest.raises(BoppArgumentError, match="does not have a default target field"):
+        trim(ann, start=20.0, end=70.0)
+
+    # Trimming along x
+    trimmed_x = trim(ann, start=20.0, end=70.0, target_field="x", reset=True)
+    assert trimmed_x.extent.x == [0.0, 30.0]  # [30-20, 50-20]
+    assert trimmed_x.extent.width == [10.0, 20.0]
+    assert trimmed_x.extent.y == [100.0, 200.0]
+    assert trimmed_x.payload.value == ["obj1", "obj2"]
+
+    # Trimming along y
+    trimmed_y = trim(ann, start=180.0, end=260.0, target_field="y", reset=False)
+    assert trimmed_y.extent.y == [180.0, 200.0]
+    assert trimmed_y.extent.height == [70.0, 50.0]
+    assert trimmed_y.payload.value == ["obj1", "obj2"]
+
+
 def test_trim_transitive_parents_and_immutability():
-    ann1 = bopp.create(
+    ann1 = create(
         media_id="test_media",
         payload_kind="tag_open",
         extent_kind="time",
