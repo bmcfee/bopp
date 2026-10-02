@@ -122,7 +122,7 @@ def test_load_bopp_csv_string_with_brackets(tmp_path):
         bopp_version="1.0",
         media_id="track:bracket_str_test",
         payload_kind="tag_open",
-        tag=["[intro]", "(chorus)", "{verse}"],
+        value=["[intro]", "(chorus)", "{verse}"],
     )
     file_path = tmp_path / "test_bracket_str.csv"
 
@@ -130,7 +130,7 @@ def test_load_bopp_csv_string_with_brackets(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert loaded.payload.tag == ["[intro]", "(chorus)", "{verse}"]
+    assert loaded.payload.value == ["[intro]", "(chorus)", "{verse}"]
 
 
 def test_load_bopp_csv_invalid_schema(tmp_path):
