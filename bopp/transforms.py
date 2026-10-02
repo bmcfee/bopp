@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import warnings
 from typing import Any
 
 import msgspec
@@ -69,9 +70,22 @@ def trim(
     # Transitively accumulate parent IDs
     existing_parents = getattr(annotation, "parents", None)
     if existing_parents is None or existing_parents is msgspec.UNSET:
-        new_parents = [annotation.id]
+        new_parents = []
     else:
-        new_parents = list(existing_parents) + [annotation.id]
+        new_parents = list(existing_parents)
+
+    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
+        # Warn that we're deriving an annotation from an unidentified annotation
+        # and cannot correctly populate the parents array
+        warnings.warn(
+            "Trimming an annotation with no ID. The resulting annotation will have no parent lineage.",
+            UserWarning,
+        )
+
+    else:
+        new_parents.append(annotation.id)  # type: ignore[attr-defined]
+
+    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
 
     extent = getattr(annotation, "extent", msgspec.UNSET)
     if extent is msgspec.UNSET or extent is None:
@@ -80,7 +94,7 @@ def trim(
             annotation,
             id=msgspec.UNSET,
             parents=new_parents,
-            sandbox=copy.deepcopy(annotation.sandbox) if getattr(annotation, "sandbox", msgspec.UNSET) is not msgspec.UNSET else msgspec.UNSET,
+            sandbox=new_sandbox
         )
         validate_and_set_annotation_id(new_ann)
         return new_ann
@@ -151,7 +165,7 @@ def trim(
     new_extent = msgspec.structs.replace(extent, **extent_updates)
 
     # Filter payload parallel fields
-    payload = getattr(annotation, "payload", msgspec.UNSET)
+    payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
     payload_updates = {}
     for fname, fval in _get_list_fields_with_length(payload, n_obs).items():
         payload_updates[fname] = [fval[idx] for idx in kept_indices]
@@ -165,9 +179,6 @@ def trim(
         for fname, fval in _get_list_fields_with_length(confidence, n_obs).items():
             confidence_updates[fname] = [fval[idx] for idx in kept_indices]
             kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
-
-    sandbox = getattr(annotation, "sandbox", msgspec.UNSET)
-    new_sandbox = copy.deepcopy(sandbox) if sandbox is not msgspec.UNSET else msgspec.UNSET
 
     new_ann = msgspec.structs.replace(
         annotation,
