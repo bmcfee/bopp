@@ -329,12 +329,9 @@ def from_dataframe(df: Any) -> BoppBase:
         "payload": {},
     }
 
-    if "metadata" in attrs:
-        bopp_data["metadata"] = attrs["metadata"]
-    if "sandbox" in attrs:
-        bopp_data["sandbox"] = attrs["sandbox"]
-    if "annotated_domain" in attrs:
-        bopp_data["annotated_domain"] = attrs["annotated_domain"]
+    for key in ("metadata", "sandbox", "annotated_domain", "id", "parents"):
+        if key in attrs:
+            bopp_data[key] = attrs[key]
 
     coord_cols = [c for c in columns if c.startswith("extent:")]
     payload_cols = [c for c in columns if c.startswith("payload:")]

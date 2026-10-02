@@ -5,9 +5,9 @@ from typing import Any
 
 import msgspec
 
+from .base import BoppBase
 from .core import validate_and_set_annotation_id
 from .exceptions import BoppArgumentError
-from .models.v1.annotation import Annotation
 from .util import _get_tag
 
 
@@ -22,19 +22,19 @@ def _get_list_fields_with_length(struct: msgspec.Struct, expected_length: int) -
 
 
 def trim(
-    annotation: Annotation,
+    annotation: BoppBase,
     *,
     start: float | None = None,
     end: float | None = None,
     strict: bool = False,
     reset: bool = False,
-) -> Annotation:
+) -> BoppBase:
     """
     Trim an Annotation to a specific time range [start, end].
 
     Parameters
     ----------
-    annotation : Annotation
+    annotation : BoppBase
         The input Annotation model instance to trim.
     start : float or None, optional
         Start time in seconds. If None, no lower bound trimming is applied.
@@ -49,7 +49,7 @@ def trim(
 
     Returns
     -------
-    Annotation
+    BoppBase
         A new Annotation instance with trimmed extents, payloads, and confidences.
 
     Raises
@@ -73,14 +73,14 @@ def trim(
     else:
         new_parents = list(existing_parents) + [annotation.id]
 
-    extent = annotation.extent
+    extent = getattr(annotation, "extent", msgspec.UNSET)
     if extent is msgspec.UNSET or extent is None:
         # Return copy of annotation with updated parent lineage
         new_ann = msgspec.structs.replace(
             annotation,
             id=msgspec.UNSET,
             parents=new_parents,
-            sandbox=copy.deepcopy(annotation.sandbox) if annotation.sandbox is not msgspec.UNSET else msgspec.UNSET,
+            sandbox=copy.deepcopy(annotation.sandbox) if getattr(annotation, "sandbox", msgspec.UNSET) is not msgspec.UNSET else msgspec.UNSET,
         )
         validate_and_set_annotation_id(new_ann)
         return new_ann
@@ -96,12 +96,10 @@ def trim(
     shift = start if (reset and start is not None) else 0.0
 
     extent_updates: dict[str, list[Any]] = {}
-
     new_time: list[float] = []
 
     if extent_tag == "time":
         time_vals = extent.time  # type: ignore[union-attr]
-
         n_obs = len(time_vals)
 
         for i, t in enumerate(time_vals):
@@ -117,7 +115,6 @@ def trim(
     elif extent_tag in ("time_interval", "time_frequency_box"):
         time_vals = extent.time  # type: ignore[union-attr]
         duration_vals = extent.duration  # type: ignore[union-attr]
-
         n_obs = len(time_vals)
 
         new_duration: list[float] = []
@@ -154,14 +151,14 @@ def trim(
     new_extent = msgspec.structs.replace(extent, **extent_updates)
 
     # Filter payload parallel fields
-    payload = annotation.payload
+    payload = getattr(annotation, "payload", msgspec.UNSET)
     payload_updates = {}
     for fname, fval in _get_list_fields_with_length(payload, n_obs).items():
         payload_updates[fname] = [fval[idx] for idx in kept_indices]
     new_payload = msgspec.structs.replace(payload, **payload_updates)
 
     # Filter confidence parallel fields
-    confidence = annotation.confidence
+    confidence = getattr(annotation, "confidence", msgspec.UNSET)
     kwargs = {}
     if confidence is not msgspec.UNSET and confidence is not None:
         confidence_updates = {}
@@ -169,7 +166,8 @@ def trim(
             confidence_updates[fname] = [fval[idx] for idx in kept_indices]
             kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
 
-    new_sandbox = copy.deepcopy(annotation.sandbox) if annotation.sandbox is not msgspec.UNSET else msgspec.UNSET
+    sandbox = getattr(annotation, "sandbox", msgspec.UNSET)
+    new_sandbox = copy.deepcopy(sandbox) if sandbox is not msgspec.UNSET else msgspec.UNSET
 
     new_ann = msgspec.structs.replace(
         annotation,

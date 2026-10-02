@@ -13,6 +13,12 @@ from .registries import get_registry
 from .util import extract_header, from_dataframe, to_dataframe
 
 
+def _prepare_annotation(ann: BoppBase, validate_id: bool) -> None:
+    """Helper to validate or compute the annotation ID prior to serialization."""
+    if validate_id:
+        validate_and_set_annotation_id(ann)
+
+
 def save_bopp_csv(
     ann: BoppBase, filepath: str | Path, *, validate_id: bool = True
 ) -> None:
@@ -28,8 +34,7 @@ def save_bopp_csv(
     validate_id : bool, default True
         If True, validates or sets the deterministic UUIDv5 ID before saving.
     """
-    if validate_id:
-        validate_and_set_annotation_id(ann)
+    _prepare_annotation(ann, validate_id)
 
     df = to_dataframe(ann)
     metadata = extract_header(ann)
@@ -106,8 +111,7 @@ def save_bopp_json(
     validate_id : bool, default True
         If True, validates or sets the deterministic UUIDv5 ID before saving.
     """
-    if validate_id:
-        validate_and_set_annotation_id(annotation)
+    _prepare_annotation(annotation, validate_id)
 
     # msgspec encodes structs natively without needing conversion dicts
     json_data = msgspec.json.encode(annotation)
@@ -131,8 +135,7 @@ def save_bopp_msgpack(
     validate_id : bool, default True
         If True, validates or sets the deterministic UUIDv5 ID before saving.
     """
-    if validate_id:
-        validate_and_set_annotation_id(annotation)
+    _prepare_annotation(annotation, validate_id)
 
     binary_data = msgspec.msgpack.encode(annotation)
 
