@@ -3,6 +3,7 @@ import argparse
 import ast
 import importlib
 import inspect
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, get_args, get_origin
@@ -55,6 +56,31 @@ def _is_complex_field(type_hint: Any) -> bool:
     return _is_complex_type(type_hint)
 
 
+def _resolve_absolute_module(output_file: Path, base_module: str, sub_parts: list[str]) -> str:
+    """Convert relative base_module (e.g. ..models.v1) into absolute bopp.models.v1 path."""
+    if not base_module.startswith("."):
+        return f"{base_module}.{'.'.join(sub_parts)}" if sub_parts else base_module
+
+    # Count leading dots
+    clean_base = base_module.lstrip(".")
+    dots_count = len(base_module) - len(clean_base)
+
+    # Find project root / package parent relative to output_file
+    output_abs = output_file.resolve().parent
+    for _ in range(dots_count - 1):
+        output_abs = output_abs.parent
+
+    # Determine absolute import path from CWD
+    rel_from_cwd = output_abs.relative_to(Path.cwd())
+    pkg_parts = list(rel_from_cwd.parts)
+
+    if clean_base:
+        pkg_parts.append(clean_base)
+    pkg_parts.extend(sub_parts)
+
+    return ".".join(pkg_parts)
+
+
 def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> None:
     # Registries structure: { tag_field: { tag_value: class_name } }
     registries = defaultdict(dict)
@@ -64,15 +90,20 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
     imports_by_module = defaultdict(set)
     annotation_class_info = None
 
+    input_dir = input_dir.resolve()
+
     # Walk all .py files recursively in the generated schema tree
     for py_file in sorted(input_dir.rglob("*.py")):
         # Skip top-level package init files or the target registry file itself
         if py_file.resolve() == output_file.resolve() or py_file.name == "__init__.py":
             continue
 
-        # Determine the relative module import path (e.g. bopp.models.v1.payload.chord)
+        # Determine the relative module import path
         rel_path = py_file.relative_to(input_dir).with_suffix("")
-        submodule = f"{base_module}.{'.'.join(rel_path.parts)}"
+        sub_parts = [p for p in rel_path.parts if p != "."]
+
+        rel_submodule = f"{base_module}.{'.'.join(sub_parts)}" if sub_parts else base_module
+        abs_submodule = _resolve_absolute_module(output_file, base_module, sub_parts)
 
         tree = ast.parse(py_file.read_text(encoding="utf-8"))
 
@@ -89,11 +120,11 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
 
                 if tag_field and tag_value:
                     registries[tag_field][tag_value] = node.name
-                    imports_by_module[submodule].add(node.name)
+                    imports_by_module[rel_submodule].add(node.name)
 
                     complex_cols = []
                     try:
-                        mod = importlib.import_module(submodule)
+                        mod = importlib.import_module(abs_submodule)
                         cls = getattr(mod, node.name)
                         type_hints = inspect.get_annotations(cls, eval_str=True)
 
@@ -102,15 +133,17 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                                 continue
                             if _is_complex_field(hint):
                                 complex_cols.append(field_name)
-                    except Exception:
-                        pass
+                    except Exception as err:
+                        sys.stderr.write(
+                            f"Warning: Failed to inspect annotations for {node.name} in {abs_submodule}: {err}\n"
+                        )
 
                     if complex_cols:
                         complex_fields[tag_field][tag_value] = complex_cols
 
                 elif node.name == "Annotation":
                     annotation_class_info = node.name
-                    imports_by_module[submodule].add(node.name)
+                    imports_by_module[rel_submodule].add(node.name)
 
     with output_file.open("w", encoding="utf-8") as f:
         f.write("# AUTO-GENERATED: Do not edit manually.\n\n")
@@ -152,6 +185,9 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
 
 
 def main():
+    if str(Path.cwd()) not in sys.path:
+        sys.path.insert(0, str(Path.cwd()))
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", type=Path, required=True, help="Path to models root folder")
     parser.add_argument("--output", type=Path, required=True, help="Destination registry file path")
