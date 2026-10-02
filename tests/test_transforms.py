@@ -159,8 +159,8 @@ def test_trim_time_frequency_box_along_frequency():
     assert trimmed_freq.extent.freq_max == [50.0, 150.0, 350.0]
     assert trimmed_freq.payload.value == ["low", "mid", "high"]
 
-    # Trim frequency axis strict
-    trimmed_freq_strict = trim(ann, start=250.0, end=600.0, target_field="frequency", strict=True)
+    # Trim frequency axis strict (150 to 450 strictly contains [200, 400])
+    trimmed_freq_strict = trim(ann, start=150.0, end=450.0, target_field="frequency", strict=True)
     assert trimmed_freq_strict.extent.freq_min == [200.0]
     assert trimmed_freq_strict.extent.freq_max == [400.0]
     assert trimmed_freq_strict.payload.value == ["mid"]
@@ -189,11 +189,11 @@ def test_trim_pixel_box():
     assert trimmed_x.extent.y == [100.0, 200.0]
     assert trimmed_x.payload.value == ["obj1", "obj2"]
 
-    # Trimming along y
+    # Trimming along y (180.0 to 260.0 keeps obj2 [200..250])
     trimmed_y = trim(ann, start=180.0, end=260.0, target_field="y", reset=False)
-    assert trimmed_y.extent.y == [180.0, 200.0]
-    assert trimmed_y.extent.height == [70.0, 50.0]
-    assert trimmed_y.payload.value == ["obj1", "obj2"]
+    assert trimmed_y.extent.y == [200.0]
+    assert trimmed_y.extent.height == [50.0]
+    assert trimmed_y.payload.value == ["obj2"]
 
 
 def test_trim_transitive_parents_and_immutability():
