@@ -253,7 +253,7 @@ def trim(
         confidence_updates = {}
         for fname, fval in _get_list_fields_with_length(confidence, n_obs).items():
             confidence_updates[fname] = [fval[idx] for idx in kept_indices]
-            kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
+        kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
 
     new_ann = msgspec.structs.replace(
         annotation,
