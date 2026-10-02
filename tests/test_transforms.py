@@ -215,6 +215,42 @@ def test_trim_time_frequency_box_along_frequency():
     assert trimmed_freq_strict.payload.value == ["mid"]
 
 
+def test_trim_min_max_strict_and_non_strict():
+    # Targets min_max axis directly with items falling below start, above end, and inside range
+    extent = TimeFrequencyBoxExtent(
+        time=[0.0, 0.0, 0.0],
+        duration=[1.0, 1.0, 1.0],
+        freq_min=[50.0, 200.0, 500.0],
+        freq_max=[100.0, 400.0, 800.0],
+    )
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=extent,
+        payload=TagOpenPayload(value=["low", "mid", "high"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    # Non-strict trim to range [150.0, 600.0]
+    # Item 0 ([50, 100]): p_max <= start (100 <= 150) -> skipped (hits line 222)
+    # Item 1 ([200, 400]): fully inside
+    # Item 2 ([500, 800]): overlaps upper bound -> clipped to [500, 600]
+    trimmed_non_strict = trim(ann, start=150.0, end=600.0, target_field="frequency", strict=False)
+    assert trimmed_non_strict.extent.freq_min == [200.0, 500.0]
+    assert trimmed_non_strict.extent.freq_max == [400.0, 600.0]
+    assert trimmed_non_strict.payload.value == ["mid", "high"]
+
+    # Strict trim to range [150.0, 600.0]
+    # Item 0 ([50, 100]): p_min < start -> skipped in strict mode
+    # Item 1 ([200, 400]): fully inside -> kept
+    # Item 2 ([500, 800]): p_max > end -> skipped in strict mode
+    trimmed_strict = trim(ann, start=150.0, end=600.0, target_field="frequency", strict=True)
+    assert trimmed_strict.extent.freq_min == [200.0]
+    assert trimmed_strict.extent.freq_max == [400.0]
+    assert trimmed_strict.payload.value == ["mid"]
+
+
 def test_trim_pixel_box():
     ann = create(
         media_id="test_image",
