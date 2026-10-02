@@ -10,6 +10,7 @@ from msgspec import Meta
 from .extent import (
     midi_interval,
     midi_tick,
+    pixel_box,
     score_interval,
     score_quarter,
     time_frequency_box,
@@ -21,6 +22,7 @@ type AnyExtent = Annotated[
     times.Times
     | time_interval.TimeIntervalExtent
     | time_frequency_box.TimeFrequencyBoxExtent
+    | pixel_box.PixelBoxExtent
     | score_quarter.ScoreQuarterNotes
     | score_interval.ScoreInterval
     | midi_tick.MidiTicks

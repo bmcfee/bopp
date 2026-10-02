@@ -5,6 +5,7 @@ from ..models.v1.confidence.likelihood import LikelihoodConfidence
 from ..models.v1.confidence.variance import VarianceConfidence
 from ..models.v1.extent.midi_interval import MidiInterval
 from ..models.v1.extent.midi_tick import MidiTicks
+from ..models.v1.extent.pixel_box import PixelBoxExtent
 from ..models.v1.extent.score_interval import ScoreInterval
 from ..models.v1.extent.score_quarter import ScoreQuarterNotes
 from ..models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
@@ -40,6 +41,7 @@ CONFIDENCE_TYPE_REGISTRY = {
 EXTENT_TYPE_REGISTRY = {
     'midi_interval': MidiInterval,
     'midi_tick': MidiTicks,
+    'pixel_box': PixelBoxExtent,
     'score_interval': ScoreInterval,
     'score_quarter': ScoreQuarterNotes,
     'time': Times,
