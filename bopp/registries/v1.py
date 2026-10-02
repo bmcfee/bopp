@@ -77,6 +77,19 @@ PAYLOAD_TYPE_REGISTRY = {
 }
 
 COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
+    'extent_type': {
+        'score_interval': ['quarter'],
+        'score_quarter': ['quarter'],
+    },
+    'metadata_type': {
+        'algorithm': ['parameters'],
+        'sensor': ['settings'],
+    },
+    'payload_type': {
+        'object': ['value'],
+        'onset': ['value'],
+        'pitch_contour': ['value'],
+    },
 }
 
 __all__ = ['ANNOTATION_CLASS', 'COMPLEX_FIELDS_REGISTRY', 'CONFIDENCE_TYPE_REGISTRY', 'EXTENT_TYPE_REGISTRY', 'METADATA_TYPE_REGISTRY', 'PAYLOAD_TYPE_REGISTRY']
