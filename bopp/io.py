@@ -14,6 +14,12 @@ from .registries import get_registry
 from .util import extract_header, from_dataframe, to_dataframe
 
 
+class _VersionHeader(msgspec.Struct):
+    """Lightweight struct for fast schema version extraction."""
+
+    bopp_version: str = get_current_schema_version()
+
+
 def _prepare_annotation_for_save(
     ann: BoppBase, *, validate_id: bool, generate_id: bool
 ) -> None:
@@ -96,10 +102,8 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBas
     with open(filepath, "rb") as f:
         data = f.read()
 
-    raw_dict = msgspec.json.decode(data, type=dict)
-    version = raw_dict.get("bopp_version", get_current_schema_version())
-
-    annotation_cls = get_registry(version)["Annotation"]
+    header = msgspec.json.decode(data, type=_VersionHeader)
+    annotation_cls = get_registry(header.bopp_version)["Annotation"]
     ann = msgspec.json.decode(data, type=annotation_cls)
 
     if validate_id:
@@ -187,10 +191,8 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
     with open(filepath, "rb") as f:
         binary_data = f.read()
 
-    raw_dict = msgspec.msgpack.decode(binary_data, type=dict)
-    version = raw_dict.get("bopp_version", get_current_schema_version())
-
-    annotation_cls = get_registry(version)["Annotation"]
+    header = msgspec.msgpack.decode(binary_data, type=_VersionHeader)
+    annotation_cls = get_registry(header.bopp_version)["Annotation"]
     ann = msgspec.msgpack.decode(binary_data, type=annotation_cls)
 
     if validate_id:
