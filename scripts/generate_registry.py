@@ -62,6 +62,28 @@ def _is_complex_field(type_hint: Any) -> bool:
     return _is_complex_type(type_hint)
 
 
+def _is_complex_ast_node(node: ast.AST) -> bool:
+    """Fallback AST check for complex field types (Fraction, list, dict, tuple, object, Any)."""
+    # Look for list[core.Fraction], list[dict], list[list[...]], etc.
+    if isinstance(node, ast.Subscript):
+        # Check outer list[...]
+        if isinstance(node.slice, ast.Subscript):
+            return True
+        if isinstance(node.slice, ast.Attribute) and node.slice.attr == "Fraction":
+            return True
+        if isinstance(node.slice, ast.Name) and node.slice.id in ("Fraction", "dict", "list", "tuple", "Any", "object"):
+            return True
+
+    # Check for Annotated[list[core.Fraction], ...]
+    for child in ast.walk(node):
+        if isinstance(child, ast.Attribute) and child.attr == "Fraction":
+            return True
+        if isinstance(child, ast.Name) and child.id in ("Fraction", "dict", "tuple", "Any", "object"):
+            return True
+
+    return False
+
+
 def _resolve_absolute_module(output_file: Path, base_module: str, sub_parts: list[str]) -> str:
     """Convert relative base_module (e.g. ..models.v1) into absolute bopp.models.v1 path."""
     if not base_module.startswith("."):
@@ -129,10 +151,11 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                     imports_by_module[rel_submodule].add(node.name)
 
                     complex_cols = []
+                    # 1. Try runtime type hints with module namespace resolution
                     try:
                         mod = importlib.import_module(abs_submodule)
                         cls = getattr(mod, node.name)
-                        type_hints = typing.get_type_hints(cls, include_extras=True)
+                        type_hints = typing.get_type_hints(cls, globalns=mod.__dict__, include_extras=True)
 
                         for field_name, hint in type_hints.items():
                             if field_name == tag_field:
@@ -143,6 +166,16 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                         sys.stderr.write(
                             f"Warning: Failed to inspect annotations for {node.name} in {abs_submodule}: {err}\n"
                         )
+
+                    # 2. Fallback to AST inspection if runtime inspection was empty or failed
+                    if not complex_cols:
+                        for stmt in node.body:
+                            if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                                field_name = stmt.target.id
+                                if field_name == tag_field:
+                                    continue
+                                if _is_complex_ast_node(stmt.annotation):
+                                    complex_cols.append(field_name)
 
                     if complex_cols:
                         complex_fields[tag_field][tag_value] = complex_cols
