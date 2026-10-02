@@ -326,7 +326,6 @@ def from_dataframe(df: Any) -> BoppBase:
     bopp_data: dict[str, Any] = {
         "bopp_version": bopp_version,
         "media_id": attrs.get("media_id", "unknown:media"),
-        "payload": {},
     }
 
     for key in ("metadata", "sandbox", "annotated_domain", "id", "parents"):
@@ -353,7 +352,7 @@ def from_dataframe(df: Any) -> BoppBase:
 
     if payload_cols:
         payload_type = payload_cols[0].split(":")[1]
-        bopp_data["payload"]["payload_type"] = payload_type
+        bopp_data["payload"] = {"payload_type": payload_type}
         for col in payload_cols:
             parts = col.split(":")
             field_name = parts[2]

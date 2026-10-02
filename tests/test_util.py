@@ -83,7 +83,7 @@ def test_to_dataframe_field_skips_and_unset_metadata():
         bopp_version="1.0",
         metadata=msgspec.UNSET,
         extent=Times(time=[0.1, 0.2]),
-        payload=OnsetPayload(time=[0.1, 0.2], value=[1, 1]),
+        payload=OnsetPayload(value=[1, 1]),
         confidence=LikelihoodConfidence(confidence=[0.8, 0.9]),
     )
 
@@ -222,7 +222,7 @@ def test_missing_backend_imports():
 
 
 def test_from_dataframe_missing_pandas_and_polars_imports():
-    df = pd.DataFrame({"payload:onset:time": [0.1], "payload:onset:value": [1]})
+    df = pd.DataFrame({"payload:onset:value": [1]})
 
     # Simulate pandas missing during from_dataframe type check
     with patch.dict("sys.modules", {"pandas": None}):
@@ -230,7 +230,7 @@ def test_from_dataframe_missing_pandas_and_polars_imports():
             from_dataframe(df)
 
     # Simulate polars missing during from_dataframe type check
-    df_pl = pl.DataFrame({"payload:onset:time": [0.1], "payload:onset:value": [1]})
+    df_pl = pl.DataFrame({"payload:onset:value": [1]})
     with patch.dict("sys.modules", {"polars": None}):
         with pytest.raises(BoppArgumentError):
             from_dataframe(df_pl)
