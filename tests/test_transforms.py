@@ -201,8 +201,6 @@ def test_trim_time_frequency_box_along_frequency():
     bopp.validate_and_set_annotation_id(ann)
 
     # Trim frequency axis non-strict [250..600]
-    # Boxes: [100..300] (keep, clipped to [250..300]), [200..400] (keep, clipped to [250..400]),
-    #        [500..800] (keep, clipped to [500..600]), [900..1000] (dropped: p_min >= end)
     trimmed_freq = trim(ann, start=250.0, end=600.0, target_field="frequency", reset=True)
     assert trimmed_freq.extent.freq_min == [0.0, 0.0, 250.0]
     assert trimmed_freq.extent.freq_max == [50.0, 150.0, 350.0]
@@ -216,43 +214,54 @@ def test_trim_time_frequency_box_along_frequency():
 
 
 def test_trim_min_max_strict_and_non_strict():
-    # Targets min_max axis directly with items falling below start, above end, and inside range
     extent = TimeFrequencyBoxExtent(
-        time=[0.0, 0.0, 0.0],
-        duration=[1.0, 1.0, 1.0],
-        freq_min=[50.0, 200.0, 500.0],
-        freq_max=[100.0, 400.0, 800.0],
+        time=[0.0, 0.0, 0.0, 0.0],
+        duration=[1.0, 1.0, 1.0, 1.0],
+        freq_min=[50.0, 200.0, 500.0, 700.0],
+        freq_max=[100.0, 400.0, 800.0, 900.0],
     )
     ann = Annotation(
         media_id="audio",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=extent,
-        payload=TagOpenPayload(value=["low", "mid", "high"]),
+        payload=TagOpenPayload(value=["low", "mid", "high", "ultra"]),
     )
     bopp.validate_and_set_annotation_id(ann)
 
-    # Non-strict trim to range [150.0, 600.0]
-    # Item 0 ([50, 100]): p_max <= start (100 <= 150) -> skipped (hits line 222)
-    # Item 1 ([200, 400]): fully inside
-    # Item 2 ([500, 800]): overlaps upper bound -> clipped to [500, 600]
+    # Non-strict trim with start and end
     trimmed_non_strict = trim(ann, start=150.0, end=600.0, target_field="frequency", strict=False)
     assert trimmed_non_strict.extent.freq_min == [200.0, 500.0]
     assert trimmed_non_strict.extent.freq_max == [400.0, 600.0]
     assert trimmed_non_strict.payload.value == ["mid", "high"]
 
-    # Strict trim to range [150.0, 600.0]
-    # Item 0 ([50, 100]): p_min < start -> skipped in strict mode
-    # Item 1 ([200, 400]): fully inside -> kept
-    # Item 2 ([500, 800]): p_max > end -> skipped in strict mode
+    # Non-strict trim with only start (tests start is not None, end is None branch)
+    trimmed_only_start_ns = trim(ann, start=300.0, target_field="frequency", strict=False)
+    assert trimmed_only_start_ns.extent.freq_min == [300.0, 500.0, 700.0]
+    assert trimmed_only_start_ns.extent.freq_max == [400.0, 800.0, 900.0]
+
+    # Non-strict trim with only end (tests start is None, end is not None branch)
+    trimmed_only_end_ns = trim(ann, end=450.0, target_field="frequency", strict=False)
+    assert trimmed_only_end_ns.extent.freq_min == [50.0, 200.0]
+    assert trimmed_only_end_ns.extent.freq_max == [100.0, 400.0]
+
+    # Strict trim with start and end
     trimmed_strict = trim(ann, start=150.0, end=600.0, target_field="frequency", strict=True)
     assert trimmed_strict.extent.freq_min == [200.0]
     assert trimmed_strict.extent.freq_max == [400.0]
     assert trimmed_strict.payload.value == ["mid"]
 
+    # Strict trim with only start
+    trimmed_only_start_s = trim(ann, start=150.0, target_field="frequency", strict=True)
+    assert trimmed_only_start_s.extent.freq_min == [200.0, 500.0, 700.0]
+
+    # Strict trim with only end
+    trimmed_only_end_s = trim(ann, end=600.0, target_field="frequency", strict=True)
+    assert trimmed_only_end_s.extent.freq_min == [50.0, 200.0]
+
 
 def test_trim_min_max_empty_and_no_bounds():
-    # Empty min_max lists to test loop jump branch 205->236
+    # Empty min_max lists to test 0-iteration loop branch (205->236)
     extent_empty = TimeFrequencyBoxExtent(
         time=[],
         duration=[],
@@ -271,30 +280,6 @@ def test_trim_min_max_empty_and_no_bounds():
     trimmed_empty = trim(ann_empty, start=100.0, end=200.0, target_field="frequency", strict=True)
     assert trimmed_empty.extent.freq_min == []
     assert trimmed_empty.extent.freq_max == []
-
-    # Non-empty min_max with no bounds (start=None, end=None impossible per validation, but start=None or end=None)
-    extent = TimeFrequencyBoxExtent(
-        time=[0.0],
-        duration=[1.0],
-        freq_min=[200.0],
-        freq_max=[400.0],
-    )
-    ann = Annotation(
-        media_id="audio",
-        bopp_version="1.0.0",
-        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
-        extent=extent,
-        payload=TagOpenPayload(value=["mid"]),
-    )
-    bopp.validate_and_set_annotation_id(ann)
-
-    # Trim min_max with only start specified in strict mode
-    trimmed_only_start = trim(ann, start=100.0, target_field="frequency", strict=True)
-    assert trimmed_only_start.extent.freq_min == [200.0]
-
-    # Trim min_max with only end specified in strict mode
-    trimmed_only_end = trim(ann, end=500.0, target_field="frequency", strict=True)
-    assert trimmed_only_end.extent.freq_min == [200.0]
 
 
 def test_trim_pixel_box():
