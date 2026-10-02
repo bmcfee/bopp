@@ -260,10 +260,12 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
         '# bopp_version = "1.0"\n'
         '# media_id = "track:extra_col"\n'
         "# ---\n"
-        "payload:onset:value,extent:time:time,metadata:human:annotator_id\n"
+        "payload:onset:value,extent:time:time,custom_col\n"
         "1,0.1,alice\n"
     )
     file_path = tmp_path / "extra_col.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
-    load_bopp_csv(file_path, validate_id=False)
+    with patch("bopp.io.from_dataframe") as mock_from_df:
+        load_bopp_csv(file_path, validate_id=False)
+        mock_from_df.assert_called_once()
