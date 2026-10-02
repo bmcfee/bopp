@@ -31,10 +31,6 @@ def _is_complex_type(tp: Any) -> bool:
         args = get_args(tp)
         return any(_is_complex_type(arg) for arg in args if arg is not type(None))
 
-    if origin is not None:
-        args = get_args(tp)
-        return any(_is_complex_type(arg) for arg in args if arg is not type(None))
-
     # 4. Check primitive scalar classes vs complex classes
     if isinstance(tp, type):
         if issubclass(tp, (int, float, str, bool, bytes)):
