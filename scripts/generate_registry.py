@@ -8,35 +8,6 @@ from pathlib import Path
 from typing import Any, get_args, get_origin
 
 
-def _has_bopp_complex_ast(node: ast.AnnAssign) -> bool:
-    """Check if an AnnAssign node contains bopp_complex in msgspec.field or Meta extra dict."""
-    if isinstance(node.value, ast.Call):
-        for kw in node.value.keywords:
-            if kw.arg == "extra" and isinstance(kw.value, ast.Dict):
-                for k, v in zip(kw.value.keys, kw.value.values):
-                    if (
-                        isinstance(k, ast.Constant)
-                        and k.value in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
-                        and isinstance(v, ast.Constant)
-                        and bool(v.value)
-                    ):
-                        return True
-
-    for child in ast.walk(node.annotation):
-        if isinstance(child, ast.Call):
-            for kw in child.keywords:
-                if kw.arg == "extra" and isinstance(kw.value, ast.Dict):
-                    for k, v in zip(kw.value.keys, kw.value.values):
-                        if (
-                            isinstance(k, ast.Constant)
-                            and k.value in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
-                            and isinstance(v, ast.Constant)
-                            and bool(v.value)
-                        ):
-                            return True
-    return False
-
-
 def _is_complex_type(tp: Any) -> bool:
     """Determine if a type hint represents a complex structure (list, dict, tuple, Fraction, Any, etc.)."""
     if tp is Any:
@@ -44,23 +15,8 @@ def _is_complex_type(tp: Any) -> bool:
 
     origin = get_origin(tp)
 
-    # Handle Annotated[T, ...]
-    if origin is not None and hasattr(tp, "__metadata__"):
-        args = get_args(tp)
-        if args:
-            return _is_complex_type(args[0])
-
-    # Check for extra metadata on Meta
-    if hasattr(tp, "__metadata__"):
-        for meta in getattr(tp, "__metadata__", []):
-            extra = getattr(meta, "extra", {})
-            if isinstance(extra, dict) and any(
-                extra.get(k) for k in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
-            ):
-                return True
-
     # Handle Union / Optional
-    if origin is getattr(type(int | str), "__origin__", None) or origin is Any:  # UnionType or Union
+    if origin is getattr(type(int | str), "__origin__", None) or origin is Any:
         args = get_args(tp)
         return any(_is_complex_type(arg) for arg in args if arg is not type(None))
 
@@ -71,11 +27,10 @@ def _is_complex_type(tp: Any) -> bool:
         args = get_args(tp)
         return any(_is_complex_type(arg) for arg in args if arg is not type(None))
 
-    # If it's a class or type alias
+    # Handles classes like dict, list, Struct subclasses, Fraction, etc.
     if isinstance(tp, type):
         if issubclass(tp, (int, float, str, bool, bytes)):
             return False
-        # Custom structs, lists, dicts, fractions, etc.
         return True
 
     # Check string representations for forward refs or type aliases like Fraction / dict
@@ -89,19 +44,6 @@ def _is_complex_type(tp: Any) -> bool:
 def _is_complex_field(type_hint: Any) -> bool:
     """Check if the inner element type of a list array field is complex."""
     origin = get_origin(type_hint)
-
-    # Handle Annotated[list[...], Meta(...)]
-    if hasattr(type_hint, "__metadata__"):
-        for meta in getattr(type_hint, "__metadata__", []):
-            extra = getattr(meta, "extra", {})
-            if isinstance(extra, dict) and any(
-                extra.get(k) for k in ("bopp_complex", "x_bopp_complex", "x-bopp-complex")
-            ):
-                return True
-        args = get_args(type_hint)
-        if args:
-            type_hint = args[0]
-            origin = get_origin(type_hint)
 
     # Outer layer is typically list[...] for BOPP columnar arrays
     if origin in (list, getattr(importlib.import_module("typing"), "Sequence", list)):
@@ -149,30 +91,19 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                     registries[tag_field][tag_value] = node.name
                     imports_by_module[submodule].add(node.name)
 
-                    # 1. AST-based detection of bopp_complex metadata
                     complex_cols = []
-                    for stmt in node.body:
-                        if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
-                            field_name = stmt.target.id
+                    try:
+                        mod = importlib.import_module(submodule)
+                        cls = getattr(mod, node.name)
+                        type_hints = inspect.get_annotations(cls, eval_str=True)
+
+                        for field_name, hint in type_hints.items():
                             if field_name == tag_field:
                                 continue
-                            if _has_bopp_complex_ast(stmt):
+                            if _is_complex_field(hint):
                                 complex_cols.append(field_name)
-
-                    # 2. Fallback to runtime inspection if AST metadata wasn't explicit
-                    if not complex_cols:
-                        try:
-                            mod = importlib.import_module(submodule)
-                            cls = getattr(mod, node.name)
-                            type_hints = inspect.get_annotations(cls, eval_str=True)
-
-                            for field_name, hint in type_hints.items():
-                                if field_name == tag_field:
-                                    continue
-                                if _is_complex_field(hint):
-                                    complex_cols.append(field_name)
-                        except Exception:
-                            pass
+                    except Exception:
+                        pass
 
                     if complex_cols:
                         complex_fields[tag_field][tag_value] = complex_cols
