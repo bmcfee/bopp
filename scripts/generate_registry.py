@@ -2,8 +2,8 @@
 import argparse
 import ast
 import importlib
-import inspect
 import sys
+import typing
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, get_args, get_origin
@@ -132,7 +132,7 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                     try:
                         mod = importlib.import_module(abs_submodule)
                         cls = getattr(mod, node.name)
-                        type_hints = inspect.get_annotations(cls, eval_str=True)
+                        type_hints = typing.get_type_hints(cls, include_extras=True)
 
                         for field_name, hint in type_hints.items():
                             if field_name == tag_field:
