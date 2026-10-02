@@ -28,7 +28,7 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("time", "time"): ("point", "time", None),
     ("time_interval", "time"): ("origin_span", "time", "duration"),
     ("time_frequency_box", "time"): ("origin_span", "time", "duration"),
-    ("time_frequency_box", "frequency"): ("min_max", "frequency_min", "frequency_max"),
+    ("time_frequency_box", "frequency"): ("min_max", "freq_min", "freq_max"),
     ("pixel_box", "x"): ("origin_span", "x", "width"),
     ("pixel_box", "y"): ("origin_span", "y", "height"),
     ("midi_tick", "tick"): ("point", "tick", None),

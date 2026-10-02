@@ -7,7 +7,6 @@ import bopp
 from bopp.core import create
 from bopp.exceptions import BoppArgumentError
 from bopp.models.v1.annotation import Annotation
-from bopp.models.v1.extent.pixel_box import PixelBoxExtent
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.tag_open import TagOpenPayload
@@ -123,8 +122,8 @@ def test_trim_time_frequency_box():
         extent=TimeFrequencyBoxExtent(
             time=[0.0, 4.0],
             duration=[3.0, 5.0],
-            frequency_min=[100.0, 200.0],
-            frequency_max=[500.0, 800.0],
+            freq_min=[100.0, 200.0],
+            freq_max=[500.0, 800.0],
         ),
         payload=TagOpenPayload(value=["low", "high"]),
     )
@@ -133,8 +132,8 @@ def test_trim_time_frequency_box():
     trimmed = trim(ann, start=1.0, end=5.0, strict=False, reset=True)
     assert trimmed.extent.time == [0.0, 3.0]
     assert trimmed.extent.duration == [2.0, 1.0]
-    assert trimmed.extent.frequency_min == [100.0, 200.0]
-    assert trimmed.extent.frequency_max == [500.0, 800.0]
+    assert trimmed.extent.freq_min == [100.0, 200.0]
+    assert trimmed.extent.freq_max == [500.0, 800.0]
     assert trimmed.payload.value == ["low", "high"]
 
 
@@ -142,41 +141,41 @@ def test_trim_time_frequency_box_along_frequency():
     extent = TimeFrequencyBoxExtent(
         time=[0.0, 1.0, 2.0],
         duration=[1.0, 1.0, 1.0],
-        frequency_min=[100.0, 200.0, 500.0],
-        frequency_max=[300.0, 400.0, 800.0],
+        freq_min=[100.0, 200.0, 500.0],
+        freq_max=[300.0, 400.0, 800.0],
     )
-    ann = create(
+    ann = Annotation(
         media_id="audio",
-        payload_kind="tag_open",
-        value=["low", "mid", "high"],
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=extent,
+        payload=TagOpenPayload(value=["low", "mid", "high"]),
     )
+    bopp.validate_and_set_annotation_id(ann)
 
     # Trim frequency axis non-strict
     trimmed_freq = trim(ann, start=250.0, end=600.0, target_field="frequency", reset=True)
-    assert trimmed_freq.extent.frequency_min == [0.0, 0.0, 250.0]
-    assert trimmed_freq.extent.frequency_max == [50.0, 150.0, 350.0]
+    assert trimmed_freq.extent.freq_min == [0.0, 0.0, 250.0]
+    assert trimmed_freq.extent.freq_max == [50.0, 150.0, 350.0]
     assert trimmed_freq.payload.value == ["low", "mid", "high"]
 
     # Trim frequency axis strict
     trimmed_freq_strict = trim(ann, start=250.0, end=600.0, target_field="frequency", strict=True)
-    assert trimmed_freq_strict.extent.frequency_min == [200.0]
-    assert trimmed_freq_strict.extent.frequency_max == [400.0]
+    assert trimmed_freq_strict.extent.freq_min == [200.0]
+    assert trimmed_freq_strict.extent.freq_max == [400.0]
     assert trimmed_freq_strict.payload.value == ["mid"]
 
 
 def test_trim_pixel_box():
-    extent = PixelBoxExtent(
+    ann = create(
+        media_id="test_image",
+        payload_kind="tag_open",
+        extent_kind="pixel_box",
         x=[10.0, 50.0, 100.0],
         width=[20.0, 30.0, 40.0],
         y=[100.0, 200.0, 300.0],
         height=[50.0, 50.0, 50.0],
-    )
-    ann = create(
-        media_id="test_image",
-        payload_kind="tag_open",
         value=["obj1", "obj2", "obj3"],
-        extent=extent,
     )
 
     # Requiring target_field for pixel_box
