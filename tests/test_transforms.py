@@ -260,8 +260,12 @@ def test_trim_min_max_strict_and_non_strict():
     assert trimmed_only_end_s.extent.freq_min == [50.0, 200.0]
 
 
-def test_trim_min_max_empty_and_no_bounds():
-    # Empty min_max lists to test 0-iteration loop branch (205->236)
+def test_trim_empty_and_out_of_bounds_extents():
+    """Verify that trimming empty extents or extents where all observations fall outside
+
+    the specified range results in valid, empty array attributes and correct parent lineage.
+    """
+    # 1. Edge case: Extent has empty observation arrays
     extent_empty = TimeFrequencyBoxExtent(
         time=[],
         duration=[],
@@ -280,6 +284,31 @@ def test_trim_min_max_empty_and_no_bounds():
     trimmed_empty = trim(ann_empty, start=100.0, end=200.0, target_field="frequency", strict=True)
     assert trimmed_empty.extent.freq_min == []
     assert trimmed_empty.extent.freq_max == []
+    assert trimmed_empty.payload.value == []
+    assert trimmed_empty.parents == [ann_empty.id]
+
+    # 2. Functional case: Extent with observations completely outside [start, end]
+    extent_out_of_bounds = TimeFrequencyBoxExtent(
+        time=[0.0, 1.0],
+        duration=[1.0, 1.0],
+        freq_min=[10.0, 20.0],
+        freq_max=[50.0, 60.0],
+    )
+    ann_oob = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=extent_out_of_bounds,
+        payload=TagOpenPayload(value=["low1", "low2"]),
+    )
+    bopp.validate_and_set_annotation_id(ann_oob)
+
+    # Trim frequency axis [100.0, 200.0] - all observations should be filtered out
+    trimmed_oob = trim(ann_oob, start=100.0, end=200.0, target_field="frequency", strict=False)
+    assert trimmed_oob.extent.freq_min == []
+    assert trimmed_oob.extent.freq_max == []
+    assert trimmed_oob.payload.value == []
+    assert trimmed_oob.parents == [ann_oob.id]
 
 
 def test_trim_pixel_box():

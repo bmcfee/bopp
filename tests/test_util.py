@@ -50,9 +50,21 @@ def test_extract_header():
 
 
 def test_validate_dataframe_columns_invalid_format():
-    # Covers line 133 (part length != 3)
-    with pytest.raises(BoppValidationError, match="Expected exactly 3 colon-separated fields"):
-        _validate_dataframe_columns(["invalid_column_format"], "1.0")
+    """Verify that DataFrame column header validation rejects column names that do not
+
+    adhere to the required 'facet:type:field' 3-part naming format.
+    """
+    invalid_columns = [
+        "invalid_column_no_colons",
+        "extent:time",  # Too few parts (2)
+        "payload:onset:value:extra",  # Too many parts (4)
+        ":::",  # Empty parts
+    ]
+    for col in invalid_columns:
+        with pytest.raises(
+            BoppValidationError, match="Expected exactly 3 colon-separated fields"
+        ):
+            _validate_dataframe_columns([col], "1.0")
 
 
 def test_to_dataframe_partial_facets():
@@ -75,9 +87,11 @@ def test_to_dataframe_partial_facets():
     assert getattr(reconstructed, "extent", None) is msgspec.UNSET
 
 
-def test_to_dataframe_field_skips_and_unset_metadata():
-    # Covers lines 202, 207, 211, 216, 220, 231
-    # Directly instantiating structs ensures tag fields are present and skipped.
+def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
+    """Verify that `to_dataframe` correctly extracts array data and metadata headers while
+
+    omitting tag discriminator fields (e.g. `payload_type`) and UNSET optional fields.
+    """
     ann = Annotation(
         media_id="track:skip_test",
         bopp_version="1.0",
@@ -88,12 +102,18 @@ def test_to_dataframe_field_skips_and_unset_metadata():
     )
 
     df = to_dataframe(ann, backend="pandas")
-    assert "extent:time:time" in df.columns
+
+    # Verify parallel array data columns are created correctly
+    assert list(df["extent:time:time"]) == [0.1, 0.2]
+    assert list(df["payload:onset:value"]) == [1, 1]
+    assert list(df["confidence:likelihood:confidence"]) == [0.8, 0.9]
+
+    # Verify discriminator tag fields are excluded from DataFrame columns
     assert "extent:time:extent_type" not in df.columns
-    assert "payload:onset:value" in df.columns
     assert "payload:onset:payload_type" not in df.columns
-    assert "confidence:likelihood:confidence" in df.columns
     assert "confidence:likelihood:confidence_type" not in df.columns
+
+    # Verify UNSET metadata is not attached to DataFrame attributes
     assert "metadata" not in df.attrs
 
 
@@ -169,8 +189,11 @@ def test_polars_dataframe_roundtrip():
     assert getattr(reconstructed, "sandbox", None) == {"info": "polars_test"}
 
 
-def test_from_dataframe_no_payload_columns():
-    # Covers branch 354->362 (payload_cols is empty)
+def test_from_dataframe_missing_required_payload_facet():
+    """Verify that reconstructing an Annotation from a DataFrame fails validation
+
+    if the DataFrame lacks mandatory 'payload:*' columns required by the schema.
+    """
     df = pd.DataFrame({"extent:time:time": [0.1, 0.2]})
     df.attrs = {
         "bopp_version": "1.0",
@@ -204,7 +227,11 @@ def test_from_dataframe_extra_attrs():
     assert reconstructed.media_id == "track:extra_attrs"
 
 
-def test_missing_backend_imports():
+def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
+    """Verify that `to_dataframe` raises an actionable BoppIOError when attempting
+
+    to use a DataFrame backend whose underlying library is not installed.
+    """
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
@@ -214,34 +241,32 @@ def test_missing_backend_imports():
         value=[1],
     )
 
-    # Test pandas missing
     with patch.dict("sys.modules", {"pandas": None}):
         with pytest.raises(BoppIOError, match="pandas is required"):
             to_dataframe(ann, backend="pandas")
 
-    # Test pyarrow missing
     with patch.dict("sys.modules", {"pyarrow": None}):
         with pytest.raises(BoppIOError, match="pyarrow is required"):
             to_dataframe(ann, backend="pandas-pyarrow")
 
-    # Test polars missing
     with patch.dict("sys.modules", {"polars": None}):
         with pytest.raises(BoppIOError, match="polars is required"):
             to_dataframe(ann, backend="polars")
 
 
-def test_from_dataframe_missing_pandas_and_polars_imports():
-    df = pd.DataFrame({"payload:onset:value": [1]})
+def test_from_dataframe_raises_argument_error_when_dataframe_libraries_missing():
+    """Verify that `from_dataframe` raises a BoppArgumentError when required DataFrame
 
-    # Simulate pandas missing during from_dataframe type check
+    libraries (pandas/polars) cannot be imported to inspect the input object.
+    """
+    df_pd = pd.DataFrame({"payload:onset:value": [1]})
     with patch.dict("sys.modules", {"pandas": None}):
-        with pytest.raises(BoppArgumentError):
-            from_dataframe(df)
+        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
+            from_dataframe(df_pd)
 
-    # Simulate polars missing during from_dataframe type check
     df_pl = pl.DataFrame({"payload:onset:value": [1]})
     with patch.dict("sys.modules", {"polars": None}):
-        with pytest.raises(BoppArgumentError):
+        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
             from_dataframe(df_pl)
 
 
