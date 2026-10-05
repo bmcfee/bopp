@@ -150,6 +150,25 @@ def _validate_dataframe_columns(columns: list[str], bopp_version: str) -> None:
             )
 
 
+def _extract_facet_data(
+    struct: msgspec.Struct | None,
+    facet_name: str,
+    target_dict: dict[str, Any],
+) -> None:
+    """Extract array fields from a facet struct and add them to target_dict with formatted keys."""
+    if struct is None or struct is msgspec.UNSET:
+        return
+
+    tag = _get_tag(struct)
+    type_field_name = f"{facet_name}_type"
+
+    for field in msgspec.structs.fields(type(struct)):
+        if field.name == type_field_name:
+            continue
+        val = getattr(struct, field.name)
+        target_dict[f"{facet_name}:{tag}:{field.name}"] = val
+
+
 def to_dataframe(
     annotation: BoppBase,
     backend: Literal["pandas", "pandas-pyarrow", "polars"] = "pandas",
@@ -190,36 +209,9 @@ def to_dataframe(
     """
     data: dict[str, Any] = {}
 
-    extent = getattr(annotation, "extent", msgspec.UNSET)
-    payload = getattr(annotation, "payload", msgspec.UNSET)
-    confidence = getattr(annotation, "confidence", msgspec.UNSET)
-
-    # 1. Parse Extents (Geometry) if present
-    if extent is not None and extent is not msgspec.UNSET:
-        ext_type = _get_tag(extent)
-        for field in msgspec.structs.fields(type(extent)):
-            if field.name == "extent_type":
-                continue
-            val = getattr(extent, field.name)
-            data[f"extent:{ext_type}:{field.name}"] = val
-
-    # 2. Parse Payload (Passenger Data)
-    if payload is not None and payload is not msgspec.UNSET:
-        payload_type = _get_tag(payload)
-        for field in msgspec.structs.fields(type(payload)):
-            if field.name == "payload_type":
-                continue
-            val = getattr(payload, field.name)
-            data[f"payload:{payload_type}:{field.name}"] = val
-
-    # 3. Parse Confidence (if present)
-    if confidence is not None and confidence is not msgspec.UNSET:
-        conf_type = _get_tag(confidence)
-        for field in msgspec.structs.fields(type(confidence)):
-            if field.name == "confidence_type":
-                continue
-            val = getattr(confidence, field.name)
-            data[f"confidence:{conf_type}:{field.name}"] = val
+    _extract_facet_data(getattr(annotation, "extent", msgspec.UNSET), "extent", data)
+    _extract_facet_data(getattr(annotation, "payload", msgspec.UNSET), "payload", data)
+    _extract_facet_data(getattr(annotation, "confidence", msgspec.UNSET), "confidence", data)
 
     attrs = {
         "bopp_version": getattr(annotation, "bopp_version", get_current_schema_version()),
