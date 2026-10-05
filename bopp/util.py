@@ -57,9 +57,10 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
 
 def extract_header(annotation: BoppBase) -> dict[str, Any]:
     """
-    Extract all singleton fields from an Annotation for TOML serialization.
+    Extract all singleton/scalar fields from an Annotation for TOML serialization.
 
-    Parallel array blocks (`extent`, `payload`, `confidence`) are omitted.
+    Parallel array blocks within facets (`extent`, `payload`, `confidence`) are omitted,
+    while scalar attributes on those facets are preserved under their facet key.
 
     Parameters
     ----------
@@ -78,22 +79,36 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
     Examples
     --------
     >>> from bopp.models.v1.annotation import Annotation
-    >>> ann = Annotation(media_id="audio:123", payload={"payload_type": "onset", "time": [0.1]})
+    >>> ann = Annotation(media_id="audio:123", payload={"payload_type": "onset", "value": [0.1]})
     >>> header = extract_header(ann)
     >>> header["media_id"]
     'audio:123'
     """
-    excluded_fields = {"extent", "payload", "confidence"}
-
     header_data = {}
 
     for field in msgspec.structs.fields(annotation):
-        if field.name in excluded_fields:
-            continue
-
         value = getattr(annotation, field.name)
 
-        if value is not None and value is not msgspec.UNSET:
+        if value is None or value is msgspec.UNSET:
+            continue
+
+        if field.name in FACET_REGISTRY_KEYS:
+            if isinstance(value, msgspec.Struct):
+                tag = _get_tag(value)
+                facet_dict: dict[str, Any] = {}
+                if tag is not None:
+                    facet_dict[f"{field.name}_type"] = tag
+
+                for facet_field in msgspec.structs.fields(type(value)):
+                    if facet_field.name == f"{field.name}_type":
+                        continue
+                    f_val = getattr(value, facet_field.name)
+                    if f_val is not None and f_val is not msgspec.UNSET and not isinstance(f_val, list):
+                        facet_dict[facet_field.name] = msgspec.to_builtins(f_val)
+
+                if facet_dict:
+                    header_data[field.name] = facet_dict
+        else:
             header_data[field.name] = msgspec.to_builtins(value)
 
     return header_data
@@ -154,19 +169,31 @@ def _extract_facet_data(
     struct: msgspec.Struct | None,
     facet_name: str,
     target_dict: dict[str, Any],
+    attrs_dict: dict[str, Any],
 ) -> None:
-    """Extract array fields from a facet struct and add them to target_dict with formatted keys."""
+    """Extract array fields from a facet struct into target_dict, and non-array scalar fields into attrs_dict."""
     if struct is None or struct is msgspec.UNSET:
         return
 
     tag = _get_tag(struct)
     type_field_name = f"{facet_name}_type"
 
+    facet_attrs: dict[str, Any] = {}
+
     for field in msgspec.structs.fields(type(struct)):
         if field.name == type_field_name:
             continue
         val = getattr(struct, field.name)
-        target_dict[f"{facet_name}:{tag}:{field.name}"] = val
+        if val is None or val is msgspec.UNSET:
+            continue
+
+        if isinstance(val, list):
+            target_dict[f"{facet_name}:{tag}:{field.name}"] = val
+        else:
+            facet_attrs[field.name] = msgspec.to_builtins(val)
+
+    if facet_attrs:
+        attrs_dict[facet_name] = facet_attrs
 
 
 def to_dataframe(
@@ -176,7 +203,8 @@ def to_dataframe(
     """
     Convert an Annotation instance into a Pandas or Polars DataFrame.
 
-    Singleton metadata is preserved in `df.attrs` (for Pandas) or custom attributes (for Polars).
+    Singleton metadata and scalar facet attributes are preserved in `df.attrs` (for Pandas)
+    or custom attributes (for Polars).
 
     Parameters
     ----------
@@ -209,14 +237,14 @@ def to_dataframe(
     """
     data: dict[str, Any] = {}
 
-    _extract_facet_data(getattr(annotation, "extent", msgspec.UNSET), "extent", data)
-    _extract_facet_data(getattr(annotation, "payload", msgspec.UNSET), "payload", data)
-    _extract_facet_data(getattr(annotation, "confidence", msgspec.UNSET), "confidence", data)
-
     attrs = {
         "bopp_version": getattr(annotation, "bopp_version", get_current_schema_version()),
         "media_id": getattr(annotation, "media_id", None),
     }
+
+    _extract_facet_data(getattr(annotation, "extent", msgspec.UNSET), "extent", data, attrs)
+    _extract_facet_data(getattr(annotation, "payload", msgspec.UNSET), "payload", data, attrs)
+    _extract_facet_data(getattr(annotation, "confidence", msgspec.UNSET), "confidence", data, attrs)
 
     metadata = getattr(annotation, "metadata", None)
     if metadata is not None and metadata is not msgspec.UNSET:
@@ -342,26 +370,35 @@ def from_dataframe(df: Any) -> BoppBase:
 
     if coord_cols:
         ext_type = coord_cols[0].split(":")[1]
-        bopp_data["extent"] = {"extent_type": ext_type}
+        extent_dict: dict[str, Any] = {"extent_type": ext_type}
+        if isinstance(attrs.get("extent"), dict):
+            extent_dict.update(attrs["extent"])
         for col in coord_cols:
             parts = col.split(":")
             field_name = parts[2]
-            bopp_data["extent"][field_name] = _get_column_list(col)
+            extent_dict[field_name] = _get_column_list(col)
+        bopp_data["extent"] = extent_dict
 
     if payload_cols:
         payload_type = payload_cols[0].split(":")[1]
-        bopp_data["payload"] = {"payload_type": payload_type}
+        payload_dict: dict[str, Any] = {"payload_type": payload_type}
+        if isinstance(attrs.get("payload"), dict):
+            payload_dict.update(attrs["payload"])
         for col in payload_cols:
             parts = col.split(":")
             field_name = parts[2]
-            bopp_data["payload"][field_name] = _get_column_list(col)
+            payload_dict[field_name] = _get_column_list(col)
+        bopp_data["payload"] = payload_dict
 
     if conf_cols:
         conf_type = conf_cols[0].split(":")[1]
-        bopp_data["confidence"] = {"confidence_type": conf_type}
+        confidence_dict: dict[str, Any] = {"confidence_type": conf_type}
+        if isinstance(attrs.get("confidence"), dict):
+            confidence_dict.update(attrs["confidence"])
         for col in conf_cols:
             parts = col.split(":")
             field_name = parts[2]
-            bopp_data["confidence"][field_name] = _get_column_list(col)
+            confidence_dict[field_name] = _get_column_list(col)
+        bopp_data["confidence"] = confidence_dict
 
     return msgspec.convert(bopp_data, type=annotation_cls)
