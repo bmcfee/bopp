@@ -18,6 +18,7 @@ from .payload import (
     object,
     onset,
     pitch_contour_hz,
+    relation,
     segment_multi,
     segment_open,
     tag_open,
@@ -35,6 +36,7 @@ type AnyPayload = Annotated[
     | object.ObjectPayload
     | onset.OnsetPayload
     | pitch_contour_hz.PitchContourPayload
+    | relation.RelationPayload
     | segment_multi.MultiSegmentPayload
     | segment_open.SegmentOpenPayload
     | tag_open.TagOpenPayload

@@ -14,6 +14,7 @@
     { "$ref": "payload/object.json" },
     { "$ref": "payload/onset.json" },
     { "$ref": "payload/pitch_contour_hz.json" },
+    { "$ref": "payload/relation.json" },
     { "$ref": "payload/segment_multi.json" },
     { "$ref": "payload/segment_open.json" },
     { "$ref": "payload/tag_open.json" },

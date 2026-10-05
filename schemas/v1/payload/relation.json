@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/relation",
+  "title": "Relation Payload",
+  "description": "Columnar payload defining relationships between works (covers, quotes, etc).",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+        "const": "relation"
+    },
+    "performance_id": {
+        "type": "string"
+    },
+    "value": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of referenced work or clique identifiers."
+    },
+    "relation": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["cover", "quote", "medley_part", "sample", "interpolation", "remix", "live_performance"]
+      },
+      "description": "Array of relation types parallel to work_id."
+    }
+  },
+  "required": ["payload_type", "performance_id", "value"],
+  "additionalProperties": false
+}

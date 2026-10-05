@@ -27,6 +27,7 @@ from ..models.v1.payload.note_midi import NoteMidiPayload
 from ..models.v1.payload.object import ObjectPayload
 from ..models.v1.payload.onset import OnsetPayload
 from ..models.v1.payload.pitch_contour_hz import PitchContourPayload
+from ..models.v1.payload.relation import RelationPayload
 from ..models.v1.payload.segment_multi import MultiSegmentPayload
 from ..models.v1.payload.segment_open import SegmentOpenPayload
 from ..models.v1.payload.tag_open import TagOpenPayload
@@ -71,6 +72,7 @@ PAYLOAD_TYPE_REGISTRY = {
     'object': ObjectPayload,
     'onset': OnsetPayload,
     'pitch_contour': PitchContourPayload,
+    'relation': RelationPayload,
     'segment_open': SegmentOpenPayload,
     'tag_open': TagOpenPayload,
     'tempo': TempoPayload,
@@ -89,6 +91,7 @@ COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
         'object': ['value'],
         'onset': ['value'],
         'pitch_contour': ['value'],
+        'relation': ['relation'],
     },
 }
 
