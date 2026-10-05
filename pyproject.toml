@@ -75,8 +75,7 @@ pytest tests/benchmark.py \
     -o addopts='' \
     -p no:cov \
     --benchmark-group-by=param:prefix \
-    --benchmark-columns=min,mean,stddev,rounds \
-    --benchmark-disable-gc
+    --benchmark-columns=min,mean,stddev,rounds
 """
 
 [tool.hatch.build.targets.wheel]
