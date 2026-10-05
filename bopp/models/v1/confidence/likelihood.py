@@ -13,5 +13,5 @@ type ConfidenceItem = Annotated[float, Meta(ge=0.0, le=1.0)]
 class LikelihoodConfidence(Struct, tag_field="confidence_type", tag="likelihood"):
     confidence: Annotated[
         list[ConfidenceItem],
-        Meta(description="The likeilhood (probability) of each observation"),
+        Meta(description="The likelihood (probability) of each observation"),
     ]

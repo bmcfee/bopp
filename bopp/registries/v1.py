@@ -1,6 +1,7 @@
 # AUTO-GENERATED: Do not edit manually.
 
 from ..models.v1.annotation import Annotation
+from ..models.v1.confidence.agreement import ConfidenceByInterAnnotatorAgreement
 from ..models.v1.confidence.likelihood import LikelihoodConfidence
 from ..models.v1.confidence.variance import VarianceConfidence
 from ..models.v1.extent.midi_interval import MidiInterval
@@ -36,6 +37,7 @@ from ..models.v1.payload.tempo import TempoPayload
 ANNOTATION_CLASS = Annotation
 
 CONFIDENCE_TYPE_REGISTRY = {
+    'agreement': ConfidenceByInterAnnotatorAgreement,
     'likelihood': LikelihoodConfidence,
     'variance': VarianceConfidence,
 }
@@ -79,6 +81,9 @@ PAYLOAD_TYPE_REGISTRY = {
 }
 
 COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
+    'confidence_type': {
+        'agreement': ['n_annotators'],
+    },
     'extent_type': {
         'score_interval': ['quarter'],
         'score_quarter': ['quarter'],

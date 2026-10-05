@@ -9,7 +9,7 @@
     },
     "confidence": {
       "$ref": "../core.json#/$defs/Array",
-      "description": "The likeilhood (probability) of each observation",
+      "description": "The likelihood (probability) of each observation",
       "items": {
         "type": "number",
         "minimum": 0,

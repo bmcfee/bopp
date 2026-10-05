@@ -7,10 +7,12 @@ from typing import Annotated
 
 from msgspec import Meta
 
-from .confidence import likelihood, variance
+from .confidence import agreement, likelihood, variance
 
 type AnyConfidence = Annotated[
-    likelihood.LikelihoodConfidence | variance.VarianceConfidence,
+    agreement.ConfidenceByInterAnnotatorAgreement
+    | likelihood.LikelihoodConfidence
+    | variance.VarianceConfidence,
     Meta(
         description="A discriminated union of all supported columnar confidence types.",
         title="Any Confidence",
