@@ -18,7 +18,7 @@ cols = {
     "stats.min": "Min (μs)", 
     "stats.mean": "Mean (μs)", 
     "stats.stddev": "StdDev (μs)", 
-    "stats.iterations": "Rounds"
+    "stats.rounds": "Rounds"
 }
 
 # Group by the parameterized prefix and render separate tables
