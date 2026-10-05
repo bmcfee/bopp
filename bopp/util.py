@@ -95,18 +95,20 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
         if field.name in FACET_REGISTRY_KEYS:
             if isinstance(value, msgspec.Struct):
                 tag = _get_tag(value)
+                type_key = f"{field.name}_type"
                 facet_dict: dict[str, Any] = {}
                 if tag is not None:
-                    facet_dict[f"{field.name}_type"] = tag
+                    facet_dict[type_key] = tag
 
                 for facet_field in msgspec.structs.fields(type(value)):
-                    if facet_field.name == f"{field.name}_type":
+                    if facet_field.name == type_key:
                         continue
                     f_val = getattr(value, facet_field.name)
                     if f_val is not None and f_val is not msgspec.UNSET and not isinstance(f_val, list):
                         facet_dict[facet_field.name] = msgspec.to_builtins(f_val)
 
-                if facet_dict:
+                # Only include facet block in header if it contains scalar attributes beyond just type tag
+                if len(facet_dict) > 1:
                     header_data[field.name] = facet_dict
         else:
             header_data[field.name] = msgspec.to_builtins(value)
