@@ -75,7 +75,8 @@ pytest tests/benchmark.py \
     -o addopts='' \
     -p no:cov \
     --benchmark-group-by=param:prefix \
-    --benchmark-columns=min,mean,stddev,rounds
+    --benchmark-columns=min,mean,stddev,rounds \
+    --benchmark-json=benchmark.json
 """
 
 [tool.hatch.build.targets.wheel]

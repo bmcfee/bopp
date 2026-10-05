@@ -9,7 +9,8 @@ Comparisons to direct CSV loading via pandas (`pd`) and polars (`pl`) are also i
 All comparisons are implemented on the author's development machine (intel core i7-1360P, 32GB
 ram, ubuntu 26.04.01-LTS, python 3.13.0 conda).
 
-Running time is calculated using the `%timeit` utility in IPython.
+Running time is calculated by `pytest-benchmark` with code in `tests/benchmark.py` and
+configuration in `pyproject.toml`.
 
 Beats
 -----
@@ -17,28 +18,16 @@ Beats
 
 Extents are time values in seconds, payloads are integer-valued.
 
-```
-In [3]: %timeit jams.load("longbeats.jams");
-32.2 ms ± 1.73 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
+| Loader       |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
+|:-------------|-----------:|------------:|--------------:|---------:|
+| jams_val     |    30910.2 |     45340.5 |       11894.3 |        1 |
+| jams_no_val  |     1429.5 |      1676.8 |         190.4 |        1 |
+| pd_csv       |      662.7 |       857.1 |         132.1 |        1 |
+| pl_csv       |      534.8 |       685.9 |          99.4 |        1 |
+| bopp_csv     |     2106.3 |      2938.3 |         983.7 |        1 |
+| bopp_json    |      170.7 |       235.7 |          60.5 |        1 |
+| bopp_msgpack |      155.9 |       201.9 |          35.6 |        1 |
 
-In [4]: %timeit jams.load("longbeats.jams", validate=False);
-1.58 ms ± 28.3 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
-
-In [5]: %timeit pd.read_csv("longbeats.bopp.csv", comment='#')
-774 μs ± 15.4 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
-
-In [6]: %timeit pl.read_csv("longbeats.bopp.csv", comment_prefix="#")
-296 μs ± 64.9 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
-
-In [7]: %timeit bopp.io.load_bopp_csv("longbeats.bopp.csv");
-1.64 ms ± 103 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
-In [8]: %timeit bopp.io.load_bopp_json("longbeats.bopp");
-180 μs ± 4.01 μs per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
-
-In [9]: %timeit bopp.io.load_bopp_msgpack("longbeats.bopp.msgpack");
-163 μs ± 5.7 μs per loop (mean ± std. dev. of 7 runs, 10,000 loops each)
-```
 
 
 Chords
@@ -49,25 +38,25 @@ disjoint time intervals.
 Extents are time intervals in seconds, payloads are chord strings under the Harte grammar,
 likelihoods are probabilities (floats in `[0, 1]`).
 
-```
-In [3]: %timeit jams.load("drive.jams");
-3.68 ms ± 142 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+| Loader       |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
+|:-------------|-----------:|------------:|--------------:|---------:|
+| jams_val     |     3158.3 |      3725.9 |         372.8 |        1 |
+| jams_no_val  |      295.2 |       398.1 |          54.7 |        1 |
+| pd_csv       |      744.9 |      1092.1 |         197.0 |        1 |
+| pl_csv       |      156.8 |       267.3 |         161.7 |        1 |
+| bopp_csv     |     2009.5 |      2942.4 |         600.3 |        1 |
+| bopp_json    |      267.8 |       318.0 |          49.1 |        1 |
+| bopp_msgpack |      295.8 |       381.0 |          81.9 |        1 |
 
-In [4]: %timeit jams.load("drive.jams", validate=False);
-324 μs ± 9.04 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
-In [5]: %timeit pd.read_csv("drive.csv", comment='#')
-861 μs ± 40.2 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
 
-In [6]: %timeit pl.read_csv("drive.csv", comment_prefix="#")
-281 μs ± 63 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
+Legend
+------
 
-In [7]: %timeit bopp.io.load_bopp_csv("drive.csv")
-2.12 ms ± 65.4 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
-In [8]: %timeit bopp.io.load_bopp_json("drive.bopp")
-282 μs ± 9.35 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
-
-In [9]: %timeit bopp.io.load_bopp_msgpack("drive.bopp.msgpack")
-335 μs ± 11.8 μs per loop (mean ± std. dev. of 7 runs, 1,000 loops each)
-```
+- `jams_val`: `jams.load(file, validate=True)`
+- `jams_no_val`: `jams.load(file, validate=False)`
+- `pd_csv`: `pandas.read_csv(file, comment="#")`
+- `pl_csv`: `polars.read_csv(file, comment_prefix="#")`
+- `bopp_csv`: `bopp.io.load_bopp_csv(file)`
+- `bopp_json`: `bopp.io.load_bopp.json(file)`
+- `bopp_msgpack`: `bopp.io.load_bopp_msgpack(file)`
