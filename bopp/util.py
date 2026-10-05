@@ -244,9 +244,11 @@ def to_dataframe(
         "media_id": getattr(annotation, "media_id", None),
     }
 
-    _extract_facet_data(getattr(annotation, "extent", msgspec.UNSET), "extent", data, attrs)
-    _extract_facet_data(getattr(annotation, "payload", msgspec.UNSET), "payload", data, attrs)
-    _extract_facet_data(getattr(annotation, "confidence", msgspec.UNSET), "confidence", data, attrs)
+    _extract_facet_data(annotation.payload, "payload", data, attrs)  # type: ignore[attr-defined]
+    if hasattr(annotation, "extent"):
+        _extract_facet_data(annotation.extent, "extent", data, attrs)
+    if hasattr(annotation, "confidence"):
+        _extract_facet_data(annotation.confidence, "confidence", data, attrs)
 
     metadata = getattr(annotation, "metadata", None)
     if metadata is not None and metadata is not msgspec.UNSET:

@@ -11,7 +11,7 @@ from .base import BoppBase
 from .core import ensure_annotation_id, validate_annotation_id
 from .exceptions import BoppArgumentError
 from .registries import get_registry
-from .util import extract_header, from_dataframe, to_dataframe
+from .util import from_dataframe, to_dataframe
 
 
 class _VersionHeader(msgspec.Struct):
@@ -53,11 +53,12 @@ def save_bopp_csv(
     """
     _prepare_annotation_for_save(ann, validate_id=validate_id, generate_id=generate_id)
 
+    # Serializing to dataframe stores header information in the attrs
     df = to_dataframe(ann)
-    metadata = extract_header(ann)
+    header = getattr(df, "attrs", {})
 
     # 1. Convert the metadata dictionary to a TOML string
-    toml_bytes = msgspec.toml.encode(metadata)
+    toml_bytes = msgspec.toml.encode(header)
     toml_text = toml_bytes.decode("utf-8")
 
     # 2. Prefix every line with a comment hash
