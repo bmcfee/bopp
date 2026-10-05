@@ -30,6 +30,9 @@ test = [
     "polars>=0.20.0",
     "pyarrow>=12.0.0",
 ]
+benchmark = [
+    "pytest-benchmark"
+]
 
 [tool.hatch.version]
 path = "bopp/_version.py"
@@ -66,6 +69,15 @@ exclude_files = [
     '.*/models/*/*/*.py'
 ]
 
+[tool.hatch.envs.default.scripts]
+bench = """
+pytest tests/benchmark.py \
+    -o addopts='' \
+    -p no:cov \
+    --benchmark-group-by=param:prefix \
+    --benchmark-columns=min,mean,stddev,rounds \
+    --benchmark-disable-gc
+"""
 
 [tool.hatch.build.targets.wheel]
 packages = ["bopp"]
