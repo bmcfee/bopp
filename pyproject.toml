@@ -8,6 +8,9 @@ dynamic = ["version"]
 description = "Bounded Observation Payload Protocol"
 dependencies = [
     "msgspec>=0.18.0",
+    "mir_eval>=0.7",
+    "numpy>=1.20.0",
+    "scipy>=1.7.0",
 ]
 
 [project.optional-dependencies]
@@ -15,16 +18,6 @@ dataframe = [
     "pandas>=2.0.0",
     "polars>=0.20.0",
     "pyarrow>=12.0.0",
-]
-evaluation = [
-    "mir_eval>=0.7",
-    "numpy>=1.20.0",
-    "scipy>=1.7.0",
-]
-eval = [
-    "mir_eval>=0.7",
-    "numpy>=1.20.0",
-    "scipy>=1.7.0",
 ]
 docs = [
     "sphinx",
@@ -39,9 +32,6 @@ test = [
     "pandas>=2.0.0",
     "polars>=0.20.0",
     "pyarrow>=12.0.0",
-    "mir_eval>=0.7",
-    "numpy>=1.20.0",
-    "scipy>=1.7.0",
 ]
 benchmark = [
     "pytest-benchmark"
