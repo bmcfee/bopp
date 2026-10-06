@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import warnings
-from typing import Any
+from typing import Any, Callable, Literal
 
 import msgspec
 
@@ -38,12 +38,39 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
 }
 
 
+class FilterRecord(dict):
+    """
+    Dictionary supporting attribute access for multi-column filter predicates.
+    """
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(f"'FilterRecord' object has no attribute '{name}'") from None
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        self[name] = value
+
+
 def _get_list_fields_with_length(struct: msgspec.Struct, expected_length: int) -> dict[str, list[Any]]:
     """Return dictionary of field name -> list value for list fields matching expected_length."""
     result = {}
     for field in msgspec.structs.fields(type(struct)):
         val = getattr(struct, field.name)
         if isinstance(val, list) and len(val) == expected_length:
+            result[field.name] = val
+    return result
+
+
+def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]]:
+    """Return dictionary of field name -> list value for all list fields in a struct."""
+    if struct is None or struct is msgspec.UNSET:
+        return {}
+    result = {}
+    for field in msgspec.structs.fields(type(struct)):
+        val = getattr(struct, field.name)
+        if isinstance(val, list):
             result[field.name] = val
     return result
 
@@ -263,6 +290,198 @@ def trim(
         payload=new_payload,
         sandbox=new_sandbox,
         **kwargs
+    )
+    validate_and_set_annotation_id(new_ann)
+    return new_ann
+
+
+def filter_by(
+    annotation: BoppBase,
+    predicate: Callable[..., bool],
+    *,
+    target: str | None = None,
+    facet: Literal["payload", "extent", "confidence", "all"] = "payload",
+) -> BoppBase:
+    """
+    Filter observations in an Annotation by applying a predicate function.
+
+    Observations across extent, payload, and confidence facets are filtered in parallel
+    according to their shared array indices, keeping only elements where `predicate`
+    evaluates to True.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        The input Annotation instance to filter.
+    predicate : Callable[..., bool]
+        A callable taking observation elements or records and returning a truthy/falsy value.
+    target : str or None, optional
+        A specific field name to pass into `predicate` (e.g., 'value', 'time', 'valence').
+        If specified, `predicate` is invoked as `predicate(value)`.
+        If None and `facet` is not "all", if the facet contains a single parallel column
+        or a field named 'value', that column value is passed directly to `predicate`.
+        Otherwise, a record (accessible via attribute and dict key) is passed to `predicate`.
+    facet : {"payload", "extent", "confidence", "all"}, default "payload"
+        The facet to target when evaluating `predicate`.
+        When set to "all", `predicate` is passed a row record containing fields from
+        extent, payload, and confidence facets.
+
+    Returns
+    -------
+    BoppBase
+        A new Annotation instance containing only matching observations.
+
+    Raises
+    ------
+    BoppArgumentError
+        If arguments are invalid or the specified facet/target is not found.
+    """
+    if facet not in ("payload", "extent", "confidence", "all"):
+        raise BoppArgumentError(
+            f"Invalid facet '{facet}'. Must be one of 'payload', 'extent', 'confidence', or 'all'."
+        )
+
+    # Accumulate parent IDs
+    existing_parents = getattr(annotation, "parents", None)
+    if existing_parents is None or existing_parents is msgspec.UNSET:
+        new_parents = []
+    else:
+        new_parents = list(existing_parents)
+
+    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
+        warnings.warn(
+            "Filtering an annotation with no ID. The resulting annotation will have no parent lineage.",
+            UserWarning,
+        )
+    else:
+        new_parents.append(annotation.id)  # type: ignore[attr-defined]
+
+    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
+
+    payload = getattr(annotation, "payload", None)
+    extent = getattr(annotation, "extent", None)
+    confidence = getattr(annotation, "confidence", None)
+
+    payload_cols = _get_facet_list_fields(payload)
+    extent_cols = _get_facet_list_fields(extent)
+    confidence_cols = _get_facet_list_fields(confidence)
+
+    # Determine number of observations from any available facet column
+    n_obs = 0
+    all_facets_cols = [payload_cols, extent_cols, confidence_cols]
+    for cols in all_facets_cols:
+        if cols:
+            first_col = next(iter(cols.values()))
+            n_obs = len(first_col)
+            break
+
+    if n_obs == 0:
+        new_ann = msgspec.structs.replace(
+            annotation,
+            id=msgspec.UNSET,
+            parents=new_parents,
+            sandbox=new_sandbox,
+        )
+        validate_and_set_annotation_id(new_ann)
+        return new_ann
+
+    # Prepare input stream for predicate
+    kept_indices: list[int] = []
+
+    if facet == "all":
+        if target is not None:
+            # Look for target across all facets
+            found_col = None
+            for cols in (payload_cols, extent_cols, confidence_cols):
+                if target in cols:
+                    found_col = cols[target]
+                    break
+            if found_col is None:
+                raise BoppArgumentError(f"Target field '{target}' not found in any annotation facet.")
+            for i, val in enumerate(found_col):
+                if predicate(val):
+                    kept_indices.append(i)
+        else:
+            for i in range(n_obs):
+                record_dict: dict[str, Any] = {}
+                for k, v in extent_cols.items():
+                    record_dict[k] = v[i]
+                for k, v in payload_cols.items():
+                    record_dict[k] = v[i]
+                for k, v in confidence_cols.items():
+                    record_dict[k] = v[i]
+                record = FilterRecord(record_dict)
+                if predicate(record):
+                    kept_indices.append(i)
+
+    else:
+        facet_struct_map = {
+            "payload": (payload, payload_cols),
+            "extent": (extent, extent_cols),
+            "confidence": (confidence, confidence_cols),
+        }
+        struct_obj, cols = facet_struct_map[facet]
+        if struct_obj is None or struct_obj is msgspec.UNSET or not cols:
+            raise BoppArgumentError(f"Facet '{facet}' is not present on annotation or contains no columns.")
+
+        if target is not None:
+            if target not in cols:
+                raise BoppArgumentError(
+                    f"Target field '{target}' not found in facet '{facet}'. Available: {list(cols.keys())}"
+                )
+            target_list = cols[target]
+            for i, val in enumerate(target_list):
+                if predicate(val):
+                    kept_indices.append(i)
+        else:
+            # If there's a 'value' column or only 1 column, pass values directly
+            if "value" in cols:
+                target_list = cols["value"]
+                for i, val in enumerate(target_list):
+                    if predicate(val):
+                        kept_indices.append(i)
+            elif len(cols) == 1:
+                target_list = next(iter(cols.values()))
+                for i, val in enumerate(target_list):
+                    if predicate(val):
+                        kept_indices.append(i)
+            else:
+                # Multiple columns and no 'value' column: pass record
+                for i in range(n_obs):
+                    record = FilterRecord({k: v[i] for k, v in cols.items()})
+                    if predicate(record):
+                        kept_indices.append(i)
+
+    # Update facets with kept indices
+    kwargs: dict[str, Any] = {}
+
+    if payload is not None and payload is not msgspec.UNSET:
+        payload_updates = {
+            fname: [fval[idx] for idx in kept_indices]
+            for fname, fval in _get_list_fields_with_length(payload, n_obs).items()
+        }
+        kwargs["payload"] = msgspec.structs.replace(payload, **payload_updates)
+
+    if extent is not None and extent is not msgspec.UNSET:
+        extent_updates = {
+            fname: [fval[idx] for idx in kept_indices]
+            for fname, fval in _get_list_fields_with_length(extent, n_obs).items()
+        }
+        kwargs["extent"] = msgspec.structs.replace(extent, **extent_updates)
+
+    if confidence is not None and confidence is not msgspec.UNSET:
+        confidence_updates = {
+            fname: [fval[idx] for idx in kept_indices]
+            for fname, fval in _get_list_fields_with_length(confidence, n_obs).items()
+        }
+        kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
+
+    new_ann = msgspec.structs.replace(
+        annotation,
+        id=msgspec.UNSET,
+        parents=new_parents,
+        sandbox=new_sandbox,
+        **kwargs,
     )
     validate_and_set_annotation_id(new_ann)
     return new_ann
