@@ -336,6 +336,60 @@ def filter_by(
     ------
     BoppArgumentError
         If arguments are invalid or the specified facet/target is not found.
+
+    Examples
+    --------
+    Filter by payload value (default behavior):
+
+    >>> ann = bopp.create(
+    ...     media_id="track_1",
+    ...     payload_kind="tag_open",
+    ...     extent_kind="time",
+    ...     time=[1.0, 2.0, 3.0],
+    ...     value=["rock", "pop", "rock"],
+    ... )
+    >>> filtered = bopp.filter_by(ann, lambda v: v == "rock")
+    >>> filtered.payload.value
+    ['rock', 'rock']
+    >>> filtered.extent.time
+    [1.0, 3.0]
+
+    Filter by an explicit extent field:
+
+    >>> filtered = bopp.filter_by(ann, lambda t: t > 1.5, facet="extent", target="time")
+    >>> filtered.extent.time
+    [2.0, 3.0]
+
+    Filter multi-column payloads using record attribute access:
+
+    >>> ann_mood = bopp.create(
+    ...     media_id="track_1",
+    ...     payload_kind="mood_thayer",
+    ...     valence=[0.5, -0.2, 0.8],
+    ...     arousal=[0.1, 0.4, -0.3],
+    ... )
+    >>> happy = bopp.filter_by(ann_mood, lambda r: r.valence > 0 and r.arousal > 0)
+    >>> happy.payload.valence
+    [0.5]
+
+    Cross-facet filtering across extent, payload, and confidence:
+
+    >>> ann_multi = bopp.create(
+    ...     media_id="track_1",
+    ...     payload_kind="tag_open",
+    ...     extent_kind="time",
+    ...     confidence_kind="likelihood",
+    ...     time=[1.0, 2.0, 3.0],
+    ...     value=["intro", "verse", "chorus"],
+    ...     confidence=[0.9, 0.4, 0.95],
+    ... )
+    >>> res = bopp.filter_by(
+    ...     ann_multi,
+    ...     lambda r: r.time >= 2.0 and r.confidence >= 0.8,
+    ...     facet="all",
+    ... )
+    >>> res.payload.value
+    ['chorus']
     """
     if facet not in ("payload", "extent", "confidence", "all"):
         raise BoppArgumentError(
