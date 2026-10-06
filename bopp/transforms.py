@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import math
 import warnings
 from collections.abc import Callable
 from typing import Any, Literal
@@ -9,7 +10,8 @@ import msgspec
 
 from .base import BoppBase
 from .core import validate_and_set_annotation_id
-from .exceptions import BoppArgumentError
+from .exceptions import BoppArgumentError, BoppValidationError
+from .models.v1.extent.times import Times
 from .util import _get_tag
 
 # Mapping default target_field when target_field is None
@@ -152,7 +154,7 @@ def trim(
             annotation,
             id=msgspec.UNSET,
             parents=new_parents,
-            sandbox=new_sandbox
+            sandbox=new_sandbox,
         )
         validate_and_set_annotation_id(new_ann)
         return new_ann
@@ -290,7 +292,7 @@ def trim(
         extent=new_extent,
         payload=new_payload,
         sandbox=new_sandbox,
-        **kwargs
+        **kwargs,
     )
     validate_and_set_annotation_id(new_ann)
     return new_ann
@@ -341,6 +343,7 @@ def filter_by(
     --------
     Filter by payload value (default behavior):
 
+    >>> import bopp
     >>> ann = bopp.create(
     ...     media_id="track_1",
     ...     payload_kind="tag_open",
@@ -535,6 +538,411 @@ def filter_by(
         annotation,
         id=msgspec.UNSET,
         parents=new_parents,
+        sandbox=new_sandbox,
+        **kwargs,
+    )
+    validate_and_set_annotation_id(new_ann)
+    return new_ann
+
+
+def _validate_fill_values(
+    struct_type: type[msgspec.Struct],
+    fill_map: dict[str, Any],
+    facet_name: str,
+) -> None:
+    """Validate that fill values conform to the struct's field types."""
+    dummy_kwargs: dict[str, Any] = {}
+    for f in msgspec.structs.fields(struct_type):
+        if f.name in fill_map:
+            dummy_kwargs[f.name] = [fill_map[f.name]]
+        else:
+            dummy_kwargs[f.name] = []
+    try:
+        msgspec.convert(dummy_kwargs, struct_type)
+    except Exception as exc:
+        raise BoppValidationError(
+            f"Invalid fill value for {facet_name} struct '{struct_type.__name__}': {exc}"
+        ) from exc
+
+
+def to_times(
+    annotation: BoppBase,
+    *,
+    times: list[float] | None = None,
+    sample_rate: float | None = None,
+    method: Literal["previous", "nearest"] = "previous",
+    overlap: Literal["latest", "first", "multiple"] = "latest",
+    fill_value: Any = None,
+) -> BoppBase:
+    """
+    Convert an Annotation to the 'times' (point-in-time) extent via sampling or interpolation.
+
+    Evaluates observations at the requested timestamps. For interval extents, observations
+    covering each timestamp are selected. For point extents, nearest or previous neighbor
+    lookup is performed without assuming any algebra on the payload values. If confidence
+    values are present, they are resampled in parallel.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        The input Annotation instance to convert.
+    times : list of float or None, optional
+        Explicit array of timestamp positions against which to sample.
+        Mutually exclusive with `sample_rate`.
+    sample_rate : float or None, optional
+        Uniform sampling rate in Hertz (> 0). Samples are generated covering the full
+        extent of the annotation: from the earliest start time to the latest end time.
+        Mutually exclusive with `times`.
+    method : {"previous", "nearest"}, default "previous"
+        Interpolation method when sampling point extents ('time'):
+        - "previous": Selects the most recent prior event at or before the sample timestamp.
+        - "nearest": Selects the event closest in time to the sample timestamp.
+    overlap : {"latest", "first", "multiple"}, default "latest"
+        Disambiguation strategy when multiple intervals cover a sample timestamp:
+        - "latest": Pick the interval that starts latest (or has the highest index).
+        - "first": Pick the interval that starts earliest (or has the lowest index).
+        - "multiple": Emit duplicate sample timestamps, one for each overlapping interval.
+    fill_value : Any or dict of str to Any, optional
+        Value to fill when a sample timestamp falls in a gap (no covering observation).
+        For single-column payloads, a scalar value may be supplied. For multi-column
+        payloads, a dictionary mapping field names to fill values must be provided.
+        Fill values are validated against the payload schema. Default is None.
+
+    Returns
+    -------
+    BoppBase
+        A new Annotation instance with extent type `times` (`Times` struct).
+
+    Raises
+    ------
+    BoppArgumentError
+        If arguments are invalid or the source extent is incompatible with time conversion.
+    BoppValidationError
+        If `fill_value` does not conform to the payload or confidence schema types.
+
+    Examples
+    --------
+    Sample a time interval annotation at explicit timestamps:
+
+    >>> import bopp
+    >>> ann = bopp.create(
+    ...     media_id="track_1",
+    ...     payload_kind="tag_open",
+    ...     extent_kind="time_interval",
+    ...     time=[0.0, 2.0],
+    ...     duration=[2.0, 2.0],
+    ...     value=["verse", "chorus"],
+    ... )
+    >>> sampled = bopp.to_times(ann, times=[0.5, 1.5, 2.5])
+    >>> sampled.extent.time
+    [0.5, 1.5, 2.5]
+    >>> sampled.payload.value
+    ['verse', 'verse', 'chorus']
+
+    Sample with a uniform sample rate over the full extent:
+
+    >>> sampled_rate = bopp.to_times(ann, sample_rate=1.0)
+    >>> sampled_rate.extent.time
+    [0.0, 1.0, 2.0, 3.0, 4.0]
+    >>> sampled_rate.payload.value
+    ['verse', 'verse', 'chorus', 'chorus', 'chorus']
+
+    Resample point events using previous-neighbor lookup:
+
+    >>> points = bopp.create(
+    ...     media_id="track_1",
+    ...     payload_kind="chord",
+    ...     extent_kind="time",
+    ...     time=[0.0, 2.0],
+    ...     value=["C:maj", "G:maj"],
+    ... )
+    >>> resampled = bopp.to_times(points, times=[0.5, 1.9, 2.1], method="previous")
+    >>> resampled.payload.value
+    ['C:maj', 'C:maj', 'G:maj']
+
+    Handling gaps with a fill value:
+
+    >>> intervals = bopp.create(
+    ...     media_id="track_1",
+    ...     payload_kind="tag_open",
+    ...     extent_kind="time_interval",
+    ...     time=[1.0],
+    ...     duration=[1.0],
+    ...     value=["solo"],
+    ... )
+    >>> filled = bopp.to_times(intervals, times=[0.5, 1.5, 2.5], fill_value="silence")
+    >>> filled.payload.value
+    ['silence', 'solo', 'silence']
+    """
+    if (times is None and sample_rate is None) or (times is not None and sample_rate is not None):
+        raise BoppArgumentError("Exactly one of 'times' or 'sample_rate' must be specified.")
+
+    if sample_rate is not None and sample_rate <= 0:
+        raise BoppArgumentError(f"sample_rate must be positive (> 0), got {sample_rate}.")
+
+    if method not in ("previous", "nearest"):
+        raise BoppArgumentError(f"Invalid method '{method}'. Must be 'previous' or 'nearest'.")
+
+    if overlap not in ("latest", "first", "multiple"):
+        raise BoppArgumentError(
+            f"Invalid overlap strategy '{overlap}'. Must be 'latest', 'first', or 'multiple'."
+        )
+
+    # Lineage tracking
+    existing_parents = getattr(annotation, "parents", None)
+    if existing_parents is None or existing_parents is msgspec.UNSET:
+        new_parents = []
+    else:
+        new_parents = list(existing_parents)
+
+    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
+        warnings.warn(
+            "Converting an annotation with no ID. The resulting annotation will have no parent lineage.",
+            UserWarning,
+        )
+    else:
+        new_parents.append(annotation.id)  # type: ignore[attr-defined]
+
+    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
+
+    extent = getattr(annotation, "extent", None)
+    payload: msgspec.Struct = getattr(annotation, "payload")
+    confidence = getattr(annotation, "confidence", None)
+
+    payload_cols = _get_facet_list_fields(payload)
+    confidence_cols = _get_facet_list_fields(confidence)
+
+    # Determine extent tag & compatibility
+    extent_tag: str | None = None
+    if extent is not None and extent is not msgspec.UNSET:
+        extent_tag = _get_tag(extent)
+        if extent_tag not in ("time", "time_interval", "time_frequency_box"):
+            raise BoppArgumentError(
+                f"Extent type '{extent_tag}' is incompatible with to_times. "
+                f"Supported extents are 'time', 'time_interval', 'time_frequency_box', or None (global)."
+            )
+
+    # Determine observations count
+    n_source_obs = 0
+    if extent_tag is not None and extent is not None:
+        first_extent_col = next(iter(_get_facet_list_fields(extent).values()), [])
+        n_source_obs = len(first_extent_col)
+    elif payload_cols:
+        first_payload_col = next(iter(payload_cols.values()))
+        n_source_obs = len(first_payload_col)
+
+    # Setup fill_value map
+    payload_fill_map: dict[str, Any] = {}
+    confidence_fill_map: dict[str, Any] = {}
+
+    if isinstance(fill_value, dict):
+        for col_name in payload_cols:
+            if col_name in fill_value:
+                payload_fill_map[col_name] = fill_value[col_name]
+            elif "value" in fill_value and len(payload_cols) == 1:
+                payload_fill_map[col_name] = fill_value["value"]
+            else:
+                raise BoppArgumentError(
+                    f"Missing fill value for payload field '{col_name}' in fill_value dictionary."
+                )
+        for col_name in confidence_cols:
+            if col_name in fill_value:
+                confidence_fill_map[col_name] = fill_value[col_name]
+            else:
+                confidence_fill_map[col_name] = 0.0
+    else:
+        if len(payload_cols) == 1:
+            col_name = next(iter(payload_cols.keys()))
+            payload_fill_map[col_name] = fill_value
+        elif len(payload_cols) > 1 and fill_value is not None:
+            raise BoppArgumentError(
+                "Multi-column payload requires fill_value to be a dict mapping field names to values."
+            )
+        elif len(payload_cols) > 1:
+            # fill_value is None
+            for col_name in payload_cols:
+                payload_fill_map[col_name] = None
+
+        for col_name in confidence_cols:
+            confidence_fill_map[col_name] = 0.0
+
+    # Build sampling grid
+    target_times: list[float]
+    if times is not None:
+        target_times = [float(t) for t in times]
+    else:
+        assert sample_rate is not None
+        if extent_tag is None or n_source_obs == 0:
+            raise BoppArgumentError(
+                "sample_rate requires an extent with observations to determine temporal bounds. "
+                "Specify explicit 'times' instead."
+            )
+        if extent_tag == "time":
+            time_arr = getattr(extent, "time")
+            t_min = min(time_arr)
+            t_max = max(time_arr)
+        elif extent_tag in ("time_interval", "time_frequency_box"):
+            time_arr = getattr(extent, "time")
+            dur_arr = getattr(extent, "duration")
+            t_min = min(time_arr)
+            t_max = max(t + d for t, d in zip(time_arr, dur_arr))
+        else:
+            raise BoppArgumentError(f"Cannot determine bounds for extent '{extent_tag}'.")
+
+        step = 1.0 / sample_rate
+        # Calculate number of steps with float tolerance
+        n_steps = int(math.floor((t_max - t_min) / step + 1e-9)) + 1
+        target_times = [t_min + i * step for i in range(n_steps)]
+        if target_times and target_times[-1] > t_max + 1e-9:
+            target_times.pop()
+
+    # If target_times is empty, return empty times extent
+    if not target_times:
+        new_extent = Times(time=[])
+        payload_updates = {fname: [] for fname in payload_cols}
+        new_payload = msgspec.structs.replace(payload, **payload_updates)
+        kwargs = {}
+        if confidence is not None and confidence is not msgspec.UNSET:
+            confidence_updates = {fname: [] for fname in confidence_cols}
+            kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
+
+        new_ann = msgspec.structs.replace(
+            annotation,
+            id=msgspec.UNSET,
+            parents=new_parents,
+            extent=new_extent,
+            payload=new_payload,
+            sandbox=new_sandbox,
+            **kwargs,
+        )
+        validate_and_set_annotation_id(new_ann)
+        return new_ann
+
+    # If source annotation has no observations
+    if n_source_obs == 0:
+        # Validate fill values since every query position will be a gap
+        _validate_fill_values(type(payload), payload_fill_map, "payload")
+        if confidence is not None and confidence is not msgspec.UNSET:
+            _validate_fill_values(type(confidence), confidence_fill_map, "confidence")
+
+        out_times = list(target_times)
+        payload_updates = {k: [payload_fill_map[k]] * len(out_times) for k in payload_cols}
+        new_payload = msgspec.structs.replace(payload, **payload_updates)
+        kwargs = {}
+        if confidence is not None and confidence is not msgspec.UNSET:
+            confidence_updates = {k: [confidence_fill_map[k]] * len(out_times) for k in confidence_cols}
+            kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
+
+        new_extent = Times(time=out_times)
+        new_ann = msgspec.structs.replace(
+            annotation,
+            id=msgspec.UNSET,
+            parents=new_parents,
+            extent=new_extent,
+            payload=new_payload,
+            sandbox=new_sandbox,
+            **kwargs,
+        )
+        validate_and_set_annotation_id(new_ann)
+        return new_ann
+
+    out_times = []
+    # matched_indices_or_none: None means gap, int means source index
+    matched_indices: list[int | None] = []
+
+    # Sampling per extent type
+    if extent_tag is None:
+        # Global annotation: broadcast the single observation across all query times
+        for t in target_times:
+            out_times.append(t)
+            matched_indices.append(0)
+
+    elif extent_tag in ("time_interval", "time_frequency_box"):
+        t_starts = getattr(extent, "time")
+        durations = getattr(extent, "duration")
+
+        for t in target_times:
+            # An interval covers t if t_start <= t <= t_start + duration
+            # (or strict end boundary)
+            covers = [
+                i
+                for i, (ts, dur) in enumerate(zip(t_starts, durations))
+                if ts <= t <= ts + dur
+            ]
+            if not covers:
+                out_times.append(t)
+                matched_indices.append(None)
+            elif overlap == "multiple":
+                for idx in covers:
+                    out_times.append(t)
+                    matched_indices.append(idx)
+            elif overlap == "first":
+                out_times.append(t)
+                matched_indices.append(covers[0])
+            elif overlap == "latest":
+                out_times.append(t)
+                matched_indices.append(covers[-1])
+
+    elif extent_tag == "time":
+        src_times = getattr(extent, "time")
+        for t in target_times:
+            if method == "previous":
+                prev_candidates = [i for i, st in enumerate(src_times) if st <= t]
+                if not prev_candidates:
+                    out_times.append(t)
+                    matched_indices.append(None)
+                else:
+                    best_idx = prev_candidates[-1]
+                    out_times.append(t)
+                    matched_indices.append(best_idx)
+            elif method == "nearest":
+                # Find index with minimum absolute distance
+                best_idx = min(range(len(src_times)), key=lambda i: abs(src_times[i] - t))
+                out_times.append(t)
+                matched_indices.append(best_idx)
+
+    # Validate fill_value if any gaps occurred
+    if None in matched_indices:
+        _validate_fill_values(type(payload), payload_fill_map, "payload")
+        if confidence is not None and confidence is not msgspec.UNSET:
+            _validate_fill_values(type(confidence), confidence_fill_map, "confidence")
+
+    # Assemble output payload
+    payload_updates = {}
+    for col_name, col_values in payload_cols.items():
+        out_col = []
+        fill_val = payload_fill_map.get(col_name)
+        for m_idx in matched_indices:
+            if m_idx is None:
+                out_col.append(fill_val)
+            else:
+                out_col.append(col_values[m_idx])
+        payload_updates[col_name] = out_col
+
+    new_payload = msgspec.structs.replace(payload, **payload_updates)
+
+    # Assemble output confidence
+    kwargs = {}
+    if confidence is not None and confidence is not msgspec.UNSET:
+        confidence_updates = {}
+        for col_name, col_values in confidence_cols.items():
+            out_col = []
+            fill_val = confidence_fill_map.get(col_name)
+            for m_idx in matched_indices:
+                if m_idx is None:
+                    out_col.append(fill_val)
+                else:
+                    out_col.append(col_values[m_idx])
+            confidence_updates[col_name] = out_col
+        kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
+
+    new_extent = Times(time=out_times)
+    new_ann = msgspec.structs.replace(
+        annotation,
+        id=msgspec.UNSET,
+        parents=new_parents,
+        extent=new_extent,
+        payload=new_payload,
         sandbox=new_sandbox,
         **kwargs,
     )

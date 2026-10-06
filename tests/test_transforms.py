@@ -6,7 +6,7 @@ import pytest
 
 import bopp
 from bopp.core import create
-from bopp.exceptions import BoppArgumentError
+from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
@@ -17,6 +17,7 @@ from bopp.transforms import (
     _get_facet_list_fields,
     _get_list_fields_with_length,
     filter_by,
+    to_times,
     trim,
 )
 
@@ -593,3 +594,270 @@ def test_filter_by_sandbox_and_immutability():
 
     # Verify original unchanged
     assert ann == ann_copy
+
+
+def test_to_times_invalid_args():
+    ann = create(
+        media_id="test",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 2.0],
+        value=["a", "b"],
+    )
+
+    # Neither times nor sample_rate
+    with pytest.raises(BoppArgumentError, match="Exactly one of 'times' or 'sample_rate'"):
+        to_times(ann)
+
+    # Both times and sample_rate
+    with pytest.raises(BoppArgumentError, match="Exactly one of 'times' or 'sample_rate'"):
+        to_times(ann, times=[1.0], sample_rate=2.0)
+
+    # Non-positive sample_rate
+    with pytest.raises(BoppArgumentError, match="sample_rate must be positive"):
+        to_times(ann, sample_rate=0)
+    with pytest.raises(BoppArgumentError, match="sample_rate must be positive"):
+        to_times(ann, sample_rate=-1.5)
+
+    # Invalid method
+    with pytest.raises(BoppArgumentError, match="Invalid method 'invalid'"):
+        to_times(ann, times=[1.0], method="invalid")  # type: ignore[arg-type]
+
+    # Invalid overlap
+    with pytest.raises(BoppArgumentError, match="Invalid overlap strategy 'invalid'"):
+        to_times(ann, times=[1.0], overlap="invalid")  # type: ignore[arg-type]
+
+
+def test_to_times_incompatible_extent():
+    ann = create(
+        media_id="img",
+        payload_kind="tag_open",
+        extent_kind="pixel_box",
+        x=[0.0],
+        y=[0.0],
+        width=[10.0],
+        height=[10.0],
+        value=["box"],
+    )
+    with pytest.raises(BoppArgumentError, match="incompatible with to_times"):
+        to_times(ann, times=[0.0])
+
+
+def test_to_times_from_time_interval_with_sample_rate():
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time_interval",
+        confidence_kind="likelihood",
+        time=[0.0, 2.0],
+        duration=[2.0, 2.0],
+        value=["verse", "chorus"],
+        confidence=[0.8, 0.9],
+    )
+
+    res = to_times(ann, sample_rate=1.0)
+    assert res.extent.time == [0.0, 1.0, 2.0, 3.0, 4.0]
+    # At t=2.0, both intervals cover [0, 2] and [2, 4]; overlap defaults to 'latest'
+    assert res.payload.value == ["verse", "verse", "chorus", "chorus", "chorus"]
+    assert res.confidence.confidence == [0.8, 0.8, 0.9, 0.9, 0.9]
+    assert res.parents == [ann.id]
+    assert res.id != ann.id
+
+
+def test_to_times_overlap_strategies():
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time_interval",
+        time=[0.0, 1.0],
+        duration=[2.0, 2.0],
+        value=["first", "second"],
+    )
+
+    # Sampling at t=1.5 falls into both [0, 2] and [1, 3]
+    res_latest = to_times(ann, times=[1.5], overlap="latest")
+    assert res_latest.payload.value == ["second"]
+
+    res_first = to_times(ann, times=[1.5], overlap="first")
+    assert res_first.payload.value == ["first"]
+
+    res_multi = to_times(ann, times=[1.5], overlap="multiple")
+    assert res_multi.extent.time == [1.5, 1.5]
+    assert res_multi.payload.value == ["first", "second"]
+
+
+def test_to_times_interval_gaps_and_fill_value():
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time_interval",
+        confidence_kind="likelihood",
+        time=[1.0],
+        duration=[1.0],
+        value=["vocal"],
+        confidence=[0.9],
+    )
+
+    res = to_times(
+        ann,
+        times=[0.0, 1.5, 3.0],
+        fill_value="silence",
+    )
+    assert res.extent.time == [0.0, 1.5, 3.0]
+    assert res.payload.value == ["silence", "vocal", "silence"]
+    assert res.confidence.confidence == [0.0, 0.9, 0.0]
+
+
+def test_to_times_from_point_time_extent():
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 3.0],
+        value=["a", "b"],
+    )
+
+    # previous lookup
+    res_prev = to_times(ann, times=[0.5, 1.5, 3.0, 4.0], method="previous", fill_value="none")
+    assert res_prev.payload.value == ["none", "a", "b", "b"]
+
+    # nearest lookup
+    res_near = to_times(ann, times=[0.5, 1.9, 2.1, 4.0], method="nearest")
+    assert res_near.payload.value == ["a", "a", "b", "b"]
+
+
+def test_to_times_global_annotation():
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["rock"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    # sample_rate without extent raises error
+    with pytest.raises(BoppArgumentError, match="sample_rate requires an extent"):
+        to_times(ann, sample_rate=1.0)
+
+    # explicit times broadcasts
+    res = to_times(ann, times=[0.0, 1.0, 2.0])
+    assert res.extent.time == [0.0, 1.0, 2.0]
+    assert res.payload.value == ["rock", "rock", "rock"]
+
+
+def test_to_times_time_frequency_box():
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
+        extent=TimeFrequencyBoxExtent(
+            time=[0.0, 2.0],
+            duration=[2.0, 2.0],
+            freq_min=[100.0, 200.0],
+            freq_max=[500.0, 600.0],
+        ),
+        payload=TagOpenPayload(value=["low", "high"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    res = to_times(ann, times=[1.0, 3.0])
+    assert res.extent.time == [1.0, 3.0]
+    assert res.payload.value == ["low", "high"]
+
+
+def test_to_times_multi_column_payload_dict_fill():
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=TimeFrequencyBoxExtent(
+            time=[1.0],
+            duration=[1.0],
+            freq_min=[100.0],
+            freq_max=[200.0],
+        ),
+        payload=MoodThayerPayload(valence=[0.5], arousal=[0.8]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    # Scalar fill value for multi-column payload raises error
+    with pytest.raises(BoppArgumentError, match="requires fill_value to be a dict"):
+        to_times(ann, times=[0.0], fill_value=0.0)
+
+    # Incomplete dict raises error
+    with pytest.raises(BoppArgumentError, match="Missing fill value for payload field 'arousal'"):
+        to_times(ann, times=[0.0], fill_value={"valence": 0.0})
+
+    # Proper dict fill
+    res = to_times(ann, times=[0.0, 1.5], fill_value={"valence": 0.0, "arousal": 0.0})
+    assert res.extent.time == [0.0, 1.5]
+    assert res.payload.valence == [0.0, 0.5]
+    assert res.payload.arousal == [0.0, 0.8]
+
+
+def test_to_times_fill_value_type_validation_error():
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time_interval",
+        time=[1.0],
+        duration=[1.0],
+        value=["tag"],
+    )
+
+    # tag_open requires list[str], so passing an invalid non-string (int) causes validation error
+    with pytest.raises(BoppValidationError, match="Invalid fill value"):
+        to_times(ann, times=[0.0], fill_value=123)  # type: ignore[arg-type]
+
+
+def test_to_times_empty_annotation_and_empty_times():
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[],
+        value=[],
+    )
+
+    # Empty times
+    res_empty_times = to_times(ann, times=[])
+    assert res_empty_times.extent.time == []
+    assert res_empty_times.payload.value == []
+
+    # Sampling empty annotation with times
+    res_sampled = to_times(ann, times=[1.0, 2.0], fill_value="fill")
+    assert res_sampled.extent.time == [1.0, 2.0]
+    assert res_sampled.payload.value == ["fill", "fill"]
+
+
+def test_to_times_warning_no_id_and_immutability():
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["v"]),
+    )
+
+    with pytest.warns(UserWarning, match="Converting an annotation with no ID"):
+        res = to_times(ann, times=[0.0])
+
+    assert res.parents == []
+
+    # Verify immutability
+    ann_with_id = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0],
+        value=["val"],
+        sandbox={"key": 1},
+    )
+    ann_copy = copy.deepcopy(ann_with_id)
+    res_immut = to_times(ann_with_id, times=[1.0])
+    assert ann_with_id == ann_copy
+    assert res_immut.sandbox is not ann_with_id.sandbox

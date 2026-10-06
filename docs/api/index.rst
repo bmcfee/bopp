@@ -44,6 +44,8 @@ Transforms
     :toctree: generated/
     :nosignatures:
 
+    filter_by
+    to_times
     trim
 
 Utilities
