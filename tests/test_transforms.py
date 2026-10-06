@@ -10,8 +10,15 @@ from bopp.exceptions import BoppArgumentError
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
+from bopp.models.v1.payload.mood_thayer import MoodThayerPayload
 from bopp.models.v1.payload.tag_open import TagOpenPayload
-from bopp.transforms import _get_list_fields_with_length, trim
+from bopp.transforms import (
+    FilterRecord,
+    _get_facet_list_fields,
+    _get_list_fields_with_length,
+    filter_by,
+    trim,
+)
 
 
 def test_get_list_fields_with_length_empty():
@@ -21,6 +28,11 @@ def test_get_list_fields_with_length_empty():
 
     s = EmptyStruct()
     assert _get_list_fields_with_length(s, 2) == {}
+
+
+def test_get_facet_list_fields_empty():
+    assert _get_facet_list_fields(None) == {}
+    assert _get_facet_list_fields(msgspec.UNSET) == {}
 
 
 def test_trim_invalid_arguments():
@@ -368,3 +380,216 @@ def test_trim_transitive_parents_and_immutability():
 
     # Verify second annotation was not mutated
     assert ann2 == ann2_copy
+
+
+def test_filter_record_attribute_access():
+    rec = FilterRecord({"a": 1, "b": "hello"})
+    assert rec.a == 1
+    assert rec.b == "hello"
+    assert rec["a"] == 1
+    rec.c = True
+    assert rec.c is True
+    assert rec["c"] is True
+
+    with pytest.raises(AttributeError, match="has no attribute 'nonexistent'"):
+        _ = rec.nonexistent
+
+
+def test_filter_by_default_payload():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[1.0, 2.0, 3.0, 4.0],
+        value=["rock", "pop", "rock", "jazz"],
+        confidence=[0.5, 0.6, 0.7, 0.8],
+    )
+
+    filtered = filter_by(ann, lambda v: v == "rock")
+    assert filtered.payload.value == ["rock", "rock"]
+    assert filtered.extent.time == [1.0, 3.0]
+    assert filtered.confidence.confidence == [0.5, 0.7]
+    assert filtered.parents == [ann.id]
+    assert filtered.id != ann.id
+
+
+def test_filter_by_target_on_payload():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 2.0, 3.0],
+        value=["rock", "pop", "metal"],
+    )
+
+    filtered = filter_by(ann, lambda v: len(v) == 4, target="value")
+    assert filtered.payload.value == ["rock"]
+    assert filtered.extent.time == [1.0]
+
+
+def test_filter_by_target_on_extent():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[1.0, 2.0, 3.0, 4.0],
+        value=["a", "b", "c", "d"],
+        confidence=[0.1, 0.2, 0.3, 0.4],
+    )
+
+    filtered = filter_by(ann, lambda t: t > 2.0, facet="extent", target="time")
+    assert filtered.extent.time == [3.0, 4.0]
+    assert filtered.payload.value == ["c", "d"]
+    assert filtered.confidence.confidence == [0.3, 0.4]
+
+
+def test_filter_by_confidence_facet():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[1.0, 2.0, 3.0],
+        value=["a", "b", "c"],
+        confidence=[0.2, 0.8, 0.5],
+    )
+
+    filtered = filter_by(ann, lambda c: c >= 0.5, facet="confidence", target="confidence")
+    assert filtered.confidence.confidence == [0.8, 0.5]
+    assert filtered.payload.value == ["b", "c"]
+    assert filtered.extent.time == [2.0, 3.0]
+
+
+def test_filter_by_multi_column_payload():
+    # MoodThayerPayload has valence and arousal
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="gui")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=msgspec.UNSET,
+        payload=MoodThayerPayload(valence=[0.5, -0.2, 0.8], arousal=[0.1, 0.4, -0.3]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    # Filter with record
+    filtered = filter_by(ann, lambda r: r.valence > 0 and r.arousal > 0)
+    assert filtered.payload.valence == [0.5]
+    assert filtered.payload.arousal == [0.1]
+
+    # Explicit target on one field
+    filtered_v = filter_by(ann, lambda v: v > 0, target="valence")
+    assert filtered_v.payload.valence == [0.5, 0.8]
+    assert filtered_v.payload.arousal == [0.1, -0.3]
+
+
+def test_filter_by_facet_all():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[1.0, 2.0, 3.0, 4.0],
+        value=["intro", "verse", "chorus", "verse"],
+        confidence=[0.9, 0.4, 0.95, 0.85],
+    )
+
+    # Filter across facets using record
+    filtered = filter_by(
+        ann,
+        lambda r: r.confidence >= 0.8 and r.value.startswith("v"),
+        facet="all",
+    )
+    assert filtered.payload.value == ["verse"]
+    assert filtered.extent.time == [4.0]
+    assert filtered.confidence.confidence == [0.85]
+
+    # Filter across facets specifying target
+    filtered_target = filter_by(
+        ann,
+        lambda t: t <= 2.0,
+        facet="all",
+        target="time",
+    )
+    assert filtered_target.extent.time == [1.0, 2.0]
+    assert filtered_target.payload.value == ["intro", "verse"]
+
+
+def test_filter_by_invalid_arguments():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 2.0],
+        value=["a", "b"],
+    )
+
+    with pytest.raises(BoppArgumentError, match="Invalid facet 'invalid'"):
+        filter_by(ann, lambda x: True, facet="invalid")  # type: ignore[arg-type]
+
+    with pytest.raises(BoppArgumentError, match="Facet 'confidence' is not present"):
+        filter_by(ann, lambda x: True, facet="confidence")
+
+    with pytest.raises(BoppArgumentError, match="Target field 'unknown' not found in facet 'payload'"):
+        filter_by(ann, lambda x: True, target="unknown")
+
+    with pytest.raises(BoppArgumentError, match="Target field 'unknown' not found in any annotation facet"):
+        filter_by(ann, lambda x: True, facet="all", target="unknown")
+
+
+def test_filter_by_no_id_warning():
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["pop"]),
+    )
+
+    with pytest.warns(UserWarning, match="Filtering an annotation with no ID"):
+        res = filter_by(ann, lambda v: True)
+
+    assert res.parents == []
+
+
+def test_filter_by_empty_or_none_remaining():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 2.0],
+        value=["a", "b"],
+    )
+
+    filtered_none = filter_by(ann, lambda v: False)
+    assert filtered_none.payload.value == []
+    assert filtered_none.extent.time == []
+    assert filtered_none.parents == [ann.id]
+
+    # Now filter the already empty annotation
+    filtered_again = filter_by(filtered_none, lambda v: True)
+    assert filtered_again.payload.value == []
+    assert filtered_again.extent.time == []
+    assert filtered_again.parents == [ann.id, filtered_none.id]
+
+
+def test_filter_by_sandbox_and_immutability():
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 2.0],
+        value=["a", "b"],
+        sandbox={"custom": [1, 2, 3]},
+    )
+    ann_copy = copy.deepcopy(ann)
+
+    filtered = filter_by(ann, lambda v: v == "b")
+    assert filtered.sandbox == {"custom": [1, 2, 3]}
+    assert filtered.sandbox is not ann.sandbox
+
+    # Verify original unchanged
+    assert ann == ann_copy

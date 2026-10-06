@@ -47,5 +47,6 @@ from .core import (
     validate_and_set_annotation_id as validate_and_set_annotation_id,
 )
 from .transforms import (
+    filter_by as filter_by,
     trim as trim,
 )
