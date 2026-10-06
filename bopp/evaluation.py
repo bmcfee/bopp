@@ -20,7 +20,7 @@ def _check_mir_eval_available() -> tuple[Any, Any]:
         ) from exc
 
     try:
-        import mir_eval  # type: ignore[import-not-found]
+        import mir_eval  # type: ignore[import-not-found,import-untyped]
     except ImportError as exc:
         raise BoppError(
             "Evaluation requires 'mir_eval' to be installed. "
