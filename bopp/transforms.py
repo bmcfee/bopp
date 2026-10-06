@@ -78,6 +78,96 @@ def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]
     return result
 
 
+def _derive_parents_and_sandbox(annotation: BoppBase, action_name: str) -> tuple[list[str], Any]:
+    """Extract parent lineage and deep copy sandbox for a derived annotation."""
+    existing_parents = getattr(annotation, "parents", None)
+    if existing_parents is None or existing_parents is msgspec.UNSET:
+        new_parents = []
+    else:
+        new_parents = list(existing_parents)
+
+    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
+        warnings.warn(
+            f"{action_name} an annotation with no ID. The resulting annotation will have no parent lineage.",
+            UserWarning,
+        )
+    else:
+        new_parents.append(annotation.id)  # type: ignore[attr-defined]
+
+    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
+    return new_parents, new_sandbox
+
+
+def _rebuild_annotation(
+    annotation: BoppBase,
+    *,
+    parents: list[str],
+    sandbox: Any,
+    payload: msgspec.Struct,
+    extent: msgspec.Struct | None | Any = msgspec.UNSET,
+    confidence: msgspec.Struct | None | Any = msgspec.UNSET,
+) -> BoppBase:
+    """Rebuild an Annotation with updated facets and recompute its deterministic ID."""
+    kwargs: dict[str, Any] = {
+        "id": msgspec.UNSET,
+        "parents": parents,
+        "sandbox": sandbox,
+        "payload": payload,
+    }
+    if extent is not msgspec.UNSET:
+        kwargs["extent"] = extent
+    if confidence is not msgspec.UNSET:
+        kwargs["confidence"] = confidence
+
+    new_ann = msgspec.structs.replace(annotation, **kwargs)
+    validate_and_set_annotation_id(new_ann)
+    return new_ann
+
+
+def _subset_struct_lists(
+    struct: msgspec.Struct | None,
+    indices: list[int],
+    expected_length: int | None = None,
+    overrides: dict[str, list[Any]] | None = None,
+) -> msgspec.Struct | None:
+    """Subset list fields of a struct using indices, applying optional pre-computed overrides."""
+    if struct is None or struct is msgspec.UNSET:
+        return struct
+
+    updates: dict[str, list[Any]] = dict(overrides) if overrides else {}
+    list_fields = (
+        _get_list_fields_with_length(struct, expected_length)
+        if expected_length is not None
+        else _get_facet_list_fields(struct)
+    )
+
+    for fname, fval in list_fields.items():
+        if fname not in updates:
+            updates[fname] = [fval[idx] for idx in indices]
+
+    return msgspec.structs.replace(struct, **updates)
+
+
+def _resample_struct(
+    struct: msgspec.Struct | None,
+    cols: dict[str, list[Any]],
+    matched_indices: list[int | None],
+    fill_map: dict[str, Any],
+) -> msgspec.Struct | None:
+    """Resample struct list fields based on matched indices and a fill mapping."""
+    if struct is None or struct is msgspec.UNSET:
+        return struct
+
+    updates: dict[str, list[Any]] = {}
+    for col_name, col_values in cols.items():
+        fill_val = fill_map.get(col_name)
+        updates[col_name] = [
+            fill_val if idx is None else col_values[idx] for idx in matched_indices
+        ]
+
+    return msgspec.structs.replace(struct, **updates)
+
+
 def trim(
     annotation: BoppBase,
     *,
@@ -128,36 +218,21 @@ def trim(
     if reset and start is None:
         raise BoppArgumentError("reset=True requires 'start' to be specified.")
 
-    # Transitively accumulate parent IDs
-    existing_parents = getattr(annotation, "parents", None)
-    if existing_parents is None or existing_parents is msgspec.UNSET:
-        new_parents = []
-    else:
-        new_parents = list(existing_parents)
-
-    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
-        # Warn that we're deriving an annotation from an unidentified annotation
-        # and cannot correctly populate the parents array
-        warnings.warn(
-            "Trimming an annotation with no ID. The resulting annotation will have no parent lineage.",
-            UserWarning,
-        )
-    else:
-        new_parents.append(annotation.id)  # type: ignore[attr-defined]
-
-    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
+    new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Trimming")
 
     extent = getattr(annotation, "extent", msgspec.UNSET)
+    payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
+    confidence = getattr(annotation, "confidence", msgspec.UNSET)
+
     if extent is msgspec.UNSET or extent is None:
-        # Return copy of annotation with updated parent lineage
-        new_ann = msgspec.structs.replace(
+        return _rebuild_annotation(
             annotation,
-            id=msgspec.UNSET,
             parents=new_parents,
             sandbox=new_sandbox,
+            payload=payload,
+            extent=extent,
+            confidence=confidence,
         )
-        validate_and_set_annotation_id(new_ann)
-        return new_ann
 
     extent_tag = _get_tag(extent)
     if extent_tag is None:
@@ -262,40 +337,18 @@ def trim(
         extent_updates[field_a] = new_min
         extent_updates[field_b] = new_max  # type: ignore[index]
 
-    # Filter remaining parallel list fields in extent
-    for fname, fval in _get_list_fields_with_length(extent, n_obs).items():
-        if fname not in extent_updates:
-            extent_updates[fname] = [fval[idx] for idx in kept_indices]
+    new_extent = _subset_struct_lists(extent, kept_indices, n_obs, overrides=extent_updates)
+    new_payload = _subset_struct_lists(payload, kept_indices, n_obs)
+    new_confidence = _subset_struct_lists(confidence, kept_indices, n_obs)
 
-    new_extent = msgspec.structs.replace(extent, **extent_updates)
-
-    # Filter payload parallel fields
-    payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
-    payload_updates = {}
-    for fname, fval in _get_list_fields_with_length(payload, n_obs).items():
-        payload_updates[fname] = [fval[idx] for idx in kept_indices]
-    new_payload = msgspec.structs.replace(payload, **payload_updates)
-
-    # Filter confidence parallel fields
-    confidence = getattr(annotation, "confidence", msgspec.UNSET)
-    kwargs = {}
-    if confidence is not msgspec.UNSET and confidence is not None:
-        confidence_updates = {}
-        for fname, fval in _get_list_fields_with_length(confidence, n_obs).items():
-            confidence_updates[fname] = [fval[idx] for idx in kept_indices]
-        kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
-
-    new_ann = msgspec.structs.replace(
+    return _rebuild_annotation(
         annotation,
-        id=msgspec.UNSET,
         parents=new_parents,
-        extent=new_extent,
-        payload=new_payload,
         sandbox=new_sandbox,
-        **kwargs,
+        extent=new_extent,
+        payload=new_payload,  # type: ignore[arg-type]
+        confidence=new_confidence,
     )
-    validate_and_set_annotation_id(new_ann)
-    return new_ann
 
 
 def filter_by(
@@ -399,24 +452,9 @@ def filter_by(
             f"Invalid facet '{facet}'. Must be one of 'payload', 'extent', 'confidence', or 'all'."
         )
 
-    # Accumulate parent IDs
-    existing_parents = getattr(annotation, "parents", None)
-    if existing_parents is None or existing_parents is msgspec.UNSET:
-        new_parents = []
-    else:
-        new_parents = list(existing_parents)
+    new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Filtering")
 
-    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
-        warnings.warn(
-            "Filtering an annotation with no ID. The resulting annotation will have no parent lineage.",
-            UserWarning,
-        )
-    else:
-        new_parents.append(annotation.id)  # type: ignore[attr-defined]
-
-    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
-
-    payload = getattr(annotation, "payload", None)
+    payload: msgspec.Struct = getattr(annotation, "payload", None)  # type: ignore[assignment]
     extent = getattr(annotation, "extent", None)
     confidence = getattr(annotation, "confidence", None)
 
@@ -434,14 +472,14 @@ def filter_by(
             break
 
     if n_obs == 0:
-        new_ann = msgspec.structs.replace(
+        return _rebuild_annotation(
             annotation,
-            id=msgspec.UNSET,
             parents=new_parents,
             sandbox=new_sandbox,
+            payload=payload,
+            extent=extent,
+            confidence=confidence,
         )
-        validate_and_set_annotation_id(new_ann)
-        return new_ann
 
     # Prepare input stream for predicate
     kept_indices: list[int] = []
@@ -511,38 +549,18 @@ def filter_by(
                         kept_indices.append(i)
 
     # Update facets with kept indices
-    kwargs: dict[str, Any] = {}
+    new_payload = _subset_struct_lists(payload, kept_indices, n_obs)
+    new_extent = _subset_struct_lists(extent, kept_indices, n_obs)
+    new_confidence = _subset_struct_lists(confidence, kept_indices, n_obs)
 
-    if payload is not None and payload is not msgspec.UNSET:
-        payload_updates = {
-            fname: [fval[idx] for idx in kept_indices]
-            for fname, fval in _get_list_fields_with_length(payload, n_obs).items()
-        }
-        kwargs["payload"] = msgspec.structs.replace(payload, **payload_updates)
-
-    if extent is not None and extent is not msgspec.UNSET:
-        extent_updates = {
-            fname: [fval[idx] for idx in kept_indices]
-            for fname, fval in _get_list_fields_with_length(extent, n_obs).items()
-        }
-        kwargs["extent"] = msgspec.structs.replace(extent, **extent_updates)
-
-    if confidence is not None and confidence is not msgspec.UNSET:
-        confidence_updates = {
-            fname: [fval[idx] for idx in kept_indices]
-            for fname, fval in _get_list_fields_with_length(confidence, n_obs).items()
-        }
-        kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
-
-    new_ann = msgspec.structs.replace(
+    return _rebuild_annotation(
         annotation,
-        id=msgspec.UNSET,
         parents=new_parents,
         sandbox=new_sandbox,
-        **kwargs,
+        extent=new_extent,
+        payload=new_payload,  # type: ignore[arg-type]
+        confidence=new_confidence,
     )
-    validate_and_set_annotation_id(new_ann)
-    return new_ann
 
 
 def _validate_fill_values(
@@ -689,21 +707,7 @@ def to_times(
         )
 
     # Lineage tracking
-    existing_parents = getattr(annotation, "parents", None)
-    if existing_parents is None or existing_parents is msgspec.UNSET:
-        new_parents = []
-    else:
-        new_parents = list(existing_parents)
-
-    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
-        warnings.warn(
-            "Converting an annotation with no ID. The resulting annotation will have no parent lineage.",
-            UserWarning,
-        )
-    else:
-        new_parents.append(annotation.id)  # type: ignore[attr-defined]
-
-    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
+    new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Converting")
 
     extent = getattr(annotation, "extent", None)
     payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
@@ -799,24 +803,17 @@ def to_times(
     # If target_times is empty, return empty times extent
     if not target_times:
         new_extent = Times(time=[])
-        payload_updates: dict[str, list] = {fname: [] for fname in payload_cols}
-        new_payload = msgspec.structs.replace(payload, **payload_updates)
-        kwargs = {}
-        if confidence is not None and confidence is not msgspec.UNSET:
-            confidence_updates: dict[str, list] = {fname: [] for fname in confidence_cols}
-            kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
+        new_payload = _subset_struct_lists(payload, [], n_source_obs)
+        new_confidence = _subset_struct_lists(confidence, [], n_source_obs)
 
-        new_ann = msgspec.structs.replace(
+        return _rebuild_annotation(
             annotation,
-            id=msgspec.UNSET,
             parents=new_parents,
-            extent=new_extent,
-            payload=new_payload,
             sandbox=new_sandbox,
-            **kwargs,
+            extent=new_extent,
+            payload=new_payload,  # type: ignore[arg-type]
+            confidence=new_confidence,
         )
-        validate_and_set_annotation_id(new_ann)
-        return new_ann
 
     # If source annotation has no observations
     if n_source_obs == 0:
@@ -826,28 +823,22 @@ def to_times(
             _validate_fill_values(type(confidence), confidence_fill_map, "confidence")
 
         out_times = list(target_times)
-        payload_updates = {k: [payload_fill_map[k]] * len(out_times) for k in payload_cols}
-        new_payload = msgspec.structs.replace(payload, **payload_updates)
-        kwargs = {}
-        if confidence is not None and confidence is not msgspec.UNSET:
-            confidence_updates = {k: [confidence_fill_map[k]] * len(out_times) for k in confidence_cols}
-            kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
-
+        empty_indices: list[int | None] = [None] * len(out_times)
+        new_payload = _resample_struct(payload, payload_cols, empty_indices, payload_fill_map)
+        new_confidence = _resample_struct(confidence, confidence_cols, empty_indices, confidence_fill_map)
         new_extent = Times(time=out_times)
-        new_ann = msgspec.structs.replace(
+
+        return _rebuild_annotation(
             annotation,
-            id=msgspec.UNSET,
             parents=new_parents,
-            extent=new_extent,
-            payload=new_payload,
             sandbox=new_sandbox,
-            **kwargs,
+            extent=new_extent,
+            payload=new_payload,  # type: ignore[arg-type]
+            confidence=new_confidence,
         )
-        validate_and_set_annotation_id(new_ann)
-        return new_ann
 
     out_times = []
-    # matched_indices_or_none: None means gap, int means source index
+    # matched_indices: None means gap, int means source index
     matched_indices: list[int | None] = []
 
     # Sampling per extent type
@@ -863,7 +854,6 @@ def to_times(
 
         for t in target_times:
             # An interval covers t if t_start <= t <= t_start + duration
-            # (or strict end boundary)
             covers = [
                 i
                 for i, (ts, dur) in enumerate(zip(t_starts, durations))
@@ -907,44 +897,15 @@ def to_times(
         if confidence is not None and confidence is not msgspec.UNSET:
             _validate_fill_values(type(confidence), confidence_fill_map, "confidence")
 
-    # Assemble output payload
-    payload_updates = {}
-    for col_name, col_values in payload_cols.items():
-        out_col = []
-        fill_val = payload_fill_map.get(col_name)
-        for m_idx in matched_indices:
-            if m_idx is None:
-                out_col.append(fill_val)
-            else:
-                out_col.append(col_values[m_idx])
-        payload_updates[col_name] = out_col
-
-    new_payload = msgspec.structs.replace(payload, **payload_updates)
-
-    # Assemble output confidence
-    kwargs = {}
-    if confidence is not None and confidence is not msgspec.UNSET:
-        confidence_updates = {}
-        for col_name, col_values in confidence_cols.items():
-            out_col = []
-            fill_val = confidence_fill_map.get(col_name)
-            for m_idx in matched_indices:
-                if m_idx is None:
-                    out_col.append(fill_val)
-                else:
-                    out_col.append(col_values[m_idx])
-            confidence_updates[col_name] = out_col
-        kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
-
+    new_payload = _resample_struct(payload, payload_cols, matched_indices, payload_fill_map)
+    new_confidence = _resample_struct(confidence, confidence_cols, matched_indices, confidence_fill_map)
     new_extent = Times(time=out_times)
-    new_ann = msgspec.structs.replace(
+
+    return _rebuild_annotation(
         annotation,
-        id=msgspec.UNSET,
         parents=new_parents,
-        extent=new_extent,
-        payload=new_payload,
         sandbox=new_sandbox,
-        **kwargs,
+        extent=new_extent,
+        payload=new_payload,  # type: ignore[arg-type]
+        confidence=new_confidence,
     )
-    validate_and_set_annotation_id(new_ann)
-    return new_ann

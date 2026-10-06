@@ -9,13 +9,18 @@ from bopp.core import create
 from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
+from bopp.models.v1.extent.times import Times
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.mood_thayer import MoodThayerPayload
 from bopp.models.v1.payload.tag_open import TagOpenPayload
 from bopp.transforms import (
     FilterRecord,
+    _derive_parents_and_sandbox,
     _get_facet_list_fields,
     _get_list_fields_with_length,
+    _rebuild_annotation,
+    _resample_struct,
+    _subset_struct_lists,
     filter_by,
     to_times,
     trim,
@@ -34,6 +39,98 @@ def test_get_list_fields_with_length_empty():
 def test_get_facet_list_fields_empty():
     assert _get_facet_list_fields(None) == {}
     assert _get_facet_list_fields(msgspec.UNSET) == {}
+
+
+def test_derive_parents_and_sandbox_helpers():
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+
+    # When annotation has an ID and existing parents
+    ann = Annotation(
+        id="ann_1",
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        parents=["parent_0"],
+        sandbox={"custom": [1, 2]},
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["pop"]),
+    )
+    parents, sandbox = _derive_parents_and_sandbox(ann, "Testing")
+    assert parents == ["parent_0", "ann_1"]
+    assert sandbox == {"custom": [1, 2]}
+    assert sandbox is not ann.sandbox
+
+    # When annotation has no ID and UNSET parents
+    ann_no_id = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["pop"]),
+    )
+    with pytest.warns(UserWarning, match="Testing an annotation with no ID"):
+        parents_no_id, sandbox_no_id = _derive_parents_and_sandbox(ann_no_id, "Testing")
+    assert parents_no_id == []
+    assert sandbox_no_id is msgspec.UNSET
+
+
+def test_subset_struct_lists_helper():
+    assert _subset_struct_lists(None, [0, 1]) is None
+    assert _subset_struct_lists(msgspec.UNSET, [0, 1]) is msgspec.UNSET
+
+    class SampleStruct(msgspec.Struct):
+        tags: list[str]
+        scores: list[float]
+        extra_scalar: int = 42
+
+    sample = SampleStruct(tags=["a", "b", "c"], scores=[1.0, 2.0, 3.0])
+    subsetted = _subset_struct_lists(sample, [0, 2], expected_length=3)
+    assert subsetted.tags == ["a", "c"]
+    assert subsetted.scores == [1.0, 3.0]
+    assert subsetted.extra_scalar == 42
+
+    # With overrides
+    overridden = _subset_struct_lists(
+        sample, [1], expected_length=3, overrides={"tags": ["custom"]}
+    )
+    assert overridden.tags == ["custom"]
+    assert overridden.scores == [2.0]
+
+
+def test_resample_struct_helper():
+    assert _resample_struct(None, {}, [], {}) is None
+    assert _resample_struct(msgspec.UNSET, {}, [], {}) is msgspec.UNSET
+
+    payload = TagOpenPayload(value=["apple", "banana"])
+    cols = _get_facet_list_fields(payload)
+    resampled = _resample_struct(
+        payload, cols, [1, None, 0], fill_map={"value": "empty"}
+    )
+    assert resampled.value == ["banana", "empty", "apple"]
+
+
+def test_rebuild_annotation_helper():
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        id="old_id",
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=Times(time=[1.0]),
+        payload=TagOpenPayload(value=["test"]),
+    )
+    rebuilt = _rebuild_annotation(
+        ann,
+        parents=["old_id"],
+        sandbox={"foo": "bar"},
+        payload=TagOpenPayload(value=["new_test"]),
+        extent=Times(time=[2.0]),
+    )
+    assert rebuilt.id != "old_id"
+    assert rebuilt.parents == ["old_id"]
+    assert rebuilt.sandbox == {"foo": "bar"}
+    assert rebuilt.payload.value == ["new_test"]
+    assert rebuilt.extent.time == [2.0]
 
 
 def test_trim_invalid_arguments():
