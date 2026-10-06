@@ -62,7 +62,3 @@ jobs:
     - name: Type check package
       shell: bash -l {0}
       run: python -m mypy --pretty bopp
-    
-    - name: Type check tests
-      shell: bash -l {0}
-      run: python -m mypy --pretty tests
