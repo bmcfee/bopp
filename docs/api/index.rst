@@ -48,6 +48,18 @@ Transforms
     to_times
     trim
 
+Evaluation
+----------
+
+.. automodule:: bopp.evaluation
+    :no-members:
+.. currentmodule:: bopp.evaluation
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    evaluate
+
 Utilities
 ---------
 
@@ -85,7 +97,7 @@ Schema-generated objects
 .. automodule:: bopp.models
 .. currentmodule:: bopp.models
 .. autosummary::
-   :toctree: generated_schema/
+   :toctree: generated/
    :nosignatures:
    :recursive:
 
