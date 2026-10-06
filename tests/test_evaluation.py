@@ -409,12 +409,13 @@ def test_evaluate_hierarchy():
     ]
     est_labels = [["A", "B"], ["full"]]
 
-    expected = mir_eval.hierarchy.evaluate(
-        ref_intervals,
-        ref_labels,
-        est_intervals,
-        est_labels,
-    )
+    with pytest.warns(UserWarning, match="Segment hierarchy is inconsistent"):
+        expected = mir_eval.hierarchy.evaluate(
+            ref_intervals,
+            ref_labels,
+            est_intervals,
+            est_labels,
+        )
 
     metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
     ref = Annotation(
@@ -434,7 +435,8 @@ def test_evaluate_hierarchy():
     bopp.validate_and_set_annotation_id(ref)
     bopp.validate_and_set_annotation_id(est)
 
-    actual = evaluate(ref, est)
+    with pytest.warns(UserWarning, match="Segment hierarchy is inconsistent"):
+        actual = evaluate(ref, est)
     assert actual == expected
     assert "T-Precision reduced" in actual
 
