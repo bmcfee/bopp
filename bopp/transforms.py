@@ -706,7 +706,7 @@ def to_times(
     new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
 
     extent = getattr(annotation, "extent", None)
-    payload: msgspec.Struct = getattr(annotation, "payload")
+    payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
     confidence = getattr(annotation, "confidence", None)
 
     payload_cols = _get_facet_list_fields(payload)
@@ -778,12 +778,12 @@ def to_times(
                 "Specify explicit 'times' instead."
             )
         if extent_tag == "time":
-            time_arr = getattr(extent, "time")
+            time_arr = extent.time  # type: ignore[union-attr]
             t_min = min(time_arr)
             t_max = max(time_arr)
         elif extent_tag in ("time_interval", "time_frequency_box"):
-            time_arr = getattr(extent, "time")
-            dur_arr = getattr(extent, "duration")
+            time_arr = extent.time  # type: ignore[union-attr]
+            dur_arr = extent.duration  # type: ignore[union-attr]
             t_min = min(time_arr)
             t_max = max(t + d for t, d in zip(time_arr, dur_arr))
         else:
@@ -791,7 +791,7 @@ def to_times(
 
         step = 1.0 / sample_rate
         # Calculate number of steps with float tolerance
-        n_steps = int(math.floor((t_max - t_min) / step + 1e-9)) + 1
+        n_steps = math.floor((t_max - t_min) / step + 1e-9) + 1
         target_times = [t_min + i * step for i in range(n_steps)]
         if target_times and target_times[-1] > t_max + 1e-9:
             target_times.pop()
@@ -799,11 +799,11 @@ def to_times(
     # If target_times is empty, return empty times extent
     if not target_times:
         new_extent = Times(time=[])
-        payload_updates = {fname: [] for fname in payload_cols}
+        payload_updates: dict[str, list] = {fname: [] for fname in payload_cols}
         new_payload = msgspec.structs.replace(payload, **payload_updates)
         kwargs = {}
         if confidence is not None and confidence is not msgspec.UNSET:
-            confidence_updates = {fname: [] for fname in confidence_cols}
+            confidence_updates: dict[str, list] = {fname: [] for fname in confidence_cols}
             kwargs["confidence"] = msgspec.structs.replace(confidence, **confidence_updates)
 
         new_ann = msgspec.structs.replace(
@@ -858,8 +858,8 @@ def to_times(
             matched_indices.append(0)
 
     elif extent_tag in ("time_interval", "time_frequency_box"):
-        t_starts = getattr(extent, "time")
-        durations = getattr(extent, "duration")
+        t_starts = extent.time  # type: ignore[union-attr]
+        durations = extent.duration  # type: ignore[union-attr]
 
         for t in target_times:
             # An interval covers t if t_start <= t <= t_start + duration
@@ -884,7 +884,7 @@ def to_times(
                 matched_indices.append(covers[-1])
 
     elif extent_tag == "time":
-        src_times = getattr(extent, "time")
+        src_times = extent.time  # type: ignore[union-attr]
         for t in target_times:
             if method == "previous":
                 prev_candidates = [i for i, st in enumerate(src_times) if st <= t]
