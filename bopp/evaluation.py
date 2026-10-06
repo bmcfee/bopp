@@ -20,7 +20,7 @@ def _check_mir_eval_available() -> tuple[Any, Any]:
         ) from exc
 
     try:
-        import mir_eval
+        import mir_eval  # type: ignore[import-not-found]
     except ImportError as exc:
         raise BoppError(
             "Evaluation requires 'mir_eval' to be installed. "
@@ -102,9 +102,9 @@ def _extract_note_pitches_in_hz(ann: BoppBase) -> Any:
     payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
 
     if payload_tag == "note_hz":
-        return np.asarray(payload.value, dtype=float)
+        return np.asarray(payload.value, dtype=float)  # type: ignore[union-attr]
     if payload_tag == "note_midi":
-        midi_nums = np.asarray(payload.value, dtype=float)
+        midi_nums = np.asarray(payload.value, dtype=float)  # type: ignore[union-attr]
         return 440.0 * (2.0 ** ((midi_nums - 69.0) / 12.0))
 
     raise BoppArgumentError(
@@ -221,8 +221,8 @@ def _eval_hierarchy(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, An
                 f"Hierarchy evaluation requires 'time_interval' extent, found '{extent_tag}'."
             )
 
-        times = np.asarray(extent.time, dtype=float)
-        durations = np.asarray(extent.duration, dtype=float)
+        times = np.asarray(extent.time, dtype=float)  # type: ignore[union-attr]
+        durations = np.asarray(extent.duration, dtype=float)  # type: ignore[union-attr]
         labels = getattr(payload, "label", [])
         levels = getattr(payload, "level", [])
 
@@ -316,7 +316,7 @@ def evaluate(
     est_payload = getattr(est, "payload", None)
 
     ref_tag = _get_tag(ref_payload) if ref_payload not in (None, msgspec.UNSET) else None
-    est_tag = _get_tag(est_payload) if est_payload not in (None, msgspec.UNSET) else None
+    _get_tag(est_payload) if est_payload not in (None, msgspec.UNSET) else None
 
     resolved_task = task
     if resolved_task is None:

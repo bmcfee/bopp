@@ -125,11 +125,11 @@ def _rebuild_annotation(
 
 
 def _subset_struct_lists(
-    struct: msgspec.Struct | None,
+    struct: msgspec.Struct | Literal[msgspec.UnsetType.UNSET] | None,
     indices: list[int],
     expected_length: int | None = None,
     overrides: dict[str, list[Any]] | None = None,
-) -> msgspec.Struct | None:
+) -> msgspec.Struct | Literal[msgspec.UnsetType.UNSET] | None:
     """Subset list fields of a struct using indices, applying optional pre-computed overrides."""
     if struct is None or struct is msgspec.UNSET:
         return struct
