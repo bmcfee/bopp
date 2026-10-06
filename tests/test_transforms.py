@@ -8,6 +8,7 @@ import bopp
 from bopp.core import create
 from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.models.v1.annotation import Annotation
+from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
@@ -72,6 +73,22 @@ def test_derive_parents_and_sandbox_helpers():
         parents_no_id, sandbox_no_id = _derive_parents_and_sandbox(ann_no_id, "Testing")
     assert parents_no_id == []
     assert sandbox_no_id is msgspec.UNSET
+
+
+def test_derive_parents_when_existing_parents_is_none():
+    """Verify _derive_parents_and_sandbox when parents attribute is explicitly None."""
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        id="ann_none_parents",
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        parents=None,
+        payload=TagOpenPayload(value=["test"]),
+    )
+    parents, sandbox = _derive_parents_and_sandbox(ann, "Testing")
+    assert parents == ["ann_none_parents"]
+    assert sandbox is msgspec.UNSET
 
 
 def test_subset_struct_lists_helper():
@@ -225,6 +242,27 @@ def test_trim_time_extent():
     assert trimmed.extent.time == [1.0, 3.0]  # 3.0 - 2.0, 5.0 - 2.0
     assert trimmed.payload.value == ["b", "c"]
     assert trimmed.confidence.confidence == [0.3, 0.5]
+
+
+def test_trim_point_extent_open_ended_bounds():
+    """Verify trim on point extent with only start, only end, and check boundary conditions."""
+    ann = create(
+        media_id="test_media",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[1.0, 2.0, 3.0, 4.0, 5.0],
+        value=["a", "b", "c", "d", "e"],
+    )
+
+    # Only start bound
+    res_start = trim(ann, start=3.0)
+    assert res_start.extent.time == [3.0, 4.0, 5.0]
+    assert res_start.payload.value == ["c", "d", "e"]
+
+    # Only end bound
+    res_end = trim(ann, end=3.0)
+    assert res_end.extent.time == [1.0, 2.0, 3.0]
+    assert res_end.payload.value == ["a", "b", "c"]
 
 
 def test_trim_time_interval_non_strict():
@@ -615,6 +653,22 @@ def test_filter_by_facet_all():
     assert filtered_target.payload.value == ["intro", "verse"]
 
 
+def test_filter_by_skips_empty_facet_in_obs_counting():
+    """Verify that filter_by handles annotations where extent is unset (empty dict in all_facets_cols)."""
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        id="ann_no_extent",
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["one", "two", "three"]),
+    )
+    filtered = filter_by(ann, lambda v: v != "two")
+    assert filtered.payload.value == ["one", "three"]
+    assert filtered.extent is msgspec.UNSET
+
+
 def test_filter_by_invalid_arguments():
     ann = create(
         media_id="test_media",
@@ -738,6 +792,29 @@ def test_to_times_incompatible_extent():
     )
     with pytest.raises(BoppArgumentError, match="incompatible with to_times"):
         to_times(ann, times=[0.0])
+
+
+def test_to_times_incompatible_extent_types():
+    """Verify to_times rejects unsupported extent types like midi_tick or score_quarter."""
+    ann_midi = create(
+        media_id="track",
+        payload_kind="tag_open",
+        extent_kind="midi_tick",
+        tick=[0, 480],
+        value=["a", "b"],
+    )
+    with pytest.raises(BoppArgumentError, match="is incompatible with to_times"):
+        to_times(ann_midi, times=[0.0, 1.0])
+
+    ann_score = create(
+        media_id="track",
+        payload_kind="tag_open",
+        extent_kind="score_quarter",
+        quarter=[0.0, 1.0],
+        value=["a", "b"],
+    )
+    with pytest.raises(BoppArgumentError, match="is incompatible with to_times"):
+        to_times(ann_score, times=[0.0, 1.0])
 
 
 def test_to_times_from_time_interval_with_sample_rate():
@@ -864,6 +941,44 @@ def test_to_times_time_frequency_box():
     assert res.payload.value == ["low", "high"]
 
 
+def test_to_times_fill_value_dict_with_value_fallback_and_confidence():
+    """Verify fill_value dict with 'value' key fallback for single-column payload and confidence fill."""
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time_interval",
+        confidence_kind="likelihood",
+        time=[1.0],
+        duration=[1.0],
+        value=["solo"],
+        confidence=[0.9],
+    )
+    res = to_times(
+        ann,
+        times=[0.0, 1.5, 3.0],
+        fill_value={"value": "silent", "confidence": 0.05},
+    )
+    assert res.extent.time == [0.0, 1.5, 3.0]
+    assert res.payload.value == ["silent", "solo", "silent"]
+    assert res.confidence.confidence == [0.05, 0.9, 0.05]
+
+
+def test_to_times_fill_value_dict_missing_required_key():
+    """Verify to_times raises BoppArgumentError when a dict fill_value omits required payload fields."""
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=Times(time=[1.0]),
+        payload=MoodThayerPayload(valence=[0.5], arousal=[0.2]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    with pytest.raises(BoppArgumentError, match="Missing fill value for payload field"):
+        to_times(ann, times=[0.0, 1.0], fill_value={"valence": 0.0})
+
+
 def test_to_times_multi_column_payload_dict_fill():
     metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
     ann = Annotation(
@@ -893,6 +1008,42 @@ def test_to_times_multi_column_payload_dict_fill():
     assert res.extent.time == [0.0, 1.5]
     assert res.payload.valence == [0.0, 0.5]
     assert res.payload.arousal == [0.0, 0.8]
+
+
+def test_to_times_multi_column_payload_none_fill_value():
+    """Verify multi-column payload with fill_value=None successfully fills missing positions with None."""
+    class OptionalFieldPayload(msgspec.Struct, tag_field="payload_type", tag="opt_payload"):
+        label: list[str | None]
+        comment: list[str | None]
+
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=Times(time=[1.0]),
+        payload=OptionalFieldPayload(label=["test"], comment=["note"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    res = to_times(ann, times=[0.0, 1.0], method="previous", fill_value=None)
+    assert res.extent.time == [0.0, 1.0]
+    assert res.payload.label == [None, "test"]
+    assert res.payload.comment == [None, "note"]
+
+
+def test_to_times_sample_rate_grid_boundary_pop():
+    """Verify target_times grid trimming when step multiple lands precisely on t_max."""
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=["start", "end"],
+    )
+    # sample_rate=1.0 over [0.0, 1.0] creates points [0.0, 1.0]
+    res = to_times(ann, sample_rate=1.0)
+    assert res.extent.time == [0.0, 1.0]
 
 
 def test_to_times_fill_value_type_validation_error():
@@ -928,6 +1079,56 @@ def test_to_times_empty_annotation_and_empty_times():
     res_sampled = to_times(ann, times=[1.0, 2.0], fill_value="fill")
     assert res_sampled.extent.time == [1.0, 2.0]
     assert res_sampled.payload.value == ["fill", "fill"]
+
+
+def test_to_times_empty_annotation_with_confidence_and_fill():
+    """Verify sampling an empty annotation that has both payload and confidence facets."""
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=Times(time=[]),
+        payload=TagOpenPayload(value=[]),
+        confidence=LikelihoodConfidence(confidence=[]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    res = to_times(ann, times=[0.0, 1.0], fill_value="silence")
+    assert res.extent.time == [0.0, 1.0]
+    assert res.payload.value == ["silence", "silence"]
+    assert res.confidence.confidence == [0.0, 0.0]
+
+
+def test_to_times_empty_annotation_confidence_fill_validation_failure():
+    """Verify validation error when confidence fill value does not match confidence struct types."""
+    metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=metadata,
+        extent=Times(time=[]),
+        payload=TagOpenPayload(value=[]),
+        confidence=LikelihoodConfidence(confidence=[]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    with pytest.raises(BoppValidationError, match="Invalid fill value for confidence struct"):
+        to_times(ann, times=[0.0, 1.0], fill_value={"value": "silence", "confidence": "not_a_float"})
+
+
+def test_to_times_point_extent_previous_with_gaps_before_first_observation():
+    """Verify that queries before the first timestamp in method='previous' produce gaps and trigger fill."""
+    ann = create(
+        media_id="audio",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[5.0, 10.0],
+        value=["a", "b"],
+    )
+    res = to_times(ann, times=[1.0, 5.0, 7.0], method="previous", fill_value="gap")
+    assert res.extent.time == [1.0, 5.0, 7.0]
+    assert res.payload.value == ["gap", "a", "a"]
 
 
 def test_to_times_warning_no_id_and_immutability():
