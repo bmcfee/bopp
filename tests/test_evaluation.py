@@ -436,7 +436,7 @@ def test_evaluate_hierarchy():
 
     actual = evaluate(ref, est)
     assert actual == expected
-    assert "T-measure reduced" in actual
+    assert "T-Precision reduced" in actual
 
 
 def test_extract_helpers_validation_errors():
