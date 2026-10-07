@@ -8,7 +8,11 @@ import tomllib
 
 from ._version import get_current_schema_version
 from .base import BoppBase
-from .core import ensure_annotation_id, validate_and_set_annotation_id, validate_annotation_id
+from .core import (
+    ensure_annotation_id,
+    validate_and_set_annotation_id,
+    validate_annotation_id,
+)
 from .exceptions import BoppArgumentError
 from .registries import get_registry
 from .util import from_dataframe, to_dataframe
