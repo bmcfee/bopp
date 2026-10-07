@@ -10,9 +10,9 @@
     "Fraction": {
         "type": "array",
         "description": "Rational number encoded as numerator and non-zero denominator",
-        "minLength": 2,
-        "maxLength": 2,
-        "items": [
+        "minItems": 2,
+        "maxItems": 2,
+        "prefixItems": [
             {
               "type": "integer",
               "description": "Numerator, signed integer"
@@ -22,14 +22,15 @@
               "minimum": 1,
               "description": "Denominator. Strictly positive to prevent zero-division and negative bases."
             }
-        ]
+        ],
+        "items": false
     },
     "FractionNonnegative": {
         "type": "array",
         "description": "Non-negative rational number",
-        "minLength": 2,
-        "maxLength": 2,
-        "items": [
+        "minItems": 2,
+        "maxItems": 2,
+        "prefixItems": [
             {
               "type": "integer",
               "minimum": 0,
@@ -40,7 +41,8 @@
               "minimum": 1,
               "description": "Denominator. Strictly positive to prevent zero-division and negative bases."
             }
-        ]
+        ],
+        "items": false
     }
 
   }

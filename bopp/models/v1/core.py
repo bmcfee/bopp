@@ -26,12 +26,8 @@ type FractionItem = Annotated[
 
 
 type Fraction = Annotated[
-    list[int | FractionItem],
-    Meta(
-        description="Rational number encoded as numerator and non-zero denominator",
-        max_length=2,
-        min_length=2,
-    ),
+    tuple[int, FractionItem],
+    Meta(description="Rational number encoded as numerator and non-zero denominator"),
 ]
 """
 Rational number encoded as numerator and non-zero denominator
@@ -53,8 +49,8 @@ type FractionNonnegativeItem1 = Annotated[
 
 
 type FractionNonnegative = Annotated[
-    list[FractionNonnegativeItem | FractionNonnegativeItem1],
-    Meta(description="Non-negative rational number", max_length=2, min_length=2),
+    tuple[FractionNonnegativeItem, FractionNonnegativeItem1],
+    Meta(description="Non-negative rational number"),
 ]
 """
 Non-negative rational number
