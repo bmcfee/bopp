@@ -2,21 +2,28 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "metadata/derived.json",
     "title": "Derived Annotation Metadata",
-    "description": "Metadata for annotations derived from other annotations.",
+    "description": "Metadata describing an annotation produced by transforming or aggregating parent annotation(s).",
     "type": "object",
     "properties": {
         "metadata_type": {
             "const": "derived"
         },
-        "source_ids": {
-            "type": "array",
-            "description": "The ids of source annotations for this derived annotation.",
-            "items": {
-                "type": "string",
-                "pattern": "^[a-zA-Z0-9]+:.*$"
-            },
-            "minItems": 1
+        "transform": {
+            "type": "string",
+            "description": "The name or identifier of the operation/transform applied (e.g., 'trim', 'filter_by', 'to_times')."
+        },
+        "parameters": {
+            "type": "object",
+            "description": "Key-value mapping of parameters passed to the transform function."
+        },
+        "software": {
+            "type": "string",
+            "description": "Software name and/or version performing the derivation (e.g., 'bopp==1.0.0')."
+        },
+        "description": {
+            "type": "string",
+            "description": "Optional human-readable description or rationale for the derivation."
         }
     },
-    "required": ["metadata_type", "source_ids"]
+    "required": ["metadata_type", "transform"]
 }

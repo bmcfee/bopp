@@ -12,6 +12,7 @@ from .base import BoppBase
 from .core import validate_and_set_annotation_id
 from .exceptions import BoppArgumentError, BoppValidationError
 from .models.v1.extent.times import Times
+from .models.v1.metadata.derived import DerivedAnnotationMetadata
 from .util import _get_tag
 
 # Mapping default target_field when target_field is None
@@ -104,6 +105,7 @@ def _rebuild_annotation(
     parents: list[str],
     sandbox: Any,
     payload: msgspec.Struct,
+    metadata: msgspec.Struct | Any = msgspec.UNSET,
     extent: msgspec.Struct | None | Any = msgspec.UNSET,
     confidence: msgspec.Struct | None | Any = msgspec.UNSET,
 ) -> BoppBase:
@@ -114,6 +116,8 @@ def _rebuild_annotation(
         "sandbox": sandbox,
         "payload": payload,
     }
+    if metadata is not msgspec.UNSET:
+        kwargs["metadata"] = metadata
     if extent is not msgspec.UNSET:
         kwargs["extent"] = extent
     if confidence is not msgspec.UNSET:
@@ -219,6 +223,16 @@ def trim(
         raise BoppArgumentError("reset=True requires 'start' to be specified.")
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Trimming")
+    derived_metadata = DerivedAnnotationMetadata(
+        transform="trim",
+        parameters={
+            "start": start,
+            "end": end,
+            "target_field": target_field,
+            "strict": strict,
+            "reset": reset,
+        },
+    )
 
     extent = getattr(annotation, "extent", msgspec.UNSET)
     payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
@@ -229,6 +243,7 @@ def trim(
             annotation,
             parents=new_parents,
             sandbox=new_sandbox,
+            metadata=derived_metadata,
             payload=payload,
             extent=extent,
             confidence=confidence,
@@ -345,6 +360,7 @@ def trim(
         annotation,
         parents=new_parents,
         sandbox=new_sandbox,
+        metadata=derived_metadata,
         extent=new_extent,
         payload=new_payload,  # type: ignore[arg-type]
         confidence=new_confidence,
@@ -453,6 +469,10 @@ def filter_by(
         )
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Filtering")
+    derived_metadata = DerivedAnnotationMetadata(
+        transform="filter_by",
+        parameters={"target": target, "facet": facet},
+    )
 
     payload: msgspec.Struct = getattr(annotation, "payload", None)  # type: ignore[assignment]
     extent = getattr(annotation, "extent", None)
@@ -476,6 +496,7 @@ def filter_by(
             annotation,
             parents=new_parents,
             sandbox=new_sandbox,
+            metadata=derived_metadata,
             payload=payload,
             extent=extent,
             confidence=confidence,
@@ -557,6 +578,7 @@ def filter_by(
         annotation,
         parents=new_parents,
         sandbox=new_sandbox,
+        metadata=derived_metadata,
         extent=new_extent,
         payload=new_payload,  # type: ignore[arg-type]
         confidence=new_confidence,
@@ -708,6 +730,14 @@ def to_times(
 
     # Lineage tracking
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Converting")
+    derived_metadata = DerivedAnnotationMetadata(
+        transform="to_times",
+        parameters={
+            "sample_rate": sample_rate,
+            "method": method,
+            "overlap": overlap,
+        },
+    )
 
     extent = getattr(annotation, "extent", None)
     payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
@@ -810,6 +840,7 @@ def to_times(
             annotation,
             parents=new_parents,
             sandbox=new_sandbox,
+            metadata=derived_metadata,
             extent=new_extent,
             payload=new_payload,  # type: ignore[arg-type]
             confidence=new_confidence,
@@ -832,6 +863,7 @@ def to_times(
             annotation,
             parents=new_parents,
             sandbox=new_sandbox,
+            metadata=derived_metadata,
             extent=new_extent,
             payload=new_payload,  # type: ignore[arg-type]
             confidence=new_confidence,
@@ -905,6 +937,7 @@ def to_times(
         annotation,
         parents=new_parents,
         sandbox=new_sandbox,
+        metadata=derived_metadata,
         extent=new_extent,
         payload=new_payload,  # type: ignore[arg-type]
         confidence=new_confidence,

@@ -11,6 +11,7 @@ from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.extent.times import Times
+from bopp.models.v1.metadata.derived import DerivedAnnotationMetadata
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.mood_thayer import MoodThayerPayload
 from bopp.models.v1.payload.tag_open import TagOpenPayload
@@ -190,6 +191,8 @@ def test_trim_warning_no_id():
         result = trim(ann, start=1.0, end=5.0)
 
     assert result.parents == []
+    assert isinstance(result.metadata, DerivedAnnotationMetadata)
+    assert result.metadata.transform == "trim"
 
 
 def test_trim_invalid_extent_tag():
@@ -225,6 +228,8 @@ def test_trim_no_extent():
     assert result.payload.value == ["pop"]
     assert result is not ann
     assert result.parents == [ann.id]
+    assert isinstance(result.metadata, DerivedAnnotationMetadata)
+    assert result.metadata.transform == "trim"
 
 
 def test_trim_time_extent():
@@ -242,6 +247,11 @@ def test_trim_time_extent():
     assert trimmed.extent.time == [1.0, 3.0]  # 3.0 - 2.0, 5.0 - 2.0
     assert trimmed.payload.value == ["b", "c"]
     assert trimmed.confidence.confidence == [0.3, 0.5]
+    assert isinstance(trimmed.metadata, DerivedAnnotationMetadata)
+    assert trimmed.metadata.transform == "trim"
+    assert trimmed.metadata.parameters["start"] == 2.0
+    assert trimmed.metadata.parameters["end"] == 6.0
+    assert trimmed.metadata.parameters["reset"] is True
 
 
 def test_trim_point_extent_open_ended_bounds():
@@ -410,7 +420,6 @@ def test_trim_min_max_strict_and_non_strict():
 
 def test_trim_empty_and_out_of_bounds_extents():
     """Verify that trimming empty extents or extents where all observations fall outside
-
     the specified range results in valid, empty array attributes and correct parent lineage.
     """
     # 1. Edge case: Extent has empty observation arrays
@@ -548,6 +557,9 @@ def test_filter_by_default_payload():
     assert filtered.confidence.confidence == [0.5, 0.7]
     assert filtered.parents == [ann.id]
     assert filtered.id != ann.id
+    assert isinstance(filtered.metadata, DerivedAnnotationMetadata)
+    assert filtered.metadata.transform == "filter_by"
+    assert filtered.metadata.parameters["facet"] == "payload"
 
 
 def test_filter_by_target_on_payload():
@@ -705,6 +717,8 @@ def test_filter_by_no_id_warning():
         res = filter_by(ann, lambda v: True)
 
     assert res.parents == []
+    assert isinstance(res.metadata, DerivedAnnotationMetadata)
+    assert res.metadata.transform == "filter_by"
 
 
 def test_filter_by_empty_or_none_remaining():
@@ -836,6 +850,9 @@ def test_to_times_from_time_interval_with_sample_rate():
     assert res.confidence.confidence == [0.8, 0.8, 0.9, 0.9, 0.9]
     assert res.parents == [ann.id]
     assert res.id != ann.id
+    assert isinstance(res.metadata, DerivedAnnotationMetadata)
+    assert res.metadata.transform == "to_times"
+    assert res.metadata.parameters["sample_rate"] == 1.0
 
 
 def test_to_times_overlap_strategies():
