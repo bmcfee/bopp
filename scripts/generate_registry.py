@@ -8,11 +8,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, get_args, get_origin
 
+_FRACTION_TYPES = ("Fraction", "FractionNonnegative")
+
 
 def _is_complex_type(tp: Any) -> bool:
     """Determine if a type hint represents a complex structure (list, dict, tuple, Fraction, Any, etc.)."""
     if tp is Any:
         return True
+
+    if isinstance(tp, typing.TypeAliasType):
+        return _is_complex_type(tp.__value__)
 
     # 1. Unwrap Annotated[T, ...] first to inspect the underlying type T
     if hasattr(tp, "__metadata__"):
@@ -44,11 +49,14 @@ def _is_complex_type(tp: Any) -> bool:
 
 def _is_complex_field(type_hint: Any) -> bool:
     """Check if the inner element type of a list array field is complex."""
+    if isinstance(type_hint, typing.TypeAliasType):
+        return _is_complex_field(type_hint.__value__)
+
     # Unwrap top-level Annotated if present
     if hasattr(type_hint, "__metadata__"):
         args = get_args(type_hint)
         if args:
-            type_hint = args[0]
+            return _is_complex_field(args[0])
 
     origin = get_origin(type_hint)
 
@@ -69,16 +77,20 @@ def _is_complex_ast_node(node: ast.AST) -> bool:
         # Check outer list[...]
         if isinstance(node.slice, ast.Subscript):
             return True
-        if isinstance(node.slice, ast.Attribute) and node.slice.attr == "Fraction":
+        if isinstance(node.slice, ast.Attribute) and node.slice.attr in _FRACTION_TYPES:
             return True
-        if isinstance(node.slice, ast.Name) and node.slice.id in ("Fraction", "dict", "list", "tuple", "Any", "object"):
+        if isinstance(node.slice, ast.Name) and (
+            node.slice.id in _FRACTION_TYPES or node.slice.id in ("dict", "list", "tuple", "Any", "object")
+        ):
             return True
 
     # Check for Annotated[list[core.Fraction], ...]
     for child in ast.walk(node):
-        if isinstance(child, ast.Attribute) and child.attr == "Fraction":
+        if isinstance(child, ast.Attribute) and child.attr in _FRACTION_TYPES:
             return True
-        if isinstance(child, ast.Name) and child.id in ("Fraction", "dict", "tuple", "Any", "object"):
+        if isinstance(child, ast.Name) and (
+            child.id in _FRACTION_TYPES or child.id in ("dict", "tuple", "Any", "object")
+        ):
             return True
 
     return False

@@ -87,7 +87,7 @@ COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
         'agreement': ['n_annotators'],
     },
     'extent_type': {
-        'score_interval': ['quarter'],
+        'score_interval': ['quarter', 'duration'],
         'score_quarter': ['quarter'],
     },
     'metadata_type': {
