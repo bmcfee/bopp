@@ -280,15 +280,15 @@ def test_from_dataframe_with_scalar_facet_attributes_using_score_interval():
     ann = Annotation(
         media_id="track:score_test",
         bopp_version="1.0",
-        extent=ScoreInterval(time_start=[0.0, 1.0], time_end=[1.0, 2.0], time_unit="eighth"),
+        extent=ScoreInterval(time=[0.0, 1.0], duration=[1.0, 1.0], time_unit="quarter"),
         payload=OnsetPayload(value=[1, 2]),
     )
     df = to_dataframe(ann, backend="pandas")
-    assert df.attrs["extent"] == {"time_unit": "eighth"}
+    assert df.attrs["extent"] == {"time_unit": "quarter"}
 
     reconstructed = from_dataframe(df)
     assert isinstance(reconstructed.extent, ScoreInterval)
-    assert reconstructed.extent.time_unit == "eighth"
+    assert reconstructed.extent.time_unit == "quarter"
 
 
 def test_from_dataframe_with_scalar_facet_attributes():
