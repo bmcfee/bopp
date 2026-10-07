@@ -19,9 +19,9 @@ def _extract_events(ann: BoppBase) -> Any:
 
     tag = _get_tag(extent)
     if tag == "time":
-        return np.asarray(extent.time, dtype=float)
+        return np.asarray(extent.time, dtype=np.float64)
     if tag == "time_interval":
-        return np.asarray(extent.time, dtype=float)
+        return np.asarray(extent.time, dtype=np.float64)
 
     raise BoppArgumentError(
         f"Cannot extract event timestamps from extent with tag '{tag}'. "
@@ -37,15 +37,15 @@ def _extract_intervals(ann: BoppBase) -> Any:
 
     tag = _get_tag(extent)
     if tag == "time_interval":
-        starts = np.asarray(extent.time, dtype=float)
-        durations = np.asarray(extent.duration, dtype=float)
+        starts = np.asarray(extent.time, dtype=np.float64)
+        durations = np.asarray(extent.duration, dtype=np.float64)
         if len(starts) == 0:
-            return np.empty((0, 2), dtype=float)
+            return np.empty((0, 2), dtype=np.float64)
         return np.column_stack([starts, starts + durations])
     if tag == "time":
-        times = np.asarray(extent.time, dtype=float)
+        times = np.asarray(extent.time, dtype=np.float64)
         if len(times) < 2:
-            return np.empty((0, 2), dtype=float)
+            return np.empty((0, 2), dtype=np.float64)
         return np.column_stack([times[:-1], times[1:]])
 
     raise BoppArgumentError(
@@ -80,9 +80,9 @@ def _extract_note_pitches_in_hz(ann: BoppBase) -> Any:
     payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
 
     if payload_tag == "note_hz":
-        return np.asarray(payload.value, dtype=float)  # type: ignore[union-attr]
+        return np.asarray(payload.value, dtype=np.float64)  # type: ignore[union-attr]
     if payload_tag == "note_midi":
-        midi_nums = np.asarray(payload.value, dtype=float)  # type: ignore[union-attr]
+        midi_nums = np.asarray(payload.value, dtype=np.float64)  # type: ignore[union-attr]
         return 440.0 * (2.0 ** ((midi_nums - 69.0) / 12.0))
 
     raise BoppArgumentError(
@@ -107,8 +107,8 @@ def _eval_tempo(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
     ref_payload = getattr(ref, "payload", None)
     est_payload = getattr(est, "payload", None)
 
-    ref_tempi = np.asarray(getattr(ref_payload, "value", []), dtype=float)
-    est_tempi = np.asarray(getattr(est_payload, "value", []), dtype=float)
+    ref_tempi = np.asarray(getattr(ref_payload, "value", []), dtype=np.float64)
+    est_tempi = np.asarray(getattr(est_payload, "value", []), dtype=np.float64)
 
     # mir_eval expects (ref_tempi, ref_weight, est_tempi)
     ref_weight = kwargs.pop("ref_weight", 1.0)
@@ -149,7 +149,7 @@ def _eval_melody(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
         if extent is not None and extent is not msgspec.UNSET:
             extent_tag = _get_tag(extent)
             if extent_tag == "time":
-                times = np.asarray(extent.time, dtype=float)
+                times = np.asarray(extent.time, dtype=np.float64)
             else:
                 raise BoppArgumentError(
                     f"Melody evaluation requires 'time' extent, found '{extent_tag}'."
@@ -168,9 +168,9 @@ def _eval_melody(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
                     freqs.append(-abs(f) if f != 0.0 else 0.0)
                 else:
                     freqs.append(f)
-            freq_arr = np.asarray(freqs, dtype=float)
+            freq_arr = np.asarray(freqs, dtype=np.float64)
         else:
-            freq_arr = np.asarray(raw_vals, dtype=float)
+            freq_arr = np.asarray(raw_vals, dtype=np.float64)
 
         return times, freq_arr
 
@@ -189,8 +189,8 @@ def _eval_hierarchy(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, An
                 f"Hierarchy evaluation requires 'time_interval' extent, found '{extent_tag}'."
             )
 
-        times = np.asarray(extent.time, dtype=float)  # type: ignore[union-attr]
-        durations = np.asarray(extent.duration, dtype=float)  # type: ignore[union-attr]
+        times = np.asarray(extent.time, dtype=np.float64)  # type: ignore[union-attr]
+        durations = np.asarray(extent.duration, dtype=np.float64)  # type: ignore[union-attr]
         labels = getattr(payload, "label", [])
         levels = getattr(payload, "level", [])
 
