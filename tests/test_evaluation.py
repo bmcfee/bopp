@@ -1,7 +1,3 @@
-import builtins
-import sys
-from unittest.mock import patch
-
 import mir_eval
 import msgspec
 import numpy as np
@@ -10,14 +6,13 @@ import pytest
 import bopp
 from bopp.core import create
 from bopp.evaluation import (
-    _check_mir_eval_available,
     _extract_events,
     _extract_intervals,
     _extract_labels,
     _extract_note_pitches_in_hz,
     evaluate,
 )
-from bopp.exceptions import BoppArgumentError, BoppError
+from bopp.exceptions import BoppArgumentError
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time_interval import TimeIntervalExtent
 from bopp.models.v1.extent.times import Times
@@ -28,32 +23,6 @@ from bopp.models.v1.payload.pitch_contour_hz import PitchContourPayload
 from bopp.models.v1.payload.segment_multi import MultiSegmentPayload
 from bopp.models.v1.payload.tag_open import TagOpenPayload
 from bopp.models.v1.payload.tempo import TempoPayload
-
-
-def test_check_mir_eval_available_missing_numpy():
-    real_import = builtins.__import__
-
-    def mock_import(name, *args, **kwargs):
-        if name == "numpy":
-            raise ImportError("No module named 'numpy'")
-        return real_import(name, *args, **kwargs)
-
-    with patch.object(builtins, "__import__", side_effect=mock_import):
-        with pytest.raises(BoppError, match="Evaluation requires 'numpy'"):
-            _check_mir_eval_available()
-
-
-def test_check_mir_eval_available_missing_mir_eval():
-    real_import = builtins.__import__
-
-    def mock_import(name, *args, **kwargs):
-        if name == "mir_eval":
-            raise ImportError("No module named 'mir_eval'")
-        return real_import(name, *args, **kwargs)
-
-    with patch.object(builtins, "__import__", side_effect=mock_import):
-        with pytest.raises(BoppError, match="Evaluation requires 'mir_eval'"):
-            _check_mir_eval_available()
 
 
 def test_evaluate_onset():

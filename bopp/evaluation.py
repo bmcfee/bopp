@@ -1,38 +1,18 @@
-from __future__ import annotations
+from __future__ annotations
 
 from typing import Any
 
+import mir_eval  # type: ignore[import-not-found,import-untyped]
 import msgspec
+import numpy as np
 
 from .base import BoppBase
-from .exceptions import BoppArgumentError, BoppError
+from .exceptions import BoppArgumentError
 from .util import _get_tag
-
-
-def _check_mir_eval_available() -> tuple[Any, Any]:
-    """Check whether mir_eval and numpy are installed and importable."""
-    try:
-        import numpy as np
-    except ImportError as exc:
-        raise BoppError(
-            "Evaluation requires 'numpy' to be installed. "
-            "Install with: pip install 'bopp[evaluation]'"
-        ) from exc
-
-    try:
-        import mir_eval  # type: ignore[import-not-found,import-untyped]
-    except ImportError as exc:
-        raise BoppError(
-            "Evaluation requires 'mir_eval' to be installed. "
-            "Install with: pip install 'bopp[evaluation]'"
-        ) from exc
-
-    return mir_eval, np
 
 
 def _extract_events(ann: BoppBase) -> Any:
     """Extract 1D event timestamps as a NumPy array."""
-    _, np = _check_mir_eval_available()
     extent = getattr(ann, "extent", None)
     if extent is None or extent is msgspec.UNSET:
         raise BoppArgumentError("Annotation requires an extent to extract event timestamps.")
@@ -51,7 +31,6 @@ def _extract_events(ann: BoppBase) -> Any:
 
 def _extract_intervals(ann: BoppBase) -> Any:
     """Extract (N, 2) interval array [start, end] from an annotation."""
-    _, np = _check_mir_eval_available()
     extent = getattr(ann, "extent", None)
     if extent is None or extent is msgspec.UNSET:
         raise BoppArgumentError("Annotation requires an extent to extract intervals.")
@@ -97,7 +76,6 @@ def _extract_labels(ann: BoppBase, field_name: str = "value") -> list[Any]:
 
 def _extract_note_pitches_in_hz(ann: BoppBase) -> Any:
     """Extract note pitches from payload in Hz, converting MIDI note numbers if necessary."""
-    _, np = _check_mir_eval_available()
     payload = getattr(ann, "payload", None)
     payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
 
@@ -114,21 +92,18 @@ def _extract_note_pitches_in_hz(ann: BoppBase) -> Any:
 
 
 def _eval_onset(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, _ = _check_mir_eval_available()
     ref_onsets = _extract_events(ref)
     est_onsets = _extract_events(est)
     return mir_eval.onset.evaluate(ref_onsets, est_onsets, **kwargs)
 
 
 def _eval_beat(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, _ = _check_mir_eval_available()
     ref_beats = _extract_events(ref)
     est_beats = _extract_events(est)
     return mir_eval.beat.evaluate(ref_beats, est_beats, **kwargs)
 
 
 def _eval_tempo(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, np = _check_mir_eval_available()
     ref_payload = getattr(ref, "payload", None)
     est_payload = getattr(est, "payload", None)
 
@@ -141,7 +116,6 @@ def _eval_tempo(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
 
 
 def _eval_chord(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, _ = _check_mir_eval_available()
     ref_intervals = _extract_intervals(ref)
     est_intervals = _extract_intervals(est)
     ref_labels = _extract_labels(ref, "value")
@@ -150,7 +124,6 @@ def _eval_chord(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
 
 
 def _eval_segment(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, _ = _check_mir_eval_available()
     ref_intervals = _extract_intervals(ref)
     est_intervals = _extract_intervals(est)
     ref_labels = _extract_labels(ref, "value")
@@ -159,7 +132,6 @@ def _eval_segment(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]
 
 
 def _eval_transcription(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, _ = _check_mir_eval_available()
     ref_intervals = _extract_intervals(ref)
     est_intervals = _extract_intervals(est)
     ref_pitches = _extract_note_pitches_in_hz(ref)
@@ -170,8 +142,6 @@ def _eval_transcription(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str
 
 
 def _eval_melody(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, np = _check_mir_eval_available()
-
     def _extract_times_and_freqs(ann: BoppBase) -> tuple[Any, Any]:
         extent = getattr(ann, "extent", None)
         payload = getattr(ann, "payload", None)
@@ -210,8 +180,6 @@ def _eval_melody(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
 
 
 def _eval_hierarchy(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    mir_eval, np = _check_mir_eval_available()
-
     def _extract_multilevel(ann: BoppBase) -> tuple[list[Any], list[list[str]]]:
         extent = getattr(ann, "extent", None)
         payload = getattr(ann, "payload", None)
@@ -305,13 +273,9 @@ def evaluate(
 
     Raises
     ------
-    BoppError
-        If mir_eval or numpy is not installed.
     BoppArgumentError
         If task cannot be determined or annotations are incompatible.
     """
-    _check_mir_eval_available()
-
     ref_payload = getattr(ref, "payload", None)
     est_payload = getattr(est, "payload", None)
 
