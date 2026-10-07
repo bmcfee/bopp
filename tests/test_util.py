@@ -10,7 +10,15 @@ from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.payload.onset import OnsetPayload
-from bopp.util import _get_tag, _validate_dataframe_columns, extract_header, from_dataframe, to_dataframe
+from bopp.registries import get_registry
+from bopp.util import (
+    _extract_facet_data,
+    _get_tag,
+    _validate_dataframe_columns,
+    extract_header,
+    from_dataframe,
+    to_dataframe,
+)
 
 
 class TaggedStruct(msgspec.Struct, tag="tagged_sample"):
@@ -49,9 +57,53 @@ def test_extract_header():
     assert "extent" not in header
 
 
+def test_extract_header_with_scalar_facet_attributes():
+    """Verify extract_header includes scalar fields on facets when present."""
+    class ScalarPayload(msgspec.Struct, tag_field="payload_type", tag="onset"):
+        value: list[int]
+        unit: str = "custom_unit"
+
+    class ScalarExtent(msgspec.Struct, tag_field="extent_type", tag="time"):
+        time: list[float]
+        time_unit: str = "seconds"
+
+    ann = Annotation(
+        media_id="track:scalar_test",
+        bopp_version="1.0",
+        extent=ScalarExtent(time=[0.1, 0.2], time_unit="seconds"),  # type: ignore[arg-type]
+        payload=ScalarPayload(value=[1, 2], unit="custom_unit"),  # type: ignore[arg-type]
+    )
+
+    header = extract_header(ann)
+    assert "payload" in header
+    assert header["payload"]["payload_type"] == "onset"
+    assert header["payload"]["unit"] == "custom_unit"
+    assert "extent" in header
+    assert header["extent"]["extent_type"] == "time"
+    assert header["extent"]["time_unit"] == "seconds"
+
+
+def test_extract_facet_data_scalar_attributes():
+    class DummyFacet(msgspec.Struct, tag_field="payload_type", tag="onset"):
+        value: list[int]
+        sample_rate: float
+
+    facet = DummyFacet(value=[1, 2], sample_rate=44100.0)
+    target_dict: dict[str, list[int]] = {}
+    attrs_dict: dict[str, dict[str, float]] = {}
+
+    _extract_facet_data(facet, "payload", target_dict, attrs_dict)
+
+    assert target_dict == {"payload:onset:value": [1, 2]}
+    assert attrs_dict == {"payload": {"sample_rate": 44100.0}}
+
+    # When struct is None or UNSET, function returns early
+    _extract_facet_data(None, "payload", target_dict, attrs_dict)
+    _extract_facet_data(msgspec.UNSET, "payload", target_dict, attrs_dict)
+
+
 def test_validate_dataframe_columns_invalid_format():
     """Verify that DataFrame column header validation rejects column names that do not
-
     adhere to the required 'facet:type:field' 3-part naming format.
     """
     invalid_columns = [
@@ -65,6 +117,27 @@ def test_validate_dataframe_columns_invalid_format():
             BoppValidationError, match="Expected exactly 3 colon-separated fields"
         ):
             _validate_dataframe_columns([col], "1.0")
+
+
+def test_validate_dataframe_columns_rules():
+    """Verify DataFrame column validation rules 2, 3, and 4."""
+    # Rule 2: Mixed types for facet
+    with pytest.raises(BoppValidationError, match="Mixed types for facet 'payload'"):
+        _validate_dataframe_columns(["payload:onset:value", "payload:beat:value"], "1.0")
+
+    # Rule 3a: Invalid facet
+    with pytest.raises(BoppValidationError, match="Invalid facet 'unknown_facet'"):
+        _validate_dataframe_columns(["unknown_facet:onset:value"], "1.0")
+
+    # Rule 3b: Unrecognized type tag in registry
+    with pytest.raises(BoppValidationError, match="Unrecognized type 'unknown_tag'"):
+        _validate_dataframe_columns(["payload:unknown_tag:value"], "1.0")
+
+    # Rule 4: Field does not exist on target type struct
+    with pytest.raises(
+        BoppValidationError, match="Field 'nonexistent_field' in column .* does not exist"
+    ):
+        _validate_dataframe_columns(["payload:onset:nonexistent_field"], "1.0")
 
 
 def test_to_dataframe_partial_facets():
@@ -89,7 +162,6 @@ def test_to_dataframe_partial_facets():
 
 def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
     """Verify that `to_dataframe` correctly extracts array data and metadata headers while
-
     omitting tag discriminator fields (e.g. `payload_type`) and UNSET optional fields.
     """
     ann = Annotation(
@@ -189,9 +261,57 @@ def test_polars_dataframe_roundtrip():
     assert getattr(reconstructed, "sandbox", None) == {"info": "polars_test"}
 
 
+def test_from_dataframe_with_scalar_facet_attributes():
+    """Verify from_dataframe accurately restores scalar facet attributes from df.attrs."""
+    # Temporarily monkey-patch registry to allow custom facet structs with scalar attributes
+    registry = get_registry("1.0")
+
+    class ExtentWithScalar(msgspec.Struct, tag_field="extent_type", tag="time"):
+        time: list[float]
+        origin: str = "start"
+
+    class PayloadWithScalar(msgspec.Struct, tag_field="payload_type", tag="onset"):
+        value: list[int]
+        source: str = "mic"
+
+    class ConfWithScalar(msgspec.Struct, tag_field="confidence_type", tag="likelihood"):
+        confidence: list[float]
+        method: str = "softmax"
+
+    orig_extent = registry["EXTENT_TYPE_REGISTRY"]["time"]
+    orig_payload = registry["PAYLOAD_TYPE_REGISTRY"]["onset"]
+    orig_conf = registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"]
+
+    registry["EXTENT_TYPE_REGISTRY"]["time"] = ExtentWithScalar
+    registry["PAYLOAD_TYPE_REGISTRY"]["onset"] = PayloadWithScalar
+    registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"] = ConfWithScalar
+
+    try:
+        df = pd.DataFrame({
+            "extent:time:time": [0.1, 0.2],
+            "payload:onset:value": [1, 2],
+            "confidence:likelihood:confidence": [0.9, 0.95],
+        })
+        df.attrs = {
+            "bopp_version": "1.0",
+            "media_id": "track:with_scalars",
+            "extent": {"origin": "custom_origin"},
+            "payload": {"source": "custom_source"},
+            "confidence": {"method": "custom_method"},
+        }
+
+        reconstructed = from_dataframe(df)
+        assert getattr(reconstructed.extent, "origin") == "custom_origin"
+        assert getattr(reconstructed.payload, "source") == "custom_source"
+        assert getattr(reconstructed.confidence, "method") == "custom_method"
+    finally:
+        registry["EXTENT_TYPE_REGISTRY"]["time"] = orig_extent
+        registry["PAYLOAD_TYPE_REGISTRY"]["onset"] = orig_payload
+        registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"] = orig_conf
+
+
 def test_from_dataframe_missing_required_payload_facet():
     """Verify that reconstructing an Annotation from a DataFrame fails validation
-
     if the DataFrame lacks mandatory 'payload:*' columns required by the schema.
     """
     df = pd.DataFrame({"extent:time:time": [0.1, 0.2]})
@@ -229,7 +349,6 @@ def test_from_dataframe_extra_attrs():
 
 def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
     """Verify that `to_dataframe` raises an actionable BoppIOError when attempting
-
     to use a DataFrame backend whose underlying library is not installed.
     """
     ann = create(
@@ -256,7 +375,6 @@ def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
 
 def test_from_dataframe_raises_argument_error_when_dataframe_libraries_missing():
     """Verify that `from_dataframe` raises a BoppArgumentError when required DataFrame
-
     libraries (pandas/polars) cannot be imported to inspect the input object.
     """
     df_pd = pd.DataFrame({"payload:onset:value": [1]})
