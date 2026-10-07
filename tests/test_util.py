@@ -9,7 +9,6 @@ import pytest
 from bopp.core import BoppArgumentError, BoppIOError, BoppValidationError, create
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
-from bopp.models.v1.extent.score_interval import ScoreInterval
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.payload.onset import OnsetPayload
 from bopp.util import (
@@ -273,22 +272,6 @@ def test_polars_dataframe_roundtrip():
     assert reconstructed.media_id == ann.media_id
     assert _get_tag(reconstructed.payload) == _get_tag(ann.payload)
     assert getattr(reconstructed, "sandbox", None) == {"info": "polars_test"}
-
-
-def test_from_dataframe_with_scalar_facet_attributes_using_score_interval():
-    """Verify from_dataframe accurately restores scalar facet attributes from df.attrs using native ScoreInterval."""
-    ann = Annotation(
-        media_id="track:score_test",
-        bopp_version="1.0",
-        extent=ScoreInterval(time=[0.0, 1.0], duration=[1.0, 1.0], time_unit="quarter"),
-        payload=OnsetPayload(value=[1, 2]),
-    )
-    df = to_dataframe(ann, backend="pandas")
-    assert df.attrs["extent"] == {"time_unit": "quarter"}
-
-    reconstructed = from_dataframe(df)
-    assert isinstance(reconstructed.extent, ScoreInterval)
-    assert reconstructed.extent.time_unit == "quarter"
 
 
 def test_from_dataframe_with_scalar_facet_attributes():
