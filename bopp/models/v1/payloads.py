@@ -10,6 +10,7 @@ from msgspec import Meta
 from .payload import (
     beat,
     chord,
+    ext,
     key_mode,
     lyrics,
     mood_thayer,
@@ -34,6 +35,7 @@ type AnyPayload = Annotated[
     | note_hz.NoteHzPayload
     | note_midi.NoteMidiPayload
     | object.ObjectPayload
+    | ext.ExtensionPayload
     | onset.OnsetPayload
     | pitch_contour_hz.PitchContourPayload
     | relation.RelationPayload

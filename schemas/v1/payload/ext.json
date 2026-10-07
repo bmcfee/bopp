@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/ext.json",
+  "title": "Extension Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "ext"
+    },
+    "ext_schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Identifier for the schema defining the items in the value array."
+    },
+    "value": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Annotations consisting of structured extension data.",
+      "items": {}
+    }
+  },
+  "required": [
+    "payload_type",
+    "ext_schema",
+    "value"
+  ]
+}

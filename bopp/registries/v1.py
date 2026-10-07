@@ -20,6 +20,7 @@ from ..models.v1.metadata.other import AnnotationMetadataOther
 from ..models.v1.metadata.sensor import SensorAnnotationMetadata
 from ..models.v1.payload.beat import BeatPositionPayload
 from ..models.v1.payload.chord import ChordPayload
+from ..models.v1.payload.ext import ExtensionPayload
 from ..models.v1.payload.key_mode import KeyModePayload
 from ..models.v1.payload.lyrics import LyricsPayload
 from ..models.v1.payload.mood_thayer import MoodThayerPayload
@@ -65,6 +66,7 @@ METADATA_TYPE_REGISTRY = {
 PAYLOAD_TYPE_REGISTRY = {
     'beat': BeatPositionPayload,
     'chord': ChordPayload,
+    'ext': ExtensionPayload,
     'key_mode': KeyModePayload,
     'lyrics': LyricsPayload,
     'mood_thayer': MoodThayerPayload,
@@ -94,6 +96,7 @@ COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
         'sensor': ['settings'],
     },
     'payload_type': {
+        'ext': ['value'],
         'object': ['value'],
         'onset': ['value'],
         'pitch_contour': ['value'],
