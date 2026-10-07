@@ -1,32 +1,3 @@
-from typing import Any
-
-from .._version import get_registry_version
-from ..exceptions import BoppRegistryError
-
-
-def get_registry(version: str) -> dict[str, Any]:
-    """Resolve the target registry and Annotation class based on the bopp_version.
-
-    Parameters
-    ----------
-    version : str
-        The version string identifying the BOPP version (e.g., "1.0.0", "v1", "1").
-
-    Returns
-    -------
-    dict of str to Any
-        A dictionary containing registry mappings and the target `Annotation` class:
-        - "PAYLOAD_TYPE_REGISTRY": dict mapping payload tags to payload classes.
-        - "EXTENT_TYPE_REGISTRY": dict mapping extent tags to extent classes.
-        - "CONFIDENCE_TYPE_REGISTRY": dict mapping confidence tags to confidence classes.
-        - "COMPLEX_FIELDS_REGISTRY": dict mapping tag_field to tag values to complex field names.
-        - "Annotation": the version-specific Annotation model class.
-
-    Raises
-    ------
-    BoppRegistryError
-        If the provided `version` is not supported.
-    """
     registry_key = get_registry_version(version)
 
     if registry_key == "v1":
@@ -39,5 +10,3 @@ def get_registry(version: str) -> dict[str, Any]:
             "COMPLEX_FIELDS_REGISTRY": getattr(v1, "COMPLEX_FIELDS_REGISTRY", {}),
             "Annotation": v1.ANNOTATION_CLASS,
         }
-
-    raise BoppRegistryError(f"Unsupported BOPP version: {version}")

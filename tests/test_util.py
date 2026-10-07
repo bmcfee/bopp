@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import patch
 
 import msgspec
@@ -8,9 +9,9 @@ import pytest
 from bopp.core import BoppArgumentError, BoppIOError, BoppValidationError, create
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
+from bopp.models.v1.extent.score_interval import ScoreInterval
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.payload.onset import OnsetPayload
-from bopp.registries import get_registry
 from bopp.util import (
     _extract_facet_data,
     _get_tag,
@@ -66,6 +67,19 @@ def test_extract_header_with_scalar_facet_attributes():
     class ScalarExtent(msgspec.Struct, tag_field="extent_type", tag="time"):
         time: list[float]
         time_unit: str = "seconds"
+
+    # Annotation with facet as a non-struct to cover line 96->89
+    class NonStructExtentAnnotation(msgspec.Struct):
+        media_id: str
+        extent: Any = "not_a_struct"
+        payload: ScalarPayload | None = None
+
+    ann_non_struct = NonStructExtentAnnotation(
+        media_id="track:non_struct",
+        payload=ScalarPayload(value=[1, 2], unit="custom_unit"),
+    )
+    header_non_struct = extract_header(ann_non_struct)  # type: ignore[arg-type]
+    assert "extent" not in header_non_struct
 
     ann = Annotation(
         media_id="track:scalar_test",
@@ -261,10 +275,24 @@ def test_polars_dataframe_roundtrip():
     assert getattr(reconstructed, "sandbox", None) == {"info": "polars_test"}
 
 
-def test_from_dataframe_with_scalar_facet_attributes():
-    """Verify from_dataframe accurately restores scalar facet attributes from df.attrs."""
-    registry = get_registry("1.0")
+def test_from_dataframe_with_scalar_facet_attributes_using_score_interval():
+    """Verify from_dataframe accurately restores scalar facet attributes from df.attrs using native ScoreInterval."""
+    ann = Annotation(
+        media_id="track:score_test",
+        bopp_version="1.0",
+        extent=ScoreInterval(time=[0.0, 1.0], duration=[1.0, 1.0], time_unit="eighth"),
+        payload=OnsetPayload(value=[1, 2]),
+    )
+    df = to_dataframe(ann, backend="pandas")
+    assert df.attrs["extent"] == {"time_unit": "eighth"}
 
+    reconstructed = from_dataframe(df)
+    assert isinstance(reconstructed.extent, ScoreInterval)
+    assert reconstructed.extent.time_unit == "eighth"
+
+
+def test_from_dataframe_with_scalar_facet_attributes():
+    """Verify from_dataframe accurately restores scalar facet attributes from df.attrs across extent, payload, confidence."""
     class ExtentWithScalar(msgspec.Struct, tag_field="extent_type", tag="time"):
         time: list[float]
         origin: str = "start"
@@ -284,17 +312,15 @@ def test_from_dataframe_with_scalar_facet_attributes():
         payload: PayloadWithScalar | None = None
         confidence: ConfWithScalar | None = None
 
-    orig_extent = registry["EXTENT_TYPE_REGISTRY"]["time"]
-    orig_payload = registry["PAYLOAD_TYPE_REGISTRY"]["onset"]
-    orig_conf = registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"]
-    orig_ann = registry["Annotation"]
+    mock_registry = {
+        "Annotation": CustomAnnotation,
+        "EXTENT_TYPE_REGISTRY": {"time": ExtentWithScalar},
+        "PAYLOAD_TYPE_REGISTRY": {"onset": PayloadWithScalar},
+        "CONFIDENCE_TYPE_REGISTRY": {"likelihood": ConfWithScalar},
+        "COMPLEX_FIELDS_REGISTRY": {},
+    }
 
-    registry["EXTENT_TYPE_REGISTRY"]["time"] = ExtentWithScalar
-    registry["PAYLOAD_TYPE_REGISTRY"]["onset"] = PayloadWithScalar
-    registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"] = ConfWithScalar
-    registry["Annotation"] = CustomAnnotation
-
-    try:
+    with patch("bopp.util.get_registry", return_value=mock_registry):
         df = pd.DataFrame({
             "extent:time:time": [0.1, 0.2],
             "payload:onset:value": [1, 2],
@@ -312,11 +338,6 @@ def test_from_dataframe_with_scalar_facet_attributes():
         assert getattr(reconstructed.extent, "origin") == "custom_origin"
         assert getattr(reconstructed.payload, "source") == "custom_source"
         assert getattr(reconstructed.confidence, "method") == "custom_method"
-    finally:
-        registry["EXTENT_TYPE_REGISTRY"]["time"] = orig_extent
-        registry["PAYLOAD_TYPE_REGISTRY"]["onset"] = orig_payload
-        registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"] = orig_conf
-        registry["Annotation"] = orig_ann
 
 
 def test_from_dataframe_missing_required_payload_facet():
