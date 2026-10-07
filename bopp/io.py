@@ -8,7 +8,7 @@ import tomllib
 
 from ._version import get_current_schema_version
 from .base import BoppBase
-from .core import ensure_annotation_id, validate_annotation_id
+from .core import ensure_annotation_id, validate_and_set_annotation_id, validate_annotation_id
 from .exceptions import BoppArgumentError
 from .registries import get_registry
 from .util import from_dataframe, to_dataframe
@@ -23,10 +23,23 @@ class _VersionHeader(msgspec.Struct):
 def _prepare_annotation_for_save(
     ann: BoppBase, *, validate_id: bool, generate_id: bool
 ) -> None:
-    """Helper to generate or validate the annotation ID prior to serialization."""
-    if generate_id and getattr(ann, "id", msgspec.UNSET) in (msgspec.UNSET, None):
-        ensure_annotation_id(ann)
-    elif validate_id:
+    """
+    Helper to generate or validate the annotation ID prior to serialization.
+
+    The four combinations of (generate_id, validate_id) operate as follows:
+    - generate_id=False, validate_id=False: Do nothing.
+    - generate_id=False, validate_id=True: Validate existing ID.
+    - generate_id=True, validate_id=False: Force generate / overwrite existing ID.
+    - generate_id=True, validate_id=True: Generate if missing, otherwise validate existing ID.
+    """
+    if generate_id and not validate_id:
+        validate_and_set_annotation_id(ann)
+    elif generate_id and validate_id:
+        if getattr(ann, "id", msgspec.UNSET) in (msgspec.UNSET, None):
+            ensure_annotation_id(ann)
+        else:
+            validate_annotation_id(ann)
+    elif not generate_id and validate_id:
         validate_annotation_id(ann)
 
 
@@ -48,8 +61,12 @@ def save_bopp_csv(
         Target file path for the output CSV file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
+        When paired with generate_id=False, strictly validates the existing ID.
+        When paired with generate_id=True, validates if present or generates if missing.
     generate_id : bool, default True
-        If True, computes and assigns an ID if missing before saving.
+        If True and validate_id=True, generates an ID if missing; if validate_id=False,
+        unconditionally overrides any existing ID with a freshly computed one.
+        If False and validate_id=False, skips ID generation and validation.
     """
     _prepare_annotation_for_save(ann, validate_id=validate_id, generate_id=generate_id)
 
@@ -131,8 +148,12 @@ def save_bopp_json(
         Target file path for saving the JSON output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
+        When paired with generate_id=False, strictly validates the existing ID.
+        When paired with generate_id=True, validates if present or generates if missing.
     generate_id : bool, default True
-        If True, computes and assigns an ID if missing before saving.
+        If True and validate_id=True, generates an ID if missing; if validate_id=False,
+        unconditionally overrides any existing ID with a freshly computed one.
+        If False and validate_id=False, skips ID generation and validation.
     """
     _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
 
@@ -161,8 +182,12 @@ def save_bopp_msgpack(
         Target file path for saving the MsgPack binary output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
+        When paired with generate_id=False, strictly validates the existing ID.
+        When paired with generate_id=True, validates if present or generates if missing.
     generate_id : bool, default True
-        If True, computes and assigns an ID if missing before saving.
+        If True and validate_id=True, generates an ID if missing; if validate_id=False,
+        unconditionally overrides any existing ID with a freshly computed one.
+        If False and validate_id=False, skips ID generation and validation.
     """
     _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
 
