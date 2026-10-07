@@ -263,7 +263,6 @@ def test_polars_dataframe_roundtrip():
 
 def test_from_dataframe_with_scalar_facet_attributes():
     """Verify from_dataframe accurately restores scalar facet attributes from df.attrs."""
-    # Temporarily monkey-patch registry to allow custom facet structs with scalar attributes
     registry = get_registry("1.0")
 
     class ExtentWithScalar(msgspec.Struct, tag_field="extent_type", tag="time"):
@@ -278,13 +277,22 @@ def test_from_dataframe_with_scalar_facet_attributes():
         confidence: list[float]
         method: str = "softmax"
 
+    class CustomAnnotation(msgspec.Struct):
+        media_id: str
+        bopp_version: str
+        extent: ExtentWithScalar | None = None
+        payload: PayloadWithScalar | None = None
+        confidence: ConfWithScalar | None = None
+
     orig_extent = registry["EXTENT_TYPE_REGISTRY"]["time"]
     orig_payload = registry["PAYLOAD_TYPE_REGISTRY"]["onset"]
     orig_conf = registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"]
+    orig_ann = registry["Annotation"]
 
     registry["EXTENT_TYPE_REGISTRY"]["time"] = ExtentWithScalar
     registry["PAYLOAD_TYPE_REGISTRY"]["onset"] = PayloadWithScalar
     registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"] = ConfWithScalar
+    registry["Annotation"] = CustomAnnotation
 
     try:
         df = pd.DataFrame({
@@ -308,6 +316,7 @@ def test_from_dataframe_with_scalar_facet_attributes():
         registry["EXTENT_TYPE_REGISTRY"]["time"] = orig_extent
         registry["PAYLOAD_TYPE_REGISTRY"]["onset"] = orig_payload
         registry["CONFIDENCE_TYPE_REGISTRY"]["likelihood"] = orig_conf
+        registry["Annotation"] = orig_ann
 
 
 def test_from_dataframe_missing_required_payload_facet():
