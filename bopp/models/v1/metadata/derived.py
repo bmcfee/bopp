@@ -3,22 +3,46 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from msgspec import Meta, Struct
-
-type SourceId = Annotated[str, Meta(pattern="^[a-zA-Z0-9]+:.*$")]
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class DerivedAnnotationMetadata(Struct, tag_field="metadata_type", tag="derived"):
     """
-    Metadata for annotations derived from other annotations.
+    Metadata describing an annotation produced by transforming or aggregating parent annotation(s).
     """
 
-    source_ids: Annotated[
-        list[SourceId],
+    transform: Annotated[
+        str,
         Meta(
-            description="The ids of source annotations for this derived annotation.",
-            min_length=1,
+            description="The name or identifier of the operation/transform applied (e.g., 'trim', 'filter_by', 'to_times')."
         ),
     ]
+    parameters: (
+        Annotated[
+            dict[str, Any],
+            Meta(
+                description="Key-value mapping of parameters passed to the transform function."
+            ),
+        ]
+        | UnsetType
+    ) = UNSET
+    software: (
+        Annotated[
+            str,
+            Meta(
+                description="Software name and/or version performing the derivation (e.g., 'bopp==1.0.0')."
+            ),
+        ]
+        | UnsetType
+    ) = UNSET
+    description: (
+        Annotated[
+            str,
+            Meta(
+                description="Optional human-readable description or rationale for the derivation."
+            ),
+        ]
+        | UnsetType
+    ) = UNSET

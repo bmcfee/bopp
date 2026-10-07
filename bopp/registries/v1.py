@@ -90,6 +90,7 @@ COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
     },
     'metadata_type': {
         'algorithm': ['parameters'],
+        'derived': ['parameters'],
         'sensor': ['settings'],
     },
     'payload_type': {
