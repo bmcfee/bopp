@@ -78,8 +78,8 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
 
     Examples
     --------
-    >>> from bopp.models.v1.annotation import Annotation
-    >>> ann = Annotation(media_id="audio:123", payload={"payload_type": "onset", "value": [0.1]})
+    >>> import bopp
+    >>> ann = bopp.create(media_id="audio:123", payload_kind="onset", value=[0.1])
     >>> header = extract_header(ann)
     >>> header["media_id"]
     'audio:123'
