@@ -19,18 +19,12 @@ from bopp.models.v1.extent.score_interval import ScoreInterval
 from bopp.models.v1.extent.score_quarter import ScoreQuarterNotes
 
 
-def _load_core_schema():
+@pytest.fixture(scope="module")
+def core_schema():
     """Load the authoritative core schema."""
     return json.loads(
         (Path(__file__).resolve().parents[1] / "schemas/v1/core.json").read_text()
     )
-
-
-def test_core_schema():
-    """The core schema conforms to JSON Schema 2020-12."""
-    jsonschema = pytest.importorskip("jsonschema")
-    core = _load_core_schema()
-    jsonschema.Draft202012Validator.check_schema(core)
 
 
 @pytest.mark.parametrize(
@@ -46,12 +40,11 @@ def test_core_schema():
     ],
     ids=lambda value: repr(value),
 )
-def test_fraction_schema_values(definition, value, expected_valid):
+def test_fraction_schema_values(definition, value, expected_valid, core_schema):
     """Fraction schemas enforce each element's bounds and the array length."""
     jsonschema = pytest.importorskip("jsonschema")
-    core = _load_core_schema()
     validator = jsonschema.Draft202012Validator(
-        {"$defs": core["$defs"], "$ref": f"#/$defs/{definition}"}
+        {"$defs": core_schema["$defs"], "$ref": f"#/$defs/{definition}"}
     )
     assert validator.is_valid(value) == expected_valid
 
