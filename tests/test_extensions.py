@@ -6,6 +6,7 @@ import pytest
 from bopp.core import compute_annotation_id, create, validate_annotation_id
 from bopp.exceptions import BoppRegistryError
 from bopp.extensions import (
+    REGISTRY,
     ExtensionRegistry,
     get_extensions,
     reset_extensions,
@@ -65,14 +66,15 @@ def test_lazy_entry_point_loading():
 def test_entry_point_fallback_load():
     mock_ep = MagicMock()
     mock_ep.name = "example.fallback"
-    mock_ep.value = "nonexistent.module:SomeClass"
+    mock_ep.value = "nonexistent_module:SomeClass"
     mock_ep.load.return_value = CustomItem
 
     reg = ExtensionRegistry()
     reg.register_entry("example.fallback", mock_ep)
 
     mock_ep.load.assert_not_called()
-    loaded = reg["example.fallback"]
+    with patch("bopp.extensions._lazy_loader.load", side_effect=ModuleNotFoundError):
+        loaded = reg["example.fallback"]
     assert loaded is CustomItem
     mock_ep.load.assert_called_once()
 
@@ -86,15 +88,18 @@ def test_update_extensions_conflict_warning():
     ep2.name = "conflict.schema"
     ep2.value = "pkg_b:SchemaB"
 
-    with patch("importlib.metadata.entry_points", return_value=[ep1, ep2]):
-        reset_extensions()
-        with pytest.warns(UserWarning, match="Conflict for extension 'conflict.schema'"):
-            update_extensions()
+    try:
+        with patch("importlib.metadata.entry_points", return_value=[ep1, ep2]):
+            REGISTRY.clear()
+            with pytest.warns(UserWarning, match="Conflict for extension 'conflict.schema'"):
+                update_extensions()
 
-    extensions = get_extensions()
-    assert "conflict.schema" in extensions
-    # Keeps first registration
-    assert extensions._raw_entries["conflict.schema"] == ep1
+            extensions = get_extensions()
+            assert "conflict.schema" in extensions
+            # Keeps first registration
+            assert extensions._raw_entries["conflict.schema"] == ep1
+    finally:
+        reset_extensions()
 
 
 def test_resolve_extensions_non_extension_payload():
