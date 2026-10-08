@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import importlib
 import importlib.metadata
 import warnings
 from collections.abc import Iterator, MutableMapping
 from typing import Any
-
-import lazy_loader as _lazy_loader  # type: ignore[import-untyped]
 
 __all__ = ["ExtensionRegistry", "get_extensions", "reset_extensions", "update_extensions"]
 
@@ -82,17 +81,15 @@ class ExtensionRegistry(MutableMapping[str, type]):
         entry = self._raw_entries[key]
         if isinstance(entry, type):
             resolved_type = entry
-        elif hasattr(entry, "value") and ":" in str(entry.value):
-            module_name, qualname = entry.value.split(":", 1)
-            try:
-                resolved_type = _lazy_loader.load(f"{module_name}:{qualname}")
-            except (ModuleNotFoundError, ImportError):
-                if hasattr(entry, "load"):
-                    resolved_type = entry.load()
-                else:
-                    raise
-        elif hasattr(entry, "load"):
+        elif hasattr(entry, "load") and callable(entry.load):
             resolved_type = entry.load()
+        elif isinstance(entry, str):
+            if ":" in entry:
+                mod_name, attr_name = entry.split(":", 1)
+                mod = importlib.import_module(mod_name)
+                resolved_type = getattr(mod, attr_name)
+            else:
+                resolved_type = importlib.import_module(entry)
         else:
             resolved_type = entry
 
