@@ -44,19 +44,34 @@ def test_extension_registry_mapping():
 def test_lazy_entry_point_loading():
     mock_ep = MagicMock()
     mock_ep.name = "example.custom"
-    mock_ep.value = "mock_pkg.sub:CustomType"
-    mock_ep.load.return_value = CustomItem
+    mock_ep.value = "tests.test_extensions:CustomItem"
 
     reg = ExtensionRegistry()
     reg.register_entry("example.custom", mock_ep)
 
-    # Entry point load should not be called until access
-    mock_ep.load.assert_not_called()
+    # Resolution should not occur upon registration
+    assert "example.custom" not in reg._resolved
 
     loaded = reg["example.custom"]
     assert loaded is CustomItem
     # Once resolved, repeated access uses cached value
     assert reg["example.custom"] is CustomItem
+    assert "example.custom" in reg._resolved
+
+
+def test_entry_point_fallback_load():
+    mock_ep = MagicMock()
+    mock_ep.name = "example.fallback"
+    mock_ep.value = "nonexistent.module:SomeClass"
+    mock_ep.load.return_value = CustomItem
+
+    reg = ExtensionRegistry()
+    reg.register_entry("example.fallback", mock_ep)
+
+    mock_ep.load.assert_not_called()
+    loaded = reg["example.fallback"]
+    assert loaded is CustomItem
+    mock_ep.load.assert_called_once()
 
 
 def test_update_extensions_conflict_warning():
