@@ -1,3 +1,0 @@
-elif hasattr(entry, "value") and ":" in entry.value:
-    module_name, qualname = entry.value.split(":", 1)
-    resolved_type = _lazy_loader.load(f"{module_name}:{qualname}")
