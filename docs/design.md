@@ -16,6 +16,7 @@ Key modules and their roles:
 * **`bopp.io`**: I/O routines for JSON, MsgPack, and CSV serialization/deserialization.
 * **`bopp.transforms`**: Functional transformations on annotations (e.g., `trim`).
 * **`bopp.util`**: Conversion utilities (DataFrame integration, header extraction).
+* **`bopp.extensions`**: Dynamic schema extension registry supporting lazy on-demand resolution via package entry points.
 
 ---
 
@@ -46,6 +47,120 @@ generate auxiliary registry code used by the `bopp` library to map schema versio
 class definitions.
 If you update the schema without running the code generation step, your changes will not be
 reflected in the library code.
+
+---
+
+## Schema Extensions
+
+`bopp` supports third-party domain extensions without requiring changes to the core JSON schemas. This mechanism allows domain-specific tasks—such as drum stroke transcription, expressive articulation nuances, or game-audio events—to benefit from strict `msgspec` validation, deterministic IDs, and seamless I/O serialization.
+
+### The Extension Model
+
+Extensions use the core `"ext"` payload type (`ExtensionPayload`). In the core schema, the `"ext"` payload specifies:
+
+* **`payload_type`**: Always `"ext"`.
+* **`ext_schema`**: A unique string URI identifying the target schema definition (e.g., `"org.example.drums:v1"`).
+* **`value`**: An array of observation values. In the initial decode pass, values can be stored as generic dictionaries or primitives, which are subsequently validated and converted against a registered schema type during resolution.
+
+### Registration and Lazy Loading
+
+Extensions register their types with Python's standard packaging entry point mechanism under the group name **`bopp-extension`**.
+
+To prevent import overhead when loading annotations, `bopp.extensions` registers metadata entry points lazily. Module imports and type resolution are deferred until the specific `ext_schema` is encountered and accessed via `bopp.extensions.get_extensions()`.
+
+If multiple installed packages register conflicting definitions for the same `ext_schema` identifier, `bopp` preserves the initial registration and emits a warning (`UserWarning`) identifying the conflict.
+
+### Minimal Example: Drum Transcription Extension
+
+The following example illustrates creating and distributing a drum transcription schema that restricts drum components to a closed vocabulary and records strike velocities.
+
+#### 1. Define the Observation Struct (`my_drums/models.py`)
+
+Create a `msgspec.Struct` that defines the schema for an individual observation item. You can use standard Python `enum.StrEnum` classes for closed-vocabulary labels:
+
+```python
+from enum import StrEnum
+import msgspec
+
+class DrumComponent(StrEnum):
+    KICK = "kick"
+    SNARE = "snare"
+    HIHAT_CLOSED = "hihat_closed"
+    HIHAT_OPEN = "hihat_open"
+    TOM_LOW = "tom_low"
+    TOM_HIGH = "tom_high"
+    CRASH = "crash"
+    RIDE = "ride"
+
+class DrumStroke(msgspec.Struct):
+    """Observation item for a single drum strike."""
+    component: DrumComponent
+    velocity: int = 100  # MIDI velocity range [1, 127]
+```
+
+#### 2. Register the Entry Point (`pyproject.toml`)
+
+In your package's `pyproject.toml`, register the struct under the `"bopp-extension"` entry point group using a unique schema name:
+
+```toml
+[project.entry-points."bopp-extension"]
+"org.example.drums:v1" = "my_drums.models:DrumStroke"
+```
+
+Once installed into your Python environment (`pip install -e .`), `bopp` automatically discovers the extension.
+
+#### 3. Creating and Validating Extended Annotations
+
+When calling `bopp.create()`, setting `resolve_ext=True` (the default) automatically validates and coerces the raw input dictionaries into instances of your registered struct:
+
+```python
+import bopp
+from my_drums.models import DrumComponent, DrumStroke
+
+ann = bopp.create(
+    media_id="audio:funk_groove_01",
+    payload_kind="ext",
+    ext_schema="org.example.drums:v1",
+    value=[
+        {"component": "kick", "velocity": 110},
+        {"component": "hihat_closed", "velocity": 85},
+        {"component": "snare", "velocity": 115},
+    ],
+    extent_kind="time",
+    time=[0.0, 0.25, 0.5],
+)
+
+# Values are strictly typed DrumStroke structs:
+assert isinstance(ann.payload.value[0], DrumStroke)
+assert ann.payload.value[0].component is DrumComponent.KICK
+```
+
+#### 4. Serialization and Deserialization
+
+Serialized files store data cleanly in standard JSON, MsgPack, or CSV formats:
+
+```python
+from bopp.io import load_bopp_json, save_bopp_json
+
+save_bopp_json(ann, "groove.json")
+
+# On load, resolve_ext=True automatically converts items back to DrumStroke
+loaded = load_bopp_json("groove.json", resolve_ext=True)
+assert isinstance(loaded.payload.value[0], DrumStroke)
+```
+
+### Missing Extensions and Strictness
+
+When loading an annotation that uses an `ext_schema` not installed in the local environment:
+
+* **Default behavior (`allow_missing=True`)**: `bopp.io.resolve_extensions()` issues a `UserWarning` and leaves `ann.payload.value` as generic dictionaries or primitives, allowing environments without the extension package to still inspect and process other facets of the annotation.
+* **Strict behavior (`allow_missing=False`)**: Raises `bopp.exceptions.BoppRegistryError` if the required extension cannot be resolved.
+
+### Best Practices for Extension Authors
+
+1. **Namespace Collisions**: Use reverse-domain prefixes (e.g. `org.mir_tools.drums:v1`) to avoid schema name conflicts across different libraries.
+2. **Serialization Compatibility**: Rely on `msgspec`-supported types (`StrEnum`, primitives, typed `msgspec.Struct`) so items roundtrip cleanly to JSON, binary MsgPack, and CSV frontmatter without custom encoder hooks.
+3. **Immutability and Constraints**: Use default field values and struct configuration options in `msgspec.Struct` to keep extension definitions self-contained and performant.
 
 ---
 
