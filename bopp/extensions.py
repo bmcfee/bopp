@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Iterator, MutableMapping
 from typing import Any
 
-import lazy_loader as _lazy_loader
+import lazy_loader as _lazy_loader  # type: ignore[import-untyped]
 
 __all__ = ["ExtensionRegistry", "get_extensions", "reset_extensions", "update_extensions"]
 

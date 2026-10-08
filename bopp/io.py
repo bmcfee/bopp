@@ -79,13 +79,14 @@ def resolve_extensions(
     if payload is None or payload is msgspec.UNSET:
         return
 
-    extension_cls = get_registry(ann.bopp_version)["PAYLOAD_TYPE_REGISTRY"]["ext"]
+    bopp_version = getattr(ann, "bopp_version", get_current_schema_version())
+    extension_cls = get_registry(bopp_version)["PAYLOAD_TYPE_REGISTRY"]["ext"]
     if not isinstance(payload, extension_cls):
         return
 
     ext_schema = getattr(payload, "ext_schema", None)
     extensions = get_extensions()
-    if ext_schema not in extensions:
+    if not isinstance(ext_schema, str) or ext_schema not in extensions:
         if allow_missing:
             warnings.warn(
                 f"No extension registered for schema '{ext_schema}'. Skipping validation.",
@@ -98,7 +99,7 @@ def resolve_extensions(
         )
 
     extension_type = extensions[ext_schema]
-    payload.value = msgspec.convert(payload.value, list[extension_type], strict=strict)
+    payload.value = msgspec.convert(payload.value, list[extension_type], strict=strict)  # type: ignore[valid-type]
 
 
 def save_bopp_csv(
