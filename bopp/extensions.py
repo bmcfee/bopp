@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, MutableMapping
 import importlib.metadata
-from typing import Any
 import warnings
+from collections.abc import Iterator, MutableMapping
+from typing import Any
 
 import lazy_loader as _lazy_loader
 
@@ -130,7 +130,6 @@ def get_extensions() -> ExtensionRegistry:
     ExtensionRegistry
         Mutable mapping of schema identifiers to extension types.
     """
-    global _INITIALIZED
     if not _INITIALIZED:
         update_extensions()
     return REGISTRY
