@@ -16,5 +16,4 @@ dependencies:
   - mir_eval>=0.7
   - numpy>=1.20.0
   - scipy>=1.7.0
-  - lazy-loader>=0.4
   - pytest
