@@ -45,38 +45,36 @@ def test_extension_registry_mapping():
 def test_lazy_entry_point_loading():
     mock_ep = MagicMock()
     mock_ep.name = "example.custom"
-    mock_ep.value = "dummy_module:CustomItem"
+    mock_ep.load.return_value = CustomItem
 
     reg = ExtensionRegistry()
     reg.register_entry("example.custom", mock_ep)
 
     # Resolution should not occur upon registration
     assert "example.custom" not in reg._resolved
+    mock_ep.load.assert_not_called()
 
-    with patch("bopp.extensions._lazy_loader.load", return_value=CustomItem) as mock_load:
-        loaded = reg["example.custom"]
-        mock_load.assert_called_once_with("dummy_module:CustomItem")
-
+    # Resolution occurs on first access
+    loaded = reg["example.custom"]
+    mock_ep.load.assert_called_once()
     assert loaded is CustomItem
-    # Once resolved, repeated access uses cached value without calling loader again
+
+    # Once resolved, repeated access uses cached value without calling load again
     assert reg["example.custom"] is CustomItem
+    assert mock_ep.load.call_count == 1
     assert "example.custom" in reg._resolved
 
 
-def test_entry_point_fallback_load():
-    mock_ep = MagicMock()
-    mock_ep.name = "example.fallback"
-    mock_ep.value = "nonexistent_module:SomeClass"
-    mock_ep.load.return_value = CustomItem
-
+def test_string_spec_entry_point_loading():
     reg = ExtensionRegistry()
-    reg.register_entry("example.fallback", mock_ep)
+    reg.register_entry("example.string_spec", f"{__name__}:CustomItem")
 
-    mock_ep.load.assert_not_called()
-    with patch("bopp.extensions._lazy_loader.load", side_effect=ModuleNotFoundError):
-        loaded = reg["example.fallback"]
+    assert "example.string_spec" not in reg._resolved
+
+    loaded = reg["example.string_spec"]
     assert loaded is CustomItem
-    mock_ep.load.assert_called_once()
+    assert reg["example.string_spec"] is CustomItem
+    assert "example.string_spec" in reg._resolved
 
 
 def test_update_extensions_conflict_warning():
