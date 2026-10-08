@@ -335,6 +335,6 @@ def test_resolved_extension_csv_roundtrip(tmp_path):
         assert isinstance(reloaded.payload.value[0], CustomItem)
         assert reloaded.payload.value[0].name == "snare"
         assert reloaded.payload.value[0].score == 95.0
-        assert reloaded.id == ann.id
+        assert compute_annotation_id(reloaded) == ann.id
     finally:
         del exts["org.test.custom"]
