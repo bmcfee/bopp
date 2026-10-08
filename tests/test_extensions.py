@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import msgspec
@@ -44,7 +45,6 @@ def test_extension_registry_mapping():
 
 def test_lazy_entry_point_loading():
     mock_ep = MagicMock()
-    mock_ep.name = "example.custom"
     mock_ep.load.return_value = CustomItem
 
     reg = ExtensionRegistry()
@@ -78,16 +78,14 @@ def test_string_spec_entry_point_loading():
 
 
 def test_update_extensions_conflict_warning():
-    ep1 = MagicMock()
-    ep1.name = "conflict.schema"
-    ep1.value = "pkg_a:SchemaA"
-
-    ep2 = MagicMock()
-    ep2.name = "conflict.schema"
-    ep2.value = "pkg_b:SchemaB"
+    ep1 = SimpleNamespace(name="conflict.schema", value="pkg_a:SchemaA")
+    ep2 = SimpleNamespace(name="conflict.schema", value="pkg_b:SchemaB")
 
     try:
-        with patch("importlib.metadata.entry_points", return_value=[ep1, ep2]):
+        with patch(
+            "bopp.extensions.importlib.metadata.entry_points",
+            return_value=[ep1, ep2],
+        ):
             REGISTRY.clear()
             with pytest.warns(UserWarning, match="Conflict for extension 'conflict.schema'"):
                 update_extensions()
