@@ -60,20 +60,6 @@ def resolve_extensions(
     Converts raw payload item mappings or primitives into their registered target types
     (typically `msgspec.Struct` models) using strict validation (`strict=True`).
 
-    Deterministic IDs and Round-Trip Validation
-    -------------------------------------------
-    BOPP annotation IDs are deterministic UUIDv5 hashes of the serialized annotation
-    content. Because saving and validation convert extension types back to canonical
-    representations (built-in mappings/lists/scalars), validation before or after extension
-    resolution is equivalent as long as the extension type's serialization and deserialization
-    are strictly lossless and well-defined.
-
-    Enforcing `strict=True` ensures that:
-    1. Implicit type coercions (such as string to float, or int to float) are rejected,
-       preventing subtle payload mutations that would change content hashes.
-    2. Data types remain predictable across environments that possess the extension schema
-       and environments that leave payload items as raw dictionaries or primitives.
-
     Parameters
     ----------
     ann : BoppBase
@@ -88,6 +74,22 @@ def resolve_extensions(
         If `allow_missing` is False and the payload schema is not registered.
     msgspec.ValidationError
         If payload values fail validation against the extension schema.
+
+    Notes
+    -----
+    Deterministic IDs and Round-Trip Validation:
+
+    BOPP annotation IDs are deterministic UUIDv5 hashes of the serialized annotation
+    content. Because saving and validation convert extension types back to canonical
+    representations (built-in mappings/lists/scalars), validation before or after extension
+    resolution is equivalent as long as the extension type's serialization and deserialization
+    are strictly lossless and well-defined.
+
+    Enforcing `strict=True` ensures that:
+    1. Implicit type coercions (such as string to float, or int to float) are rejected,
+       preventing subtle payload mutations that would change content hashes.
+    2. Data types remain predictable across environments that possess the extension schema
+       and environments that leave payload items as raw dictionaries or primitives.
     """
     payload = getattr(ann, "payload", None)
     if payload is None or payload is msgspec.UNSET:
@@ -294,7 +296,8 @@ def load_bopp_msgpack(
         Path to the binary MsgPack file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        When paired with resolve_ext=True, resolves and validates extension payload values via registered extensions.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------
@@ -332,7 +335,8 @@ def load_bopp_csv(
         Path to the BOPP CSV file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        When paired with resolve_ext=True, resolves and validates extension payload values via registered extensions.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------

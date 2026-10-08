@@ -17,8 +17,10 @@ class ExtensionRegistry(MutableMapping[str, type]):
     Stores entry point representations and resolves the underlying schema types
     only when accessed.
 
-    Target Type Guidelines & Recommendations
-    ----------------------------------------
+    Notes
+    -----
+    Target Type Guidelines & Recommendations:
+
     Target types registered for extension payloads should be either standard Python
     built-in types (e.g., primitives, dictionaries, tuples) or `msgspec.Struct` subclasses.
     Using `msgspec.Struct` is strongly recommended for several key reasons:
