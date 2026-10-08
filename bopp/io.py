@@ -14,6 +14,7 @@ from .core import (
     validate_annotation_id,
 )
 from .exceptions import BoppArgumentError
+from .extensions import get_extensions
 from .registries import get_registry
 from .util import from_dataframe, to_dataframe
 
@@ -45,6 +46,22 @@ def _prepare_annotation_for_save(
             validate_annotation_id(ann)
     elif not generate_id and validate_id:
         validate_annotation_id(ann)
+
+
+def resolve_extensions(ann: BoppBase) -> None:
+    """Apply any schema extensions to the payload of an annotation"""
+
+    # Check for extension payload type
+    extension_cls = get_registry(ann.bopp_version)["PAYLOAD_TYPE_REGISTRY"]["ext"]
+    if not isinstance(ann.payload, extension_cls):  # type: ignore[attr]
+        return
+    # We have an extension class payload.  Look for an extension to process it
+    try:
+        extension_type = get_extensions()[ann.payload.ext_schema]  # type: ignore[attr]
+        ann.payload.value = msgspec.convert(ann.payload.value, list[extension_type])
+    except KeyError:
+        # TODO: either warn or fail, depending on strictness
+        pass
 
 
 def save_bopp_csv(
