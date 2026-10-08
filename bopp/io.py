@@ -53,10 +53,26 @@ def resolve_extensions(
     ann: BoppBase,
     *,
     allow_missing: bool = True,
-    strict: bool = True,
 ) -> None:
     """
     Apply registered schema extensions to the payload of an annotation.
+
+    Converts raw payload item mappings or primitives into their registered target types
+    (typically `msgspec.Struct` models) using strict validation (`strict=True`).
+
+    Deterministic IDs and Round-Trip Validation
+    -------------------------------------------
+    BOPP annotation IDs are deterministic UUIDv5 hashes of the serialized annotation
+    content. Because saving and validation convert extension types back to canonical
+    representations (built-in mappings/lists/scalars), validation before or after extension
+    resolution is equivalent as long as the extension type's serialization and deserialization
+    are strictly lossless and well-defined.
+
+    Enforcing `strict=True` ensures that:
+    1. Implicit type coercions (such as string to float, or int to float) are rejected,
+       preventing subtle payload mutations that would change content hashes.
+    2. Data types remain predictable across environments that possess the extension schema
+       and environments that leave payload items as raw dictionaries or primitives.
 
     Parameters
     ----------
@@ -65,8 +81,6 @@ def resolve_extensions(
     allow_missing : bool, default True
         If True, issues a warning when an extension schema identifier is not
         found in the registry. If False, raises `BoppRegistryError`.
-    strict : bool, default True
-        Passed directly to `msgspec.convert` during validation of payload values.
 
     Raises
     ------
@@ -99,7 +113,7 @@ def resolve_extensions(
         )
 
     extension_type = extensions[ext_schema]
-    payload.value = msgspec.convert(payload.value, list[extension_type], strict=strict)  # type: ignore[valid-type]
+    payload.value = msgspec.convert(payload.value, list[extension_type], strict=True)  # type: ignore[valid-type]
 
 
 def save_bopp_csv(
@@ -280,8 +294,7 @@ def load_bopp_msgpack(
         Path to the binary MsgPack file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-    resolve_ext : bool, default True
-        If True, resolves and validates extension payload values via registered extensions.
+        When paired with resolve_ext=True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------
@@ -319,8 +332,7 @@ def load_bopp_csv(
         Path to the BOPP CSV file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-    resolve_ext : bool, default True
-        If True, resolves and validates extension payload values via registered extensions.
+        When paired with resolve_ext=True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------

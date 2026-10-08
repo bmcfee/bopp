@@ -70,6 +70,38 @@ To prevent import overhead when loading annotations, `bopp.extensions` registers
 
 If multiple installed packages register conflicting definitions for the same `ext_schema` identifier, `bopp` preserves the initial registration and emits a warning (`UserWarning`) identifying the conflict.
 
+### Extension Validation, Deterministic IDs, and Serialization Contracts
+
+BOPP annotations feature deterministic UUIDv5 identifiers calculated from the canonical hash of the serialized payload and metadata. Because saving and validation convert extension types back to built-in representations, validating the annotation ID before or after extension resolution is equivalent **provided that the extension type's serialization and deserialization are well-defined and strictly lossless**.
+
+To preserve this property, `bopp.io.resolve_extensions()` enforces strict conversion (`strict=True`). This eliminates implicit type coercion (such as string-to-float or int-to-float conversion) that would mutate values and break content hashes.
+
+#### Why `msgspec.Struct` is Recommended for Target Types
+
+Extension schemas can map to standard built-in types (e.g. `dict`, `int`, `str`) or `msgspec.Struct` classes. Authors are strongly recommended to use `msgspec.Struct` as the base class for custom observation items for several reasons:
+
+1. **Serialization Equivalence and ID Stability**:
+   `msgspec` encodes `Struct` instances to JSON and MsgPack with byte-level parity to plain dictionaries. An annotation produces the exact same deterministic content hash and UUID whether it is evaluated in an environment with the extension package installed (as typed structs) or in an environment where it remains as raw built-in dictionaries.
+
+2. **Native Performance and Zero-Copy Decoding**:
+   Because the core BOPP models are built on `msgspec.Struct`, using `msgspec.Struct` for extension payloads avoids conversion overhead, third-party validator dependencies, and runtime overhead during large batch I/O operations.
+
+3. **Lossless Conversion with Strict Validation**:
+   When resolving extension payloads with `msgspec.convert(..., strict=True)`, `msgspec.Struct` models enforce exact type compliance without silent loss of precision or unexpected type casting.
+
+4. **Guarding Against Field Stripping (`forbid_unknown_fields=True`)**:
+   Standard structs ignore unrecognized fields by default. If unrecognized fields are dropped during conversion to a struct, the re-serialized payload loses data, causing validation and hash mismatches. Extension authors should set `forbid_unknown_fields=True` on their structs to ensure invalid or undeclared fields fail loudly:
+   ```python
+   class DrumStroke(msgspec.Struct, forbid_unknown_fields=True):
+       component: str
+       velocity: int
+   ```
+
+5. **Precautions with Default Field Values**:
+   If an extension struct defines default field values, deserializing payloads that omitted those fields on disk will explicitly instantiate the defaults. When serialized again, the presence of these new fields can alter the content hash unless the schema is configured with `omit_defaults=True` or authors ensure fully populated records.
+
+---
+
 ### Minimal Example: Drum Transcription Extension
 
 The following example illustrates creating and distributing a drum transcription schema that restricts drum components to a closed vocabulary and records strike velocities.
@@ -92,7 +124,7 @@ class DrumComponent(StrEnum):
     CRASH = "crash"
     RIDE = "ride"
 
-class DrumStroke(msgspec.Struct):
+class DrumStroke(msgspec.Struct, forbid_unknown_fields=True):
     """Observation item for a single drum strike."""
     component: DrumComponent
     velocity: int = 100  # MIDI velocity range [1, 127]
@@ -160,7 +192,7 @@ When loading an annotation that uses an `ext_schema` not installed in the local 
 
 1. **Namespace Collisions**: Use reverse-domain prefixes (e.g. `org.mir_tools.drums:v1`) to avoid schema name conflicts across different libraries.
 2. **Serialization Compatibility**: Rely on `msgspec`-supported types (`StrEnum`, primitives, typed `msgspec.Struct`) so items roundtrip cleanly to JSON, binary MsgPack, and CSV frontmatter without custom encoder hooks.
-3. **Immutability and Constraints**: Use default field values and struct configuration options in `msgspec.Struct` to keep extension definitions self-contained and performant.
+3. **Immutability and Constraints**: Use default field values and struct configuration options (`forbid_unknown_fields=True`) in `msgspec.Struct` to keep extension definitions self-contained and performant.
 
 ---
 

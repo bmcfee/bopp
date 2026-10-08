@@ -16,6 +16,40 @@ class ExtensionRegistry(MutableMapping[str, type]):
 
     Stores entry point representations and resolves the underlying schema types
     only when accessed.
+
+    Target Type Guidelines & Recommendations
+    ----------------------------------------
+    Target types registered for extension payloads should be either standard Python
+    built-in types (e.g., primitives, dictionaries, tuples) or `msgspec.Struct` subclasses.
+    Using `msgspec.Struct` is strongly recommended for several key reasons:
+
+    1. Serialization Equivalence:
+       Annotation IDs are deterministic UUIDv5 hashes computed from canonical byte
+       serialization. Both validation and serialization pipelines convert instances
+       back and forth between target types and built-in primitives. Using `msgspec.Struct`
+       ensures that the serialized representation is identical whether the extension
+       schema is registered and resolved in the current environment, or remains as raw
+       built-in dicts/primitives.
+
+    2. Strict and Lossless Conversion:
+       Extension conversion runs with `strict=True` to guarantee lossless conversions
+       and avoid implicit coercion (such as string-to-float or int-to-float conversions)
+       that would alter content hashes. `msgspec.Struct` provides native, fast, and
+       strict validation during `msgspec.convert`.
+
+    3. Unknown Fields Handling:
+       Extension authors are recommended to configure structs with `forbid_unknown_fields=True`
+       (e.g., `class MyObservation(msgspec.Struct, forbid_unknown_fields=True): ...`).
+       This ensures unexpected fields trigger immediate validation errors rather than
+       being silently discarded, which would corrupt the payload and produce hash mismatches.
+
+    4. Default Values Considerations:
+       Default values on extension struct fields should be used carefully. If an optional
+       field has a default value on the struct, missing fields in serialized data will be
+       populated upon conversion. Unless designed intentionally, this can introduce values
+       that change the canonical re-serialized byte output. Authors should ensure payload
+       data on the wire either fully specifies fields or that structs are configured to
+       preserve exact wire semantics (e.g. using `omit_defaults=True`).
     """
 
     def __init__(self) -> None:

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import msgspec
 import pytest
 
-from bopp.core import create
+from bopp.core import compute_annotation_id, create, validate_annotation_id
 from bopp.exceptions import BoppRegistryError
 from bopp.extensions import (
     ExtensionRegistry,
@@ -22,7 +22,7 @@ from bopp.io import (
 )
 
 
-class CustomItem(msgspec.Struct):
+class CustomItem(msgspec.Struct, forbid_unknown_fields=True):
     name: str
     score: float
 
@@ -178,6 +178,62 @@ def test_resolve_extensions_validation_error():
 
         with pytest.raises(msgspec.ValidationError):
             resolve_extensions(ann)
+    finally:
+        del exts["org.test.custom"]
+
+
+def test_resolve_extensions_strict_coercion_rejected():
+    """Verify that strict=True conversion rejects string to float coercion."""
+    exts = get_extensions()
+    exts["org.test.custom"] = CustomItem
+
+    try:
+        ann = create(
+            bopp_version="1.0",
+            media_id="track:ext_test",
+            payload_kind="ext",
+            ext_schema="org.test.custom",
+            value=[{"name": "test", "score": "12.34"}],
+            resolve_ext=False,
+        )
+        with pytest.raises(msgspec.ValidationError):
+            resolve_extensions(ann)
+    finally:
+        del exts["org.test.custom"]
+
+
+def test_annotation_id_invariance_with_extension_resolution():
+    """Verify that annotation ID matches identically with raw dict vs resolved struct."""
+    exts = get_extensions()
+    exts["org.test.custom"] = CustomItem
+
+    try:
+        raw_items = [{"name": "item1", "score": 10.5}, {"name": "item2", "score": 20.0}]
+
+        ann_unresolved = create(
+            bopp_version="1.0",
+            media_id="track:invariance_test",
+            payload_kind="ext",
+            ext_schema="org.test.custom",
+            value=raw_items,
+            resolve_ext=False,
+        )
+
+        ann_resolved = create(
+            bopp_version="1.0",
+            media_id="track:invariance_test",
+            payload_kind="ext",
+            ext_schema="org.test.custom",
+            value=raw_items,
+            resolve_ext=True,
+        )
+
+        id_unresolved = compute_annotation_id(ann_unresolved)
+        id_resolved = compute_annotation_id(ann_resolved)
+
+        assert id_unresolved == id_resolved
+        assert validate_annotation_id(ann_unresolved)
+        assert validate_annotation_id(ann_resolved)
     finally:
         del exts["org.test.custom"]
 
