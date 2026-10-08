@@ -44,7 +44,7 @@ def test_extension_registry_mapping():
 def test_lazy_entry_point_loading():
     mock_ep = MagicMock()
     mock_ep.name = "example.custom"
-    mock_ep.value = "tests.test_extensions:CustomItem"
+    mock_ep.value = "dummy_module:CustomItem"
 
     reg = ExtensionRegistry()
     reg.register_entry("example.custom", mock_ep)
@@ -52,9 +52,12 @@ def test_lazy_entry_point_loading():
     # Resolution should not occur upon registration
     assert "example.custom" not in reg._resolved
 
-    loaded = reg["example.custom"]
+    with patch("bopp.extensions._lazy_loader.load", return_value=CustomItem) as mock_load:
+        loaded = reg["example.custom"]
+        mock_load.assert_called_once_with("dummy_module:CustomItem")
+
     assert loaded is CustomItem
-    # Once resolved, repeated access uses cached value
+    # Once resolved, repeated access uses cached value without calling loader again
     assert reg["example.custom"] is CustomItem
     assert "example.custom" in reg._resolved
 
