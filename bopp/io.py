@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Any
+import warnings
 
 import msgspec
 import tomllib
@@ -13,7 +15,7 @@ from .core import (
     validate_and_set_annotation_id,
     validate_annotation_id,
 )
-from .exceptions import BoppArgumentError
+from .exceptions import BoppArgumentError, BoppRegistryError
 from .extensions import get_extensions
 from .registries import get_registry
 from .util import from_dataframe, to_dataframe
@@ -48,20 +50,56 @@ def _prepare_annotation_for_save(
         validate_annotation_id(ann)
 
 
-def resolve_extensions(ann: BoppBase) -> None:
-    """Apply any schema extensions to the payload of an annotation"""
+def resolve_extensions(
+    ann: BoppBase,
+    *,
+    allow_missing: bool = True,
+    strict: bool = True,
+) -> None:
+    """
+    Apply registered schema extensions to the payload of an annotation.
 
-    # Check for extension payload type
-    extension_cls = get_registry(ann.bopp_version)["PAYLOAD_TYPE_REGISTRY"]["ext"]
-    if not isinstance(ann.payload, extension_cls):  # type: ignore[attr]
+    Parameters
+    ----------
+    ann : BoppBase
+        The Annotation struct instance containing an extension payload.
+    allow_missing : bool, default True
+        If True, issues a warning when an extension schema identifier is not
+        found in the registry. If False, raises `BoppRegistryError`.
+    strict : bool, default True
+        Passed directly to `msgspec.convert` during validation of payload values.
+
+    Raises
+    ------
+    BoppRegistryError
+        If `allow_missing` is False and the payload schema is not registered.
+    msgspec.ValidationError
+        If payload values fail validation against the extension schema.
+    """
+    payload = getattr(ann, "payload", None)
+    if payload is None or payload is msgspec.UNSET:
         return
-    # We have an extension class payload.  Look for an extension to process it
-    try:
-        extension_type = get_extensions()[ann.payload.ext_schema]  # type: ignore[attr]
-        ann.payload.value = msgspec.convert(ann.payload.value, list[extension_type])
-    except KeyError:
-        # TODO: either warn or fail, depending on strictness
-        pass
+
+    extension_cls = get_registry(ann.bopp_version)["PAYLOAD_TYPE_REGISTRY"]["ext"]
+    if not isinstance(payload, extension_cls):
+        return
+
+    ext_schema = getattr(payload, "ext_schema", None)
+    extensions = get_extensions()
+    if ext_schema not in extensions:
+        if allow_missing:
+            warnings.warn(
+                f"No extension registered for schema '{ext_schema}'. Skipping validation.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return
+        raise BoppRegistryError(
+            f"Extension schema '{ext_schema}' not found in registry."
+        )
+
+    extension_type = extensions[ext_schema]
+    payload.value = msgspec.convert(payload.value, list[extension_type], strict=strict)
 
 
 def save_bopp_csv(
@@ -120,7 +158,12 @@ def save_bopp_csv(
             raise BoppArgumentError(f"Unknown dataframe type: {type(df)}")
 
 
-def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
+def load_bopp_json(
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    resolve_ext: bool = True,
+) -> BoppBase:
     """
     Read a BOPP JSON file directly into an Annotation model instance.
 
@@ -130,7 +173,8 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBas
         Path to the BOPP JSON file to read.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        Emits a warning if missing.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------
@@ -144,6 +188,9 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBas
     header = msgspec.json.decode(data, type=_VersionHeader)
     annotation_cls = get_registry(header.bopp_version)["Annotation"]
     ann = msgspec.json.decode(data, type=annotation_cls)
+
+    if resolve_ext:
+        resolve_extensions(ann)
 
     if validate_id:
         validate_annotation_id(ann)
@@ -218,7 +265,12 @@ def save_bopp_msgpack(
         f.write(binary_data)
 
 
-def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
+def load_bopp_msgpack(
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    resolve_ext: bool = True,
+) -> BoppBase:
     """
     Read a binary MsgPack file and decode it into an Annotation struct.
 
@@ -228,7 +280,8 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
         Path to the binary MsgPack file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        Emits a warning if missing.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------
@@ -242,13 +295,21 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
     annotation_cls = get_registry(header.bopp_version)["Annotation"]
     ann = msgspec.msgpack.decode(binary_data, type=annotation_cls)
 
+    if resolve_ext:
+        resolve_extensions(ann)
+
     if validate_id:
         validate_annotation_id(ann)
 
     return ann
 
 
-def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
+def load_bopp_csv(
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    resolve_ext: bool = True,
+) -> BoppBase:
     """
     Read a BOPP CSV file directly into a validated Annotation struct.
 
@@ -258,7 +319,8 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
         Path to the BOPP CSV file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        Emits a warning if missing.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------
@@ -319,6 +381,9 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
     df.attrs.update(metadata)
 
     ann = from_dataframe(df)
+
+    if resolve_ext:
+        resolve_extensions(ann)
 
     if validate_id:
         validate_annotation_id(ann)
