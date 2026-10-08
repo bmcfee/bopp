@@ -27,6 +27,7 @@ docs = [
     "myst-parser",
 ]
 test = [
+    "check-jsonschema",
     "pytest",
     "pytest-cov",
     "pandas>=2.0.0",

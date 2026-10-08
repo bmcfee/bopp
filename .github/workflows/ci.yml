@@ -19,6 +19,11 @@ jobs:
           environment-name: bopp-test
           cache-environment: true
 
+      - name: Verify json schema
+        shell: bash -l {0}
+        run: |
+          check-jsonschema --check-metaschema schemas/*/*.json schemas/*/*/*.json
+
       - name: Check code generation
         shell: bash -l {0}
         run: |

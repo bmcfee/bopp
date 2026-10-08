@@ -1,8 +1,5 @@
 """Regression tests for signed and nonnegative fractional score values."""
 
-import json
-from pathlib import Path
-
 import msgspec
 import pytest
 
@@ -15,45 +12,32 @@ from bopp.io import (
     save_bopp_json,
     save_bopp_msgpack,
 )
+from bopp.models.v1.core import Fraction, FractionNonnegative
 from bopp.models.v1.extent.score_interval import ScoreInterval
 from bopp.models.v1.extent.score_quarter import ScoreQuarterNotes
 
 
-def _load_core_schema():
-    """Load the authoritative core schema."""
-    return json.loads(
-        (Path(__file__).resolve().parents[1] / "schemas/v1/core.json").read_text()
-    )
-
-
-def test_core_schema():
-    """The core schema conforms to JSON Schema 2020-12."""
-    jsonschema = pytest.importorskip("jsonschema")
-    core = _load_core_schema()
-    jsonschema.Draft202012Validator.check_schema(core)
-
-
 @pytest.mark.parametrize(
-    ("definition", "value", "expected_valid"),
+    ("target_type", "value", "expected_valid"),
     [
-        ("Fraction", [0, 1], True),
-        ("Fraction", [-3, 4], True),
-        ("Fraction", [1, 0], False),
-        ("Fraction", [1, 2, 3], False),
-        ("Fraction", [1], False),
-        ("FractionNonnegative", [0, 1], True),
-        ("FractionNonnegative", [-1, 2], False),
+        (Fraction, [0, 1], True),
+        (Fraction, [-3, 4], True),
+        (Fraction, [1, 0], False),
+        (Fraction, [1, 2, 3], False),
+        (Fraction, [1], False),
+        (FractionNonnegative, [0, 1], True),
+        (FractionNonnegative, [-1, 2], False),
     ],
     ids=lambda value: repr(value),
 )
-def test_fraction_schema_values(definition, value, expected_valid):
-    """Fraction schemas enforce each element's bounds and the array length."""
-    jsonschema = pytest.importorskip("jsonschema")
-    core = _load_core_schema()
-    validator = jsonschema.Draft202012Validator(
-        {"$defs": core["$defs"], "$ref": f"#/$defs/{definition}"}
-    )
-    assert validator.is_valid(value) == expected_valid
+def test_fraction_schema_values(target_type, value, expected_valid):
+    """Fraction types enforce each element's bounds and the array length."""
+    if expected_valid:
+        converted = msgspec.convert(value, target_type)
+        assert converted == tuple(value)
+    else:
+        with pytest.raises(msgspec.ValidationError):
+            msgspec.convert(value, target_type)
 
 
 @pytest.mark.parametrize("quarter", [[[0, 1]], [[-1, 2]]])
