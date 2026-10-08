@@ -83,8 +83,8 @@ Extension schemas can map to standard built-in types (e.g. `dict`, `int`, `str`)
 1. **Serialization Equivalence and ID Stability**:
    `msgspec` encodes `Struct` instances to JSON and MsgPack with byte-level parity to plain dictionaries. An annotation produces the exact same deterministic content hash and UUID whether it is evaluated in an environment with the extension package installed (as typed structs) or in an environment where it remains as raw built-in dictionaries.
 
-2. **Native Performance and Zero-Copy Decoding**:
-   Because the core BOPP models are built on `msgspec.Struct`, using `msgspec.Struct` for extension payloads avoids conversion overhead, third-party validator dependencies, and runtime overhead during large batch I/O operations.
+2. **Native `msgspec` Integration**:
+   Using `msgspec.Struct` keeps extension validation and serialization within `msgspec` and avoids third-party validator dependencies, although extension values still incur the second-pass conversion performed during resolution.
 
 3. **Lossless Conversion with Strict Validation**:
    When resolving extension payloads with `msgspec.convert(..., strict=True)`, `msgspec.Struct` models enforce exact type compliance without silent loss of precision or unexpected type casting.
