@@ -310,3 +310,31 @@ def test_io_loaders_resolve_ext(tmp_path):
         assert isinstance(loaded_csv_unresolved.payload.value[0], dict)
     finally:
         del exts["org.test.custom"]
+
+
+def test_resolved_extension_csv_roundtrip(tmp_path):
+    """Verify that an annotation with already-resolved extension structs roundtrips cleanly to CSV."""
+    exts = get_extensions()
+    exts["org.test.custom"] = CustomItem
+
+    try:
+        ann = create(
+            bopp_version="1.0",
+            media_id="track:csv_resolved",
+            payload_kind="ext",
+            ext_schema="org.test.custom",
+            value=[{"name": "snare", "score": 95.0}, {"name": "kick", "score": 100.0}],
+            resolve_ext=True,
+        )
+        assert isinstance(ann.payload.value[0], CustomItem)
+
+        csv_path = tmp_path / "resolved.csv"
+        save_bopp_csv(ann, csv_path)
+
+        reloaded = load_bopp_csv(csv_path, resolve_ext=True)
+        assert isinstance(reloaded.payload.value[0], CustomItem)
+        assert reloaded.payload.value[0].name == "snare"
+        assert reloaded.payload.value[0].score == 95.0
+        assert reloaded.id == ann.id
+    finally:
+        del exts["org.test.custom"]
