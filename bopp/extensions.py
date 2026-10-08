@@ -4,12 +4,12 @@ import importlib
 import importlib.metadata
 import warnings
 from collections.abc import Iterator, MutableMapping
-from typing import Any
+from typing import Any, cast
 
 __all__ = ["ExtensionRegistry", "get_extensions", "reset_extensions", "update_extensions"]
 
 
-class ExtensionRegistry(MutableMapping[str, type]):
+class ExtensionRegistry(MutableMapping[str, type[Any]]):
     """
     Registry for BOPP extension payload schemas with lazy on-demand loading.
 
@@ -55,7 +55,7 @@ class ExtensionRegistry(MutableMapping[str, type]):
 
     def __init__(self) -> None:
         self._raw_entries: dict[str, Any] = {}
-        self._resolved: dict[str, type] = {}
+        self._resolved: dict[str, type[Any]] = {}
 
     def register_entry(self, name: str, entry: Any) -> None:
         """
@@ -71,7 +71,7 @@ class ExtensionRegistry(MutableMapping[str, type]):
         self._raw_entries[name] = entry
         self._resolved.pop(name, None)
 
-    def __getitem__(self, key: str) -> type:
+    def __getitem__(self, key: str) -> type[Any]:
         if key in self._resolved:
             return self._resolved[key]
 
@@ -79,24 +79,31 @@ class ExtensionRegistry(MutableMapping[str, type]):
             raise KeyError(key)
 
         entry = self._raw_entries[key]
+        resolved_obj: Any
         if isinstance(entry, type):
-            resolved_type = entry
+            resolved_obj = entry
         elif hasattr(entry, "load") and callable(entry.load):
-            resolved_type = entry.load()
+            resolved_obj = entry.load()
         elif isinstance(entry, str):
             if ":" in entry:
                 mod_name, attr_name = entry.split(":", 1)
                 mod = importlib.import_module(mod_name)
-                resolved_type = getattr(mod, attr_name)
+                resolved_obj = getattr(mod, attr_name)
             else:
-                resolved_type = importlib.import_module(entry)
+                resolved_obj = importlib.import_module(entry)
         else:
-            resolved_type = entry
+            resolved_obj = entry
 
+        if not isinstance(resolved_obj, type):
+            raise TypeError(
+                f"Resolved extension for '{key}' must be a type, got {type(resolved_obj).__name__}"
+            )
+
+        resolved_type = cast(type[Any], resolved_obj)
         self._resolved[key] = resolved_type
         return resolved_type
 
-    def __setitem__(self, key: str, value: type) -> None:
+    def __setitem__(self, key: str, value: type[Any]) -> None:
         self._raw_entries[key] = value
         self._resolved[key] = value
 
