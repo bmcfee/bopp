@@ -1,3 +1,4 @@
+import base64
 import uuid
 
 import msgspec
@@ -218,3 +219,30 @@ def test_validate_invalid_data():
     }
     with pytest.raises(BoppValidationError, match="Validation failed"):
         validate(invalid_data, target_type=Annotation)
+
+
+def test_repr_mimebundle():
+    ann = create(
+        bopp_version="1.0",
+        media_id="audio:repr_test",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.25, 0.75],
+        value=[1, 1],
+    )
+
+    bundle = ann._repr_mimebundle_()
+    assert isinstance(bundle, dict)
+    mime_type = "application/vnd.bopp+msgpack"
+    assert mime_type in bundle
+
+    encoded_str = bundle[mime_type]
+    assert isinstance(encoded_str, str)
+
+    raw_bytes = base64.b64decode(encoded_str.encode("ascii"))
+    decoded_ann = msgspec.msgpack.decode(raw_bytes, type=Annotation)
+    assert decoded_ann == ann
+
+    # Check that invocation with include and exclude succeeds
+    bundle_filtered = ann._repr_mimebundle_(include=["text/plain"], exclude=[mime_type])
+    assert mime_type in bundle_filtered
