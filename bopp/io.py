@@ -86,8 +86,8 @@ def resolve_extensions(
     are strictly lossless and well-defined.
 
     Enforcing `strict=True` ensures that:
-    1. Implicit type coercions (such as string to float, or int to float) are rejected,
-       preventing subtle payload mutations that would change content hashes.
+    1. Many implicit type coercions (such as string to float) are rejected. Lossless
+       integer-to-float promotion remains permitted, so canonical wire types are still required.
     2. Data types remain predictable across environments that possess the extension schema
        and environments that leave payload items as raw dictionaries or primitives.
     """

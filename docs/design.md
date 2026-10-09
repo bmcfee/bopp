@@ -68,13 +68,13 @@ Extensions register their types with Python's standard packaging entry point mec
 
 To prevent import overhead when loading annotations, `bopp.extensions` registers metadata entry points lazily. Module imports and type resolution are deferred until the specific `ext_schema` is encountered and accessed via `bopp.extensions.get_extensions()`.
 
-If multiple installed packages register conflicting definitions for the same `ext_schema` identifier, `bopp` preserves the initial registration and emits a warning (`UserWarning`) identifying the conflict.
+If multiple installed packages register conflicting definitions for the same `ext_schema` identifier, `bopp` emits a warning (`UserWarning`) and raises `BoppRegistryError` when that schema is accessed until the conflict is explicitly overridden.
 
 ### Extension Validation, Deterministic IDs, and Serialization Contracts
 
 BOPP annotations feature deterministic UUIDv5 identifiers calculated from the canonical hash of the serialized payload and metadata. Because saving and validation convert extension types back to built-in representations, validating the annotation ID before or after extension resolution is equivalent **provided that the extension type's serialization and deserialization are well-defined and strictly lossless**.
 
-To preserve this property, `bopp.io.resolve_extensions()` enforces strict conversion (`strict=True`). This eliminates implicit type coercion (such as string-to-float or int-to-float conversion) that would mutate values and break content hashes.
+To reduce this risk, `bopp.io.resolve_extensions()` uses strict conversion (`strict=True`). This rejects many implicit coercions such as string-to-float, but msgspec still permits lossless integer-to-float promotion, so extension authors must use canonical wire types to preserve IDs.
 
 #### Why `msgspec.Struct` is Recommended for Target Types
 
