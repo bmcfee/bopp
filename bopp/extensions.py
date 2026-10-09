@@ -32,11 +32,15 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
        schema is registered and resolved in the current environment, or remains as raw
        built-in dicts/primitives.
 
-    2. Strict and Lossless Conversion:
-       Extension conversion runs with `strict=True` to guarantee lossless conversions
-       and avoid implicit coercion (such as string-to-float or int-to-float conversions)
-       that would alter content hashes. `msgspec.Struct` provides native, fast, and
-       strict validation during `msgspec.convert`.
+    2. Strict Conversion and Canonical Numeric Equivalence:
+       Extension conversion runs with `strict=True` to prevent implicit coercions
+       (such as string-to-numeric or float-to-int truncation). However, `msgspec`
+       permits lossless integer-to-float promotion even under strict mode (e.g.,
+       `42` is converted to `42.0`). Because integer and floating-point encodings
+       produce different serialized bytes, authors must ensure that numeric values
+       in serialized payload data strictly adhere to the expected canonical schema
+       types (e.g., using floats where float fields are defined) to maintain identical
+       hash calculation across environments.
 
     3. Unknown Fields Handling:
        Extension authors are recommended to configure structs with `forbid_unknown_fields=True`
