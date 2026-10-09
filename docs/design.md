@@ -64,7 +64,7 @@ Extensions use the core `"ext"` payload type (`ExtensionPayload`). In the core s
 
 ### Registration and Lazy Loading
 
-Extensions register their types with Python's standard packaging entry point mechanism under the group name **`bopp-extension`**.
+Extensions register their types with Python's standard packaging entry point mechanism under the group name **`bopp_extension`**.
 
 To prevent import overhead when loading annotations, `bopp.extensions` registers metadata entry points lazily. Module imports and type resolution are deferred until the specific `ext_schema` is encountered and accessed via `bopp.extensions.get_extensions()`.
 
@@ -132,10 +132,10 @@ class DrumStroke(msgspec.Struct, forbid_unknown_fields=True):
 
 #### 2. Register the Entry Point (`pyproject.toml`)
 
-In your package's `pyproject.toml`, register the struct under the `"bopp-extension"` entry point group using a unique schema name:
+In your package's `pyproject.toml`, register the struct under the `"bopp_extension"` entry point group using a unique schema name:
 
 ```toml
-[project.entry-points."bopp-extension"]
+[project.entry-points."bopp_extension"]
 "org.example.drums:v1" = "my_drums.models:DrumStroke"
 ```
 
