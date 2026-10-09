@@ -132,13 +132,13 @@ _INITIALIZED: bool = False
 
 def update_extensions() -> None:
     """
-    Discover and register installed entry points under group 'bopp-extension'.
+    Discover and register installed entry points under group 'bopp_extension'.
 
     Warns if multiple installed packages register conflicting extension schemas
     under the same identifier.
     """
     global _INITIALIZED
-    eps = importlib.metadata.entry_points(group="bopp-extension")
+    eps = importlib.metadata.entry_points(group="bopp_extension")
     for ep in eps:
         if ep.name in REGISTRY:
             existing = REGISTRY._raw_entries[ep.name]
