@@ -78,9 +78,17 @@ def test_string_spec_entry_point_loading():
 
 
 def test_update_extensions_conflict_warning():
-    ep1 = SimpleNamespace(name="conflict.schema", value="pkg_a:SchemaA")
-    ep2 = SimpleNamespace(name="conflict.schema", value="pkg_b:SchemaB")
-    valid_ep = SimpleNamespace(name="valid.schema", value=f"{__name__}:CustomItem")
+    ep1 = SimpleNamespace(
+        name="conflict.schema", value="pkg_a:SchemaA", load=lambda: object
+    )
+    ep2 = SimpleNamespace(
+        name="conflict.schema", value="pkg_b:SchemaB", load=lambda: object
+    )
+    valid_ep = SimpleNamespace(
+        name="valid.schema",
+        value=f"{__name__}:CustomItem",
+        load=lambda: CustomItem,
+    )
 
     try:
         reset_extensions()
