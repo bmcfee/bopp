@@ -111,6 +111,9 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
         del self._raw_entries[key]
         self._resolved.pop(key, None)
 
+    def __contains__(self, key: object) -> bool:
+        return key in self._raw_entries
+
     def __iter__(self) -> Iterator[str]:
         return iter(self._raw_entries)
 

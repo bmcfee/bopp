@@ -82,6 +82,7 @@ def test_update_extensions_conflict_warning():
     ep2 = SimpleNamespace(name="conflict.schema", value="pkg_b:SchemaB")
 
     try:
+        reset_extensions()
         with patch(
             "bopp.extensions.importlib.metadata.entry_points",
             return_value=[ep1, ep2],
