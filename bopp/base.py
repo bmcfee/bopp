@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+from typing import Any
+
 import msgspec
 
 from .exceptions import BoppArgumentError, BoppArrayError
@@ -55,3 +58,34 @@ class BoppBase(msgspec.Struct):
             )
             
         return lengths
+
+    def _repr_mimebundle_(
+        self, include: list | None = None, exclude: list | None = None
+    ) -> dict[str, Any]:
+        """Return a MIME bundle dictionary for rich Jupyter display.
+
+        Provides serialization suitable for front-end rendering extensions
+        such as ``bopp-viewer``. The model is serialized to MessagePack format
+        and encoded as an ASCII Base64 string under the MIME type
+        ``application/vnd.bopp+msgpack``.
+
+        Parameters
+        ----------
+        include : list or None, default=None
+            MIME types to include. Maintained for IPython display protocol
+            compatibility.
+        exclude : list or None, default=None
+            MIME types to exclude. Maintained for IPython display protocol
+            compatibility.
+
+        Returns
+        -------
+        dict of str to Any
+            A MIME bundle dictionary mapping MIME type strings to their
+            serialized representations.
+        """
+        bundle: dict[str, Any] = {}
+
+        bundle["application/vnd.bopp+msgpack"] = base64.b64encode(msgspec.msgpack.encode(self)).decode("ascii")
+
+        return bundle
