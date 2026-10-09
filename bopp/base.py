@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+from typing import Any
+
 import msgspec
 
 from .exceptions import BoppArgumentError, BoppArrayError
@@ -55,3 +58,11 @@ class BoppBase(msgspec.Struct):
             )
             
         return lengths
+
+    def _repr_mimebundle_(self, include: list | None = None, exclude: list | None = None) -> dict[str, Any]:
+
+        bundle: dict[str, Any] = {}
+
+        bundle["application/vnd.bopp+msgpack"] = base64.b64encode(msgspec.msgpack.encode(self)).decode("ascii")
+
+        return bundle
