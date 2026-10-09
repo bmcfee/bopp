@@ -6,6 +6,8 @@ import warnings
 from collections.abc import Iterator, MutableMapping
 from typing import Any, cast
 
+from .exceptions import BoppRegistryError
+
 __all__ = ["ExtensionRegistry", "get_extensions", "reset_extensions", "update_extensions"]
 
 
@@ -60,6 +62,7 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
     def __init__(self) -> None:
         self._raw_entries: dict[str, Any] = {}
         self._resolved: dict[str, type[Any]] = {}
+        self._conflicts: dict[str, list[Any]] = {}
 
     def register_entry(self, name: str, entry: Any) -> None:
         """
@@ -74,8 +77,35 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
         """
         self._raw_entries[name] = entry
         self._resolved.pop(name, None)
+        self._conflicts.pop(name, None)
+
+    def mark_conflict(self, name: str, conflicting_entry: Any) -> None:
+        """
+        Mark an extension schema name as having conflicting registrations.
+
+        Parameters
+        ----------
+        name : str
+            Extension schema identifier URI or name.
+        conflicting_entry : Any
+            The conflicting entry point or loader spec.
+        """
+        if name not in self._conflicts:
+            initial_entry = self._raw_entries.get(name)
+            self._conflicts[name] = [initial_entry] if initial_entry is not None else []
+        self._conflicts[name].append(conflicting_entry)
 
     def __getitem__(self, key: str) -> type[Any]:
+        if key in self._conflicts:
+            entries = self._conflicts[key]
+            entry_strs = [
+                getattr(e, "value", str(e)) for e in entries
+            ]
+            raise BoppRegistryError(
+                f"Conflicting extension registrations detected for schema '{key}': {entry_strs}. "
+                "Resolve the conflict by specifying a single implementation."
+            )
+
         if key in self._resolved:
             return self._resolved[key]
 
@@ -110,10 +140,12 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
     def __setitem__(self, key: str, value: type[Any]) -> None:
         self._raw_entries[key] = value
         self._resolved[key] = value
+        self._conflicts.pop(key, None)
 
     def __delitem__(self, key: str) -> None:
         del self._raw_entries[key]
         self._resolved.pop(key, None)
+        self._conflicts.pop(key, None)
 
     def __contains__(self, key: object) -> bool:
         return key in self._raw_entries
@@ -125,9 +157,10 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
         return len(self._raw_entries)
 
     def clear(self) -> None:
-        """Clear all registered and resolved extension entries."""
+        """Clear all registered, resolved, and conflicting extension entries."""
         self._raw_entries.clear()
         self._resolved.clear()
+        self._conflicts.clear()
 
 
 REGISTRY = ExtensionRegistry()
@@ -149,6 +182,7 @@ def update_extensions() -> None:
             existing_val = getattr(existing, "value", existing)
             new_val = getattr(ep, "value", ep)
             if existing_val != new_val:
+                REGISTRY.mark_conflict(ep.name, ep)
                 warnings.warn(
                     f"Conflict for extension '{ep.name}': already registered as "
                     f"'{existing_val}', ignoring conflicting registration '{new_val}'.",

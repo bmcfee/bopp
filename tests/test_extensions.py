@@ -80,21 +80,36 @@ def test_string_spec_entry_point_loading():
 def test_update_extensions_conflict_warning():
     ep1 = SimpleNamespace(name="conflict.schema", value="pkg_a:SchemaA")
     ep2 = SimpleNamespace(name="conflict.schema", value="pkg_b:SchemaB")
+    valid_ep = SimpleNamespace(name="valid.schema", value=f"{__name__}:CustomItem")
 
     try:
         reset_extensions()
         with patch(
             "bopp.extensions.importlib.metadata.entry_points",
-            return_value=[ep1, ep2],
+            return_value=[ep1, ep2, valid_ep],
         ):
             REGISTRY.clear()
+            # Warning is issued during update/initialization
             with pytest.warns(UserWarning, match="Conflict for extension 'conflict.schema'"):
                 update_extensions()
 
             extensions = get_extensions()
             assert "conflict.schema" in extensions
-            # Keeps first registration
-            assert extensions._raw_entries["conflict.schema"] == ep1
+            assert "valid.schema" in extensions
+
+            # Accessing an unconflicted extension succeeds
+            assert extensions["valid.schema"] is CustomItem
+
+            # Accessing the conflicting extension raises BoppRegistryError
+            with pytest.raises(
+                BoppRegistryError,
+                match="Conflicting extension registrations detected for schema 'conflict.schema'",
+            ):
+                _ = extensions["conflict.schema"]
+
+            # Overriding explicitly resolves the conflict
+            extensions["conflict.schema"] = CustomItem
+            assert extensions["conflict.schema"] is CustomItem
     finally:
         reset_extensions()
 
