@@ -36,6 +36,16 @@ class AlternativeItem(msgspec.Struct, forbid_unknown_fields=True):
     label: str
 
 
+class TaggedItemA(msgspec.Struct, tag=True, forbid_unknown_fields=True):
+    name: str
+    score: float
+
+
+class TaggedItemB(msgspec.Struct, tag=True, forbid_unknown_fields=True):
+    code: int
+    label: str
+
+
 def test_extension_registry_mapping():
     reg = ExtensionRegistry()
     reg["test_key"] = CustomItem
@@ -86,18 +96,18 @@ def test_string_spec_entry_point_loading():
 
 def test_union_type_support():
     """Verify that types.UnionType (PEP 604) and typing.Union are supported as extension schemas."""
-    target_union = CustomItem | AlternativeItem
+    target_union = TaggedItemA | TaggedItemB
     assert isinstance(target_union, types.UnionType)
 
     reg = ExtensionRegistry()
-    reg.register_entry("example.union", f"{__name__}:CustomItem")
+    reg.register_entry("example.union", f"{__name__}:TaggedItemA")
     reg["example.union"] = target_union
 
     assert reg["example.union"] == target_union
     assert "example.union" in reg
 
     # Also test typing.Union
-    typing_union = Union[CustomItem, AlternativeItem]
+    typing_union = Union[TaggedItemA, TaggedItemB]
     reg["example.typing_union"] = typing_union
     assert reg["example.typing_union"] == typing_union
 
@@ -111,15 +121,15 @@ def test_union_type_support():
             payload_kind="ext",
             ext_schema="org.test.union",
             value=[
-                {"name": "foo", "score": 1.0},
-                {"code": 42, "label": "answer"},
+                {"type": "TaggedItemA", "name": "foo", "score": 1.0},
+                {"type": "TaggedItemB", "code": 42, "label": "answer"},
             ],
             resolve_ext=False,
         )
         resolve_extensions(ann)
-        assert isinstance(ann.payload.value[0], CustomItem)
+        assert isinstance(ann.payload.value[0], TaggedItemA)
         assert ann.payload.value[0].name == "foo"
-        assert isinstance(ann.payload.value[1], AlternativeItem)
+        assert isinstance(ann.payload.value[1], TaggedItemB)
         assert ann.payload.value[1].code == 42
     finally:
         del exts["org.test.union"]
