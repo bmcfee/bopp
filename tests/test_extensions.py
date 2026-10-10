@@ -1,4 +1,6 @@
+import types
 from types import SimpleNamespace
+from typing import Union
 from unittest.mock import MagicMock, patch
 
 import msgspec
@@ -27,6 +29,11 @@ from bopp.io import (
 class CustomItem(msgspec.Struct, forbid_unknown_fields=True):
     name: str
     score: float
+
+
+class AlternativeItem(msgspec.Struct, forbid_unknown_fields=True):
+    code: int
+    label: str
 
 
 def test_extension_registry_mapping():
@@ -75,6 +82,47 @@ def test_string_spec_entry_point_loading():
     assert loaded is CustomItem
     assert reg["example.string_spec"] is CustomItem
     assert "example.string_spec" in reg._resolved
+
+
+def test_union_type_support():
+    """Verify that types.UnionType (PEP 604) and typing.Union are supported as extension schemas."""
+    target_union = CustomItem | AlternativeItem
+    assert isinstance(target_union, types.UnionType)
+
+    reg = ExtensionRegistry()
+    reg.register_entry("example.union", f"{__name__}:CustomItem")
+    reg["example.union"] = target_union
+
+    assert reg["example.union"] == target_union
+    assert "example.union" in reg
+
+    # Also test typing.Union
+    typing_union = Union[CustomItem, AlternativeItem]
+    reg["example.typing_union"] = typing_union
+    assert reg["example.typing_union"] == typing_union
+
+    # Test resolving payload with PEP 604 union type
+    exts = get_extensions()
+    exts["org.test.union"] = target_union
+    try:
+        ann = create(
+            bopp_version="1.0",
+            media_id="track:union_test",
+            payload_kind="ext",
+            ext_schema="org.test.union",
+            value=[
+                {"name": "foo", "score": 1.0},
+                {"code": 42, "label": "answer"},
+            ],
+            resolve_ext=False,
+        )
+        resolve_extensions(ann)
+        assert isinstance(ann.payload.value[0], CustomItem)
+        assert ann.payload.value[0].name == "foo"
+        assert isinstance(ann.payload.value[1], AlternativeItem)
+        assert ann.payload.value[1].code == 42
+    finally:
+        del exts["org.test.union"]
 
 
 def test_update_extensions_conflict_warning():

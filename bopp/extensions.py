@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import importlib
 import importlib.metadata
+import types
 import warnings
 from collections.abc import Iterator, MutableMapping
-from typing import Any, cast
+from typing import Any, cast, get_origin
 
 from .exceptions import BoppRegistryError
 
@@ -114,7 +115,7 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
 
         entry = self._raw_entries[key]
         resolved_obj: Any
-        if isinstance(entry, type):
+        if isinstance(entry, (type, types.UnionType)) or get_origin(entry) is not None:
             resolved_obj = entry
         elif hasattr(entry, "load") and callable(entry.load):
             resolved_obj = entry.load()
@@ -128,7 +129,10 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
         else:
             resolved_obj = entry
 
-        if not isinstance(resolved_obj, type):
+        if not (
+            isinstance(resolved_obj, (type, types.UnionType))
+            or get_origin(resolved_obj) is not None
+        ):
             raise TypeError(
                 f"Resolved extension for '{key}' must be a type, got {type(resolved_obj).__name__}"
             )
