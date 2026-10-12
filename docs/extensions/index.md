@@ -1,4 +1,4 @@
-# Schema Extensions
+# Extensions
 
 `bopp` supports third-party domain extensions without requiring changes to the core JSON schemas. This mechanism allows domain-specific tasks—such as drum stroke transcription, expressive articulation nuances, or game-audio events—to benefit from strict `msgspec` validation, deterministic IDs, and seamless I/O serialization.
 
