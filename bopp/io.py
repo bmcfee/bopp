@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import ast
 import csv
-from pathlib import Path
+import tomllib
 import typing
-from typing import Any, Callable, get_args, get_origin
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, get_args, get_origin
 
 import msgspec
-import tomllib
 
 from ._version import get_current_schema_version
 from .base import BoppBase
@@ -55,9 +56,7 @@ def _is_complex_type(tp: Any) -> bool:
         return any(_is_complex_type(arg) for arg in args if arg is not type(None))
 
     if isinstance(tp, type):
-        if issubclass(tp, (int, float, str, bool, bytes)):
-            return False
-        return True
+        return not issubclass(tp, (int, float, str, bool, bytes))
 
     tp_str = str(tp)
     return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
