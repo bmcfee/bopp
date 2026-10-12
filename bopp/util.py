@@ -94,7 +94,13 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
 
         if field.name in FACET_REGISTRY_KEYS:
             if isinstance(value, msgspec.Struct):
-                _extract_facet_data(value, field.name, {}, header_data)
+                facet_attrs: dict[str, Any] = {}
+                _extract_facet_data(value, field.name, {}, facet_attrs)
+                if field.name in facet_attrs:
+                    tag = _get_tag(value)
+                    facet_dict = {f"{field.name}_type": tag} if tag else {}
+                    facet_dict.update(facet_attrs[field.name])
+                    header_data[field.name] = facet_dict
         else:
             header_data[field.name] = msgspec.to_builtins(value)
 
@@ -166,8 +172,6 @@ def _extract_facet_data(
     type_field_name = f"{facet_name}_type"
 
     facet_attrs: dict[str, Any] = {}
-    if tag is not None:
-        facet_attrs[type_field_name] = tag
 
     for field in msgspec.structs.fields(type(struct)):
         if field.name == type_field_name:
@@ -181,7 +185,7 @@ def _extract_facet_data(
         else:
             facet_attrs[field.name] = msgspec.to_builtins(val)
 
-    if len(facet_attrs) > 1:
+    if facet_attrs:
         attrs_dict[facet_name] = facet_attrs
 
 
