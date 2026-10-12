@@ -17,7 +17,7 @@ from .core import (
     validate_and_set_annotation_id,
     validate_annotation_id,
 )
-from .exceptions import BoppArgumentError
+from .exceptions import BoppArgumentError, BoppRegistryError
 from .registries import get_registry
 from .util import FACET_REGISTRY_KEYS, from_dataframe, to_dataframe
 
@@ -106,25 +106,27 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
 
     try:
         registry = get_registry(bopp_version)
-    except Exception:
+    except BoppRegistryError:
         return converters
 
     for col in columns:
         parts = col.split(":")
         if len(parts) == 3:
             facet, tag, field = parts[0], parts[1], parts[2]
-            if facet in FACET_REGISTRY_KEYS:
-                type_registry = registry.get(FACET_REGISTRY_KEYS[facet], {})
+            registry_key = FACET_REGISTRY_KEYS.get(facet)
+            if registry_key is not None:
+                type_registry = registry.get(registry_key, {})
                 struct_cls = type_registry.get(tag)
                 if struct_cls is not None:
                     try:
                         hints = typing.get_type_hints(struct_cls, include_extras=True)
-                        if field in hints:
-                            converter = _get_column_converter(hints[field])
-                            if converter is not None:
-                                converters[col] = converter
-                    except Exception:
-                        pass
+                    except (NameError, TypeError):
+                        hints = {}
+
+                    if field in hints:
+                        converter = _get_column_converter(hints[field])
+                        if converter is not None:
+                            converters[col] = converter
     return converters
 
 
