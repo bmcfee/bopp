@@ -1,6 +1,7 @@
 """Payload schemas for drum transcription."""
 
 from enum import StrEnum
+
 import msgspec
 
 
