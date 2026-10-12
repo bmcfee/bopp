@@ -154,6 +154,24 @@ def test_load_bopp_csv_string_with_brackets(tmp_path):
     assert loaded.payload.value == ["[intro]", "(chorus)", "{verse}"]
 
 
+def test_csv_roundtrip_numeric_string_tags(tmp_path):
+    # Verify string payloads containing pure numbers like "1" or "007" are preserved as strings
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:numeric_str_test",
+        payload_kind="tag_open",
+        value=["1", "2", "007"],
+    )
+    file_path = tmp_path / "test_numeric_str.csv"
+
+    save_bopp_csv(ann, file_path)
+
+    loaded = load_bopp_csv(file_path)
+    assert loaded.media_id == ann.media_id
+    assert loaded.payload.value == ["1", "2", "007"]
+    assert all(isinstance(v, str) for v in loaded.payload.value)
+
+
 def test_load_bopp_csv_invalid_schema(tmp_path):
     # Valid CSV with frontmatter, but columns fail BOPP schema validation (format rule failure)
     csv_content = (

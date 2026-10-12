@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import ast
+import csv
 from pathlib import Path
+import typing
+from typing import Any, Callable, get_args, get_origin
 
 import msgspec
 import tomllib
@@ -15,13 +18,115 @@ from .core import (
 )
 from .exceptions import BoppArgumentError
 from .registries import get_registry
-from .util import from_dataframe, to_dataframe
+from .util import FACET_REGISTRY_KEYS, from_dataframe, to_dataframe
 
 
 class _VersionHeader(msgspec.Struct):
     """Lightweight struct for fast schema version extraction."""
 
     bopp_version: str = get_current_schema_version()
+
+
+def _unwrap_type(tp: Any) -> Any:
+    """Unwrap TypeAliasType and Annotated to inspect the underlying type."""
+    while True:
+        if isinstance(tp, typing.TypeAliasType):
+            tp = tp.__value__
+        elif hasattr(tp, "__metadata__"):
+            args = get_args(tp)
+            tp = args[0] if args else tp
+        else:
+            break
+    return tp
+
+
+def _is_complex_type(tp: Any) -> bool:
+    """Check if an unwrapped element type is a container or complex structure."""
+    tp = _unwrap_type(tp)
+    if tp is Any:
+        return True
+
+    origin = get_origin(tp)
+    if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
+        return True
+
+    if origin is getattr(type(int | str), "__origin__", None) or origin is Any:
+        args = get_args(tp)
+        return any(_is_complex_type(arg) for arg in args if arg is not type(None))
+
+    if isinstance(tp, type):
+        if issubclass(tp, (int, float, str, bool, bytes)):
+            return False
+        return True
+
+    tp_str = str(tp)
+    return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
+
+
+def _get_column_converter(type_hint: Any) -> Callable[[str], Any] | None:
+    """Infer a pandas cell converter function based on struct field type hint."""
+    unwrapped = _unwrap_type(type_hint)
+    origin = get_origin(unwrapped)
+
+    inner_type = unwrapped
+    if origin in (list, typing.Sequence):
+        args = get_args(unwrapped)
+        if args:
+            inner_type = _unwrap_type(args[0])
+
+    # If the inner element is complex (e.g. fraction tuple, list, dict), parse via ast.literal_eval
+    if _is_complex_type(inner_type):
+        def parse_complex(val: str) -> Any:
+            if not isinstance(val, str) or not val.strip():
+                return None
+            val_stripped = val.strip()
+            if val_stripped.startswith(("[", "(", "{")):
+                return ast.literal_eval(val_stripped)
+            return val
+        return parse_complex
+
+    # If the inner element is explicitly a string, ensure pandas does not cast numeric-like strings to numbers
+    if isinstance(inner_type, type) and issubclass(inner_type, str):
+        def parse_str(val: str) -> Any:
+            if val == "":
+                return ""
+            return str(val)
+        return parse_str
+
+    return None
+
+
+def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Callable[[str], Any]]:
+    """Inspect CSV header line and generate a converters dictionary for pd.read_csv."""
+    converters: dict[str, Callable[[str], Any]] = {}
+    if not header_line:
+        return converters
+
+    reader = csv.reader([header_line.strip()])
+    columns = next(reader, [])
+
+    try:
+        registry = get_registry(bopp_version)
+    except Exception:
+        return converters
+
+    for col in columns:
+        parts = col.split(":")
+        if len(parts) == 3:
+            facet, tag, field = parts[0], parts[1], parts[2]
+            if facet in FACET_REGISTRY_KEYS:
+                type_registry = registry.get(FACET_REGISTRY_KEYS[facet], {})
+                struct_cls = type_registry.get(tag)
+                if struct_cls is not None:
+                    try:
+                        hints = typing.get_type_hints(struct_cls, include_extras=True)
+                        if field in hints:
+                            converter = _get_column_converter(hints[field])
+                            if converter is not None:
+                                converters[col] = converter
+                    except Exception:
+                        pass
+    return converters
 
 
 def _prepare_annotation_for_save(
@@ -270,33 +375,16 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
             f.seek(0)
             metadata = {}
 
-        # 2. Hand the open file pointer directly to Pandas
-        df = pd.read_csv(f)
+        # 2. Inspect CSV header to infer column converters based on schema registry
+        bopp_version = metadata.get("bopp_version", get_current_schema_version())
+        header_pos = f.tell()
+        header_line = f.readline()
+        f.seek(header_pos)
 
-    # 3. Safely evaluate complex columns (lists, fractions, objects) using schema registry metadata
-    bopp_version = metadata.get("bopp_version", get_current_schema_version())
-    registry = get_registry(bopp_version)
-    complex_fields_registry = registry.get("COMPLEX_FIELDS_REGISTRY", {})
+        converters = _build_csv_converters(header_line, bopp_version)
 
-    target_cols = [
-        c
-        for c in df.columns
-        if c.startswith(("extent:", "payload:", "confidence:"))
-    ]
-
-    for col in target_cols:
-        parts = col.split(":")
-        if len(parts) == 3:
-            facet_name, tag_value, field_name = parts[0], parts[1], parts[2]
-            tag_field = f"{facet_name}_type"
-
-            is_complex = field_name in complex_fields_registry.get(tag_field, {}).get(tag_value, [])
-            if is_complex and (df[col].dtype.type is str or df[col].dtype == "object"):
-                df[col] = df[col].apply(
-                    lambda x: ast.literal_eval(x)
-                    if isinstance(x, str) and x.startswith(("[", "(", "{"))
-                    else x
-                )
+        # 3. Hand the open file pointer directly to Pandas with inferred converters
+        df = pd.read_csv(f, converters=converters if converters else None)
 
     # Attach the singleton fields directly to the DataFrame attributes
     df.attrs.update(metadata)
