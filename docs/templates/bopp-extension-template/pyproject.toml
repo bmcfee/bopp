@@ -13,5 +13,8 @@ dependencies = [
     "msgspec",
 ]
 
+[tool.flit.module]
+name = "my_drums"
+
 [project.entry-points."bopp_extension"]
 "org.example.drums:v1" = "my_drums.models:DrumStroke"
