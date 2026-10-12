@@ -29,13 +29,23 @@ class _VersionHeader(msgspec.Struct):
 
 
 def _unwrap_type(tp: Any) -> Any:
-    """Unwrap TypeAliasType and Annotated to inspect the underlying type."""
+    """Unwrap TypeAliasType, Annotated, and Optional/Unset Unions to inspect the underlying type."""
     while True:
         if isinstance(tp, typing.TypeAliasType):
             tp = tp.__value__
         elif hasattr(tp, "__metadata__"):
             args = get_args(tp)
             tp = args[0] if args else tp
+        elif get_origin(tp) in (typing.Union, getattr(type(int | str), "__origin__", None)):
+            non_empty_args = [
+                arg
+                for arg in get_args(tp)
+                if arg not in (type(None), msgspec.UnsetType, type(msgspec.UNSET))
+            ]
+            if len(non_empty_args) == 1:
+                tp = non_empty_args[0]
+            else:
+                break
         else:
             break
     return tp
