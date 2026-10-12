@@ -22,4 +22,4 @@ class DrumStroke(msgspec.Struct, forbid_unknown_fields=True):
     """Observation item for a single drum strike."""
 
     component: DrumComponent
-    velocity: int = 100
+    velocity: int

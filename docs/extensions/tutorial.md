@@ -28,7 +28,7 @@ class DrumComponent(StrEnum):
 class DrumStroke(msgspec.Struct, forbid_unknown_fields=True):
     """Observation item for a single drum strike."""
     component: DrumComponent
-    velocity: int = 100  # MIDI velocity range [1, 127]
+    velocity: int  # MIDI velocity range [1, 127]
 ```
 
 ---
