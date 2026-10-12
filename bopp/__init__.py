@@ -60,6 +60,3 @@ from .transforms import (
 from .transforms import (
     trim as trim,
 )
-
-# Update the extensions registry
-extensions.update_extensions()
