@@ -303,7 +303,7 @@ def test_load_bopp_csv_non_string_columns(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:numeric_cols",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1, 0.2],
         value=[1, 2],
