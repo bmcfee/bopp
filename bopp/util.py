@@ -84,7 +84,7 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
     >>> header["media_id"]
     'audio:123'
     """
-    header_data = {}
+    header_data: dict[str, Any] = {}
 
     for field in msgspec.structs.fields(annotation):
         value = getattr(annotation, field.name)
@@ -94,22 +94,7 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
 
         if field.name in FACET_REGISTRY_KEYS:
             if isinstance(value, msgspec.Struct):
-                tag = _get_tag(value)
-                type_key = f"{field.name}_type"
-                facet_dict: dict[str, Any] = {}
-                if tag is not None:
-                    facet_dict[type_key] = tag
-
-                for facet_field in msgspec.structs.fields(type(value)):
-                    if facet_field.name == type_key:
-                        continue
-                    f_val = getattr(value, facet_field.name)
-                    if f_val is not None and f_val is not msgspec.UNSET and not isinstance(f_val, list):
-                        facet_dict[facet_field.name] = msgspec.to_builtins(f_val)
-
-                # Only include facet block in header if it contains scalar attributes beyond just type tag
-                if len(facet_dict) > 1:
-                    header_data[field.name] = facet_dict
+                _extract_facet_data(value, field.name, {}, header_data)
         else:
             header_data[field.name] = msgspec.to_builtins(value)
 
@@ -181,6 +166,8 @@ def _extract_facet_data(
     type_field_name = f"{facet_name}_type"
 
     facet_attrs: dict[str, Any] = {}
+    if tag is not None:
+        facet_attrs[type_field_name] = tag
 
     for field in msgspec.structs.fields(type(struct)):
         if field.name == type_field_name:
@@ -194,7 +181,7 @@ def _extract_facet_data(
         else:
             facet_attrs[field.name] = msgspec.to_builtins(val)
 
-    if facet_attrs:
+    if len(facet_attrs) > 1:
         attrs_dict[facet_name] = facet_attrs
 
 
@@ -362,47 +349,27 @@ def from_dataframe(df: Any) -> BoppBase:
         if key in attrs:
             bopp_data[key] = attrs[key]
 
-    coord_cols = [c for c in columns if c.startswith("extent:")]
-    payload_cols = [c for c in columns if c.startswith("payload:")]
-    conf_cols = [c for c in columns if c.startswith("confidence:")]
-
     def _get_column_list(column_name: str) -> list[Any]:
         if is_pandas:
             return df[column_name].tolist()
         else:
             return df[column_name].to_list()
 
-    if coord_cols:
-        ext_type = coord_cols[0].split(":")[1]
-        extent_dict: dict[str, Any] = {"extent_type": ext_type}
-        if isinstance(attrs.get("extent"), dict):
-            extent_dict.update(attrs["extent"])
-        for col in coord_cols:
-            parts = col.split(":")
-            field_name = parts[2]
-            extent_dict[field_name] = _get_column_list(col)
-        bopp_data["extent"] = extent_dict
+    for facet in FACET_REGISTRY_KEYS:
+        facet_cols = [c for c in columns if c.startswith(f"{facet}:")]
+        if not facet_cols:
+            continue
 
-    if payload_cols:
-        payload_type = payload_cols[0].split(":")[1]
-        payload_dict: dict[str, Any] = {"payload_type": payload_type}
-        if isinstance(attrs.get("payload"), dict):
-            payload_dict.update(attrs["payload"])
-        for col in payload_cols:
-            parts = col.split(":")
-            field_name = parts[2]
-            payload_dict[field_name] = _get_column_list(col)
-        bopp_data["payload"] = payload_dict
+        facet_type = facet_cols[0].split(":")[1]
+        facet_dict: dict[str, Any] = {f"{facet}_type": facet_type}
 
-    if conf_cols:
-        conf_type = conf_cols[0].split(":")[1]
-        confidence_dict: dict[str, Any] = {"confidence_type": conf_type}
-        if isinstance(attrs.get("confidence"), dict):
-            confidence_dict.update(attrs["confidence"])
-        for col in conf_cols:
-            parts = col.split(":")
-            field_name = parts[2]
-            confidence_dict[field_name] = _get_column_list(col)
-        bopp_data["confidence"] = confidence_dict
+        if isinstance(attrs.get(facet), dict):
+            facet_dict.update(attrs[facet])
+
+        for col in facet_cols:
+            field_name = col.split(":")[2]
+            facet_dict[field_name] = _get_column_list(col)
+
+        bopp_data[facet] = facet_dict
 
     return msgspec.convert(bopp_data, type=annotation_cls)
