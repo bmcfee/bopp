@@ -28,8 +28,8 @@ extensions = [
 
 myst_enable_extensions = ["colon_fence", "attrs_inline", "linkify", "tasklist"]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '_templates/bopp-extension-template']
+templates_path = ['templates']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'templates/bopp-extension-template']
 
 # -- Options for intersphinx -------------------------------------------------
 intersphinx_mapping = {
@@ -52,7 +52,7 @@ html_static_path = ['_static']
 def _create_extension_template_archive(app):
     """Package the minimal extension template directory into a downloadable zip file."""
     docs_dir = Path(app.srcdir)
-    template_dir = docs_dir / "_templates" / "bopp-extension-template"
+    template_dir = docs_dir / "templates" / "bopp-extension-template"
     static_dir = docs_dir / "_static"
 
     if template_dir.is_dir():
