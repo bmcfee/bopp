@@ -1,4 +1,5 @@
 import types
+import warnings
 from types import SimpleNamespace
 from typing import Union
 from unittest.mock import MagicMock, patch
@@ -176,6 +177,114 @@ def test_update_extensions_conflict_warning():
             # Overriding explicitly resolves the conflict
             extensions["conflict.schema"] = CustomItem
             assert extensions["conflict.schema"] is CustomItem
+    finally:
+        reset_extensions()
+
+
+def test_mark_conflict_without_prior_entry():
+    """Verify mark_conflict initialization when the schema name had no prior entry (lines 94-97)."""
+    reg = ExtensionRegistry()
+    conflicting_entry = "pkg_a:SchemaA"
+
+    reg.mark_conflict("unregistered.conflict", conflicting_entry)
+
+    # _conflicts should map to a single-element list containing conflicting_entry
+    assert reg._conflicts["unregistered.conflict"] == [conflicting_entry]
+
+    with pytest.raises(
+        BoppRegistryError,
+        match="Conflicting extension registrations detected for schema 'unregistered.conflict'",
+    ):
+        _ = reg["unregistered.conflict"]
+
+
+def test_registry_getitem_key_error():
+    """Verify KeyError when requesting an unregistered schema (line 114)."""
+    reg = ExtensionRegistry()
+    with pytest.raises(KeyError):
+        _ = reg["missing.schema"]
+
+
+def test_registry_import_module_spec_without_colon():
+    """Verify module-only string import path and non-type resolution TypeError (lines 119, 128-130)."""
+    reg = ExtensionRegistry()
+    # Importing a module without ':' resolves the module object, which is not a type/union
+    reg.register_entry("math_mod", "math")
+
+    with pytest.raises(
+        TypeError,
+        match="Resolved extension for 'math_mod' must be a type, got module",
+    ):
+        _ = reg["math_mod"]
+
+
+def test_registry_non_type_resolved_raises_type_error():
+    """Verify TypeError when loaded entry point resolves to a non-type instance (lines 128-130)."""
+    reg = ExtensionRegistry()
+    mock_ep = SimpleNamespace(load=lambda: 42)
+    reg.register_entry("not_a_type", mock_ep)
+
+    with pytest.raises(
+        TypeError,
+        match="Resolved extension for 'not_a_type' must be a type, got int",
+    ):
+        _ = reg["not_a_type"]
+
+
+def test_registry_delitem_cleans_resolved_and_conflicts():
+    """Verify __delitem__ purges entry from _raw_entries, _resolved, and _conflicts (line 136)."""
+    reg = ExtensionRegistry()
+    reg.register_entry("test.del", CustomItem)
+
+    # Force resolution into _resolved
+    _ = reg["test.del"]
+    assert "test.del" in reg._resolved
+
+    # Simulate a conflict record
+    reg._conflicts["test.del"] = ["conflict"]
+
+    del reg["test.del"]
+
+    assert "test.del" not in reg._raw_entries
+    assert "test.del" not in reg._resolved
+    assert "test.del" not in reg._conflicts
+
+
+def test_update_extensions_duplicate_identical_entry_point():
+    """Verify duplicate entry points with identical values are ignored without warnings (lines 188-196)."""
+    ep1 = SimpleNamespace(name="identical.schema", value="pkg_a:SchemaA")
+    ep2 = SimpleNamespace(name="identical.schema", value="pkg_a:SchemaA")
+
+    try:
+        reset_extensions()
+        with patch(
+            "bopp.extensions.importlib.metadata.entry_points",
+            return_value=[ep1, ep2],
+        ):
+            REGISTRY.clear()
+            with warnings.catch_warnings():
+                warnings.simplefilter("error")
+                update_extensions()
+
+            assert "identical.schema" in REGISTRY
+            assert "identical.schema" not in REGISTRY._conflicts
+    finally:
+        reset_extensions()
+
+
+def test_get_extensions_when_already_initialized():
+    """Verify get_extensions returns the registry without re-invoking update_extensions when initialized (line 219)."""
+    try:
+        reset_extensions()
+        # Initial call initializes the registry
+        ext1 = get_extensions()
+        assert ext1 is REGISTRY
+
+        # Subsequent call should not re-run update_extensions
+        with patch("bopp.extensions.update_extensions") as mock_update:
+            ext2 = get_extensions()
+            mock_update.assert_not_called()
+            assert ext2 is REGISTRY
     finally:
         reset_extensions()
 
