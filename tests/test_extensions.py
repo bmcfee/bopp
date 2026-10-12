@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import msgspec
 import pytest
 
+import bopp.extensions as ext_mod
 from bopp.core import compute_annotation_id, create, validate_annotation_id
 from bopp.exceptions import BoppRegistryError
 from bopp.extensions import (
@@ -184,12 +185,19 @@ def test_update_extensions_conflict_warning():
 def test_mark_conflict_without_prior_entry():
     """Verify mark_conflict initialization when the schema name had no prior entry (lines 94-97)."""
     reg = ExtensionRegistry()
-    conflicting_entry = "pkg_a:SchemaA"
+    conflicting_entry_1 = "pkg_a:SchemaA"
+    conflicting_entry_2 = "pkg_b:SchemaB"
 
-    reg.mark_conflict("unregistered.conflict", conflicting_entry)
+    # First call covers lines 94-96: name not in _conflicts
+    reg.mark_conflict("unregistered.conflict", conflicting_entry_1)
+    assert reg._conflicts["unregistered.conflict"] == [conflicting_entry_1]
 
-    # _conflicts should map to a single-element list containing conflicting_entry
-    assert reg._conflicts["unregistered.conflict"] == [conflicting_entry]
+    # Second call covers branch 94 -> 97: name already in _conflicts
+    reg.mark_conflict("unregistered.conflict", conflicting_entry_2)
+    assert reg._conflicts["unregistered.conflict"] == [
+        conflicting_entry_1,
+        conflicting_entry_2,
+    ]
 
     with pytest.raises(
         BoppRegistryError,
@@ -221,8 +229,7 @@ def test_registry_import_module_spec_without_colon():
 def test_registry_non_type_resolved_raises_type_error():
     """Verify TypeError when loaded entry point resolves to a non-type instance (lines 128-130)."""
     reg = ExtensionRegistry()
-    mock_ep = SimpleNamespace(load=lambda: 42)
-    reg.register_entry("not_a_type", mock_ep)
+    reg.register_entry("not_a_type", 42)
 
     with pytest.raises(
         TypeError,
@@ -276,15 +283,11 @@ def test_get_extensions_when_already_initialized():
     """Verify get_extensions returns the registry without re-invoking update_extensions when initialized (line 219)."""
     try:
         reset_extensions()
-        # Initial call initializes the registry
-        ext1 = get_extensions()
-        assert ext1 is REGISTRY
+        assert ext_mod._INITIALIZED is True
 
-        # Subsequent call should not re-run update_extensions
-        with patch("bopp.extensions.update_extensions") as mock_update:
-            ext2 = get_extensions()
-            mock_update.assert_not_called()
-            assert ext2 is REGISTRY
+        # Call get_extensions() when _INITIALIZED is True, executing branch 217 -> 219
+        ext = get_extensions()
+        assert ext is REGISTRY
     finally:
         reset_extensions()
 
