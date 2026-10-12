@@ -319,14 +319,6 @@ def from_dataframe(df: Any) -> BoppBase:
     --------
     to_dataframe : Convert an Annotation instance into a Pandas or Polars DataFrame.
     """
-    type_name = type(df).__name__
-    module_name = getattr(type(df), "__module__", "")
-
-    if "pandas" not in module_name and "polars" not in module_name and type_name not in ("DataFrame",):
-        raise BoppArgumentError(
-            f"Unsupported DataFrame type: {type(df)}. Must be a pandas or polars DataFrame."
-        )
-
     # Confirm pandas/polars type dynamically
     try:
         import pandas as pd
