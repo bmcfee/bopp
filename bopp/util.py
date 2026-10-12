@@ -107,8 +107,15 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
     return header_data
 
 
-def _validate_dataframe_columns(columns: list[str], bopp_version: str) -> None:
-    """Validate DataFrame column headers according to BOPP rules.
+def _validate_dataframe_columns(
+    columns: list[str], registry_or_version: dict[str, Any] | str
+) -> dict[str, list[tuple[str, str, str]]]:
+    """Validate DataFrame column headers and return columns grouped by facet.
+
+    Returns
+    -------
+    dict[str, list[tuple[str, str, str]]]
+        Mapping from facet name to list of (type_tag, field_name, full_col_name).
 
     Rules:
     1) Every column must have exactly three fields separated by : (facet:type:field).
@@ -116,8 +123,13 @@ def _validate_dataframe_columns(columns: list[str], bopp_version: str) -> None:
     3) The facet and type must exist in the registry for the given version.
     4) The field must exist for the type struct.
     """
-    registry = get_registry(bopp_version)
+    if isinstance(registry_or_version, str):
+        registry = get_registry(registry_or_version)
+    else:
+        registry = registry_or_version
+
     facet_types: dict[str, str] = {}
+    grouped_cols: dict[str, list[tuple[str, str, str]]] = {k: [] for k in FACET_REGISTRY_KEYS}
 
     for col in columns:
         parts = col.split(":")
@@ -156,6 +168,10 @@ def _validate_dataframe_columns(columns: list[str], bopp_version: str) -> None:
             raise BoppValidationError(
                 f"Field '{field_name}' in column '{col}' does not exist on type '{type_tag}'."
             )
+
+        grouped_cols[facet].append((type_tag, field_name, col))
+
+    return grouped_cols
 
 
 def _extract_facet_data(
@@ -303,40 +319,41 @@ def from_dataframe(df: Any) -> BoppBase:
     --------
     to_dataframe : Convert an Annotation instance into a Pandas or Polars DataFrame.
     """
-    is_pandas = False
-    is_polars = False
+    type_name = type(df).__name__
+    module_name = getattr(type(df), "__module__", "")
 
+    if "pandas" not in module_name and "polars" not in module_name and type_name not in ("DataFrame",):
+        raise BoppArgumentError(
+            f"Unsupported DataFrame type: {type(df)}. Must be a pandas or polars DataFrame."
+        )
+
+    # Confirm pandas/polars type dynamically
     try:
         import pandas as pd
-
-        if isinstance(df, pd.DataFrame):
-            is_pandas = True
+        valid = isinstance(df, pd.DataFrame)
     except ImportError:
-        pass
+        valid = False
 
-    if not is_pandas:
+    if not valid:
         try:
             import polars as pl
-
-            if isinstance(df, pl.DataFrame):
-                is_polars = True
+            valid = isinstance(df, pl.DataFrame)
         except ImportError:
             pass
 
-    if not (is_pandas or is_polars):
+    if not valid:
         raise BoppArgumentError(
             f"Unsupported DataFrame type: {type(df)}. Must be a pandas or polars DataFrame."
         )
 
     attrs = getattr(df, "attrs", {})
     columns = list(df.columns)
-
     bopp_version = attrs.get("bopp_version", get_current_schema_version())
-
-    _validate_dataframe_columns(columns, bopp_version)
 
     registry = get_registry(bopp_version)
     annotation_cls = registry["Annotation"]
+
+    grouped_cols = _validate_dataframe_columns(columns, registry)
 
     media_id = attrs.get("media_id")
     if not media_id or not isinstance(media_id, str):
@@ -353,26 +370,23 @@ def from_dataframe(df: Any) -> BoppBase:
         if key in attrs:
             bopp_data[key] = attrs[key]
 
-    def _get_column_list(column_name: str) -> list[Any]:
-        if is_pandas:
-            return df[column_name].tolist()
-        else:
-            return df[column_name].to_list()
+    def _get_column_list(col_name: str) -> list[Any]:
+        col_series = df[col_name]
+        extractor = getattr(col_series, "to_list", getattr(col_series, "tolist", None))
+        return extractor() if extractor is not None else list(col_series)
 
-    for facet in FACET_REGISTRY_KEYS:
-        facet_cols = [c for c in columns if c.startswith(f"{facet}:")]
-        if not facet_cols:
+    for facet, cols in grouped_cols.items():
+        if not cols:
             continue
 
-        facet_type = facet_cols[0].split(":")[1]
+        facet_type = cols[0][0]
         facet_dict: dict[str, Any] = {f"{facet}_type": facet_type}
 
         if isinstance(attrs.get(facet), dict):
             facet_dict.update(attrs[facet])
 
-        for col in facet_cols:
-            field_name = col.split(":")[2]
-            facet_dict[field_name] = _get_column_list(col)
+        for _, field_name, full_col_name in cols:
+            facet_dict[field_name] = _get_column_list(full_col_name)
 
         bopp_data[facet] = facet_dict
 

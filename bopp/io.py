@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import csv
 import tomllib
+import types
 import typing
 from collections.abc import Callable
 from fractions import Fraction
@@ -37,11 +38,11 @@ def _unwrap_type(tp: Any) -> Any:
         elif hasattr(tp, "__metadata__"):
             args = get_args(tp)
             tp = args[0] if args else tp
-        elif get_origin(tp) in (typing.Union, getattr(type(int | str), "__origin__", None)):
+        elif get_origin(tp) in (typing.Union, types.UnionType):
             non_empty_args = [
                 arg
                 for arg in get_args(tp)
-                if arg not in (type(None), msgspec.UnsetType, type(msgspec.UNSET))
+                if arg not in (type(None), msgspec.UnsetType)
             ]
             if len(non_empty_args) == 1:
                 tp = non_empty_args[0]
@@ -61,16 +62,14 @@ def _is_complex_type(tp: Any) -> bool:
     if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
         return True
 
-    if origin in (typing.Union, getattr(type(int | str), "__origin__", None)):
+    if origin in (typing.Union, types.UnionType):
         args = [arg for arg in get_args(tp) if arg is not type(None)]
         return any(_is_complex_type(_unwrap_type(arg)) for arg in args)
 
     if isinstance(tp, type):
         if issubclass(tp, (int, float, str, bool, bytes)):
             return False
-        if issubclass(tp, (Fraction, msgspec.Struct, dict, list, tuple, set)):
-            return True
-        return not issubclass(tp, (int, float, str, bool, bytes))
+        return issubclass(tp, (Fraction, msgspec.Struct, dict, list, tuple, set))
 
     tp_str = str(tp)
     return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
@@ -223,6 +222,39 @@ def save_bopp_csv(
             raise BoppArgumentError(f"Unknown dataframe type: {type(df)}")
 
 
+def _save_msgspec_encoded(
+    annotation: BoppBase,
+    filepath: str | Path,
+    codec: Any,
+    *,
+    validate_id: bool,
+    generate_id: bool,
+) -> None:
+    _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
+    encoded_data = codec.encode(annotation)
+    with open(filepath, "wb") as f:
+        f.write(encoded_data)
+
+
+def _load_msgspec_encoded(
+    filepath: str | Path,
+    codec: Any,
+    *,
+    validate_id: bool,
+) -> BoppBase:
+    with open(filepath, "rb") as f:
+        data = f.read()
+
+    header = codec.decode(data, type=_VersionHeader)
+    annotation_cls = get_registry(header.bopp_version)["Annotation"]
+    ann = codec.decode(data, type=annotation_cls)
+
+    if validate_id:
+        validate_annotation_id(ann)
+
+    return ann
+
+
 def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
     """
     Read a BOPP JSON file directly into an Annotation model instance.
@@ -240,18 +272,7 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBas
     BoppBase
         Decoded and validated Annotation instance.
     """
-    # msgspec operates fastest on raw bytes, so we read as "rb"
-    with open(filepath, "rb") as f:
-        data = f.read()
-
-    header = msgspec.json.decode(data, type=_VersionHeader)
-    annotation_cls = get_registry(header.bopp_version)["Annotation"]
-    ann = msgspec.json.decode(data, type=annotation_cls)
-
-    if validate_id:
-        validate_annotation_id(ann)
-
-    return ann
+    return _load_msgspec_encoded(filepath, msgspec.json, validate_id=validate_id)
 
 
 def save_bopp_json(
@@ -279,13 +300,13 @@ def save_bopp_json(
         unconditionally overrides any existing ID with a freshly computed one.
         If False and validate_id=False, skips ID generation and validation.
     """
-    _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
-
-    # msgspec encodes structs natively without needing conversion dicts
-    json_data = msgspec.json.encode(annotation)
-
-    with open(filepath, "wb") as f:
-        f.write(json_data)
+    _save_msgspec_encoded(
+        annotation,
+        filepath,
+        msgspec.json,
+        validate_id=validate_id,
+        generate_id=generate_id,
+    )
 
 
 def save_bopp_msgpack(
@@ -313,12 +334,13 @@ def save_bopp_msgpack(
         unconditionally overrides any existing ID with a freshly computed one.
         If False and validate_id=False, skips ID generation and validation.
     """
-    _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
-
-    binary_data = msgspec.msgpack.encode(annotation)
-
-    with open(filepath, "wb") as f:
-        f.write(binary_data)
+    _save_msgspec_encoded(
+        annotation,
+        filepath,
+        msgspec.msgpack,
+        validate_id=validate_id,
+        generate_id=generate_id,
+    )
 
 
 def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
@@ -338,17 +360,7 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
     BoppBase
         Decoded and validated Annotation instance.
     """
-    with open(filepath, "rb") as f:
-        binary_data = f.read()
-
-    header = msgspec.msgpack.decode(binary_data, type=_VersionHeader)
-    annotation_cls = get_registry(header.bopp_version)["Annotation"]
-    ann = msgspec.msgpack.decode(binary_data, type=annotation_cls)
-
-    if validate_id:
-        validate_annotation_id(ann)
-
-    return ann
+    return _load_msgspec_encoded(filepath, msgspec.msgpack, validate_id=validate_id)
 
 
 def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
