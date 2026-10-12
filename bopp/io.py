@@ -5,6 +5,7 @@ import csv
 import tomllib
 import typing
 from collections.abc import Callable
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, get_args, get_origin
 
@@ -53,7 +54,6 @@ def _unwrap_type(tp: Any) -> Any:
 
 def _is_complex_type(tp: Any) -> bool:
     """Check if an unwrapped element type is a container or complex structure."""
-    tp = _unwrap_type(tp)
     if tp is Any:
         return True
 
@@ -61,11 +61,15 @@ def _is_complex_type(tp: Any) -> bool:
     if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
         return True
 
-    if origin is getattr(type(int | str), "__origin__", None) or origin is Any:
-        args = get_args(tp)
-        return any(_is_complex_type(arg) for arg in args if arg is not type(None))
+    if origin in (typing.Union, getattr(type(int | str), "__origin__", None)):
+        args = [arg for arg in get_args(tp) if arg is not type(None)]
+        return any(_is_complex_type(_unwrap_type(arg)) for arg in args)
 
     if isinstance(tp, type):
+        if issubclass(tp, (int, float, str, bool, bytes)):
+            return False
+        if issubclass(tp, (Fraction, msgspec.Struct, dict, list, tuple, set)):
+            return True
         return not issubclass(tp, (int, float, str, bool, bytes))
 
     tp_str = str(tp)
