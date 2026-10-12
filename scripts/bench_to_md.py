@@ -13,8 +13,14 @@ df = pd.json_normalize(data["benchmarks"])
 time_cols = ["stats.min", "stats.mean", "stats.stddev"]
 df[time_cols] *= 1e6
 
+# Determine whether the loader includes validation
+df["Validated"] = df["params.loader_name"].apply(
+    lambda name: "✓" if (name == "jams_val" or name.startswith("bopp_")) else "✗"
+)
+
 cols = {
-    "params.loader_name": "Loader", 
+    "params.loader_name": "Loader",
+    "Validated": "Validated",
     "stats.min": "Min (μs)", 
     "stats.mean": "Mean (μs)", 
     "stats.stddev": "StdDev (μs)", 
