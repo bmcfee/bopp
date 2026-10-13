@@ -420,6 +420,7 @@ def test_prepare_annotation_for_save_id_variations():
         bopp_version="1.0",
         media_id="track:save_id_test",
         payload_kind="onset",
+        extent_kind="time",
         time=[0.1],
         value=[1],
         generate_id=False,
