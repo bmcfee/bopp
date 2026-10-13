@@ -28,7 +28,7 @@ from ..models.v1.payload.note_hz import NoteHzPayload
 from ..models.v1.payload.note_midi import NoteMidiPayload
 from ..models.v1.payload.object import ObjectPayload
 from ..models.v1.payload.onset import OnsetPayload
-from ..models.v1.pitch_contour_hz import PitchContourPayload
+from ..models.v1.payload.pitch_contour_hz import PitchContourPayload
 from ..models.v1.payload.relation import RelationPayload
 from ..models.v1.payload.segment_multi import MultiSegmentPayload
 from ..models.v1.payload.segment_open import SegmentOpenPayload
@@ -105,23 +105,6 @@ COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
 }
 
 STRING_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
-    'confidence_type': {},
-    'extent_type': {},
-    'metadata_type': {
-        'algorithm': ['algorithm_name', 'version'],
-        'crowd': ['platform'],
-        'derived': ['source_annotation_id', 'method'],
-        'human': ['annotator_id', 'tool'],
-        'other': ['notes'],
-        'sensor': ['device_id'],
-    },
-    'payload_type': {
-        'chord': ['value'],
-        'key_mode': ['mode', 'key'],
-        'lyrics': ['value'],
-        'segment_open': ['value'],
-        'tag_open': ['value'],
-    },
 }
 
 __all__ = ['ANNOTATION_CLASS', 'COMPLEX_FIELDS_REGISTRY', 'CONFIDENCE_TYPE_REGISTRY', 'EXTENT_TYPE_REGISTRY', 'METADATA_TYPE_REGISTRY', 'PAYLOAD_TYPE_REGISTRY', 'STRING_FIELDS_REGISTRY']
