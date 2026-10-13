@@ -294,7 +294,7 @@ def test_save_bopp_csv_polars(tmp_path):
 
 
 def test_load_bopp_csv_without_frontmatter(tmp_path):
-    # Tests line 497-498: CSV file without '# ---' frontmatter
+    # Test handling of legacy or unfrontmattered CSV files
     csv_content = "payload:onset:value,extent:time:time\n1,0.1\n"
     file_path = tmp_path / "no_frontmatter.csv"
     file_path.write_text(csv_content, encoding="utf-8")
@@ -337,63 +337,61 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
 
 
 # ==========================================
-# Unit tests targeting previously missing coverage in bopp/io.py
+# Unit tests for type unwrapping, converters, and ID preparation
 # ==========================================
 
 
 def test_unwrap_type_pep695_and_multi_union():
-    # Test lines 63-72: TypeAliasType and multi-type unions
+    # Verify unwrapping of PEP 695 type aliases
     if sys.version_info >= (3, 12):
         namespace: dict[str, Any] = {}
         exec("type MyAlias = int", namespace)
         assert _unwrap_type(namespace["MyAlias"]) is int
 
-    # Multi-type union where unwrap stops immediately
+    # Multi-type union where unwrapping stops immediately without peeling
     multi_union = Union[int, str]
     assert _unwrap_type(multi_union) == multi_union
 
-    # Multi-type union with None (covers line 70 else: break, returns original union unchanged)
+    # Multi-type union with sentinel None leaves union untouched when non-sentinel types > 1
     multi_union_with_none = Union[int, str, None]
     assert _unwrap_type(multi_union_with_none) == multi_union_with_none
 
-    # Annotated wrapping an alias/union
+    # Annotated metadata wrapper correctly stripped
     annotated_type = Annotated[int, "metadata"]
     assert _unwrap_type(annotated_type) is int
 
 
 def test_is_complex_type_branches():
-    # Test lines 107-108, 114-118
-    # 1. Union containing a complex type
+    # Union containing at least one complex type evaluates as complex
     union_with_complex = Union[list[int], int]
     assert _is_complex_type(union_with_complex) is True
 
-    # 2. Custom class that is not primitive nor struct/collection
+    # Custom class that is not a primitive, struct, or standard container
     class DummyCustomClass:
         pass
 
     assert _is_complex_type(DummyCustomClass) is False
 
-    # 3. String forward reference containing complex identifiers
+    # String forward references containing container keywords
     assert _is_complex_type("Fraction") is True
     assert _is_complex_type("list[str]") is True
     assert _is_complex_type("int") is False
 
 
 def test_column_converters_edge_cases():
-    # Test lines 146->152, 148->152, 156, 169
     converter_complex = _get_column_converter(list[list[int]])
     assert converter_complex is not None
-    # None on non-string or whitespace
+    # Empty string or non-string inputs resolve safely to None
     assert converter_complex(None) is None  # type: ignore[arg-type]
     assert converter_complex("   ") is None
-    # Branches 146->152 and 148->152: evaluating valid container literals
+    # Valid container literal strings are evaluated via ast.literal_eval
     assert converter_complex("[1, 2, 3]") == [1, 2, 3]
     assert converter_complex("(4, 5)") == (4, 5)
     assert converter_complex('{"key": "val"}') == {"key": "val"}
-    # Literal not starting with [, (, { returns raw string
+    # Plain string literals not formatted as containers are left untouched
     assert converter_complex("unbracketed_val") == "unbracketed_val"
 
-    # String converter handling empty string
+    # String converter preserves empty strings and regular string data
     converter_str = _get_column_converter(list[str])
     assert converter_str is not None
     assert converter_str("") == ""
@@ -401,14 +399,13 @@ def test_column_converters_edge_cases():
 
 
 def test_build_csv_converters_error_and_edge_cases():
-    # Test lines 195, 202-203, 208->206, 211->206, 214->206, 217-218
-    # 1. Empty header line
+    # Empty header line returns empty converters map
     assert _build_csv_converters("", "1.0") == {}
 
-    # 2. Unknown bopp_version triggering BoppRegistryError
+    # Unknown schema version safely yields no converters
     assert _build_csv_converters("payload:onset:value", "nonexistent_version") == {}
 
-    # 3. Malformed column / non-facet column / unrecognized tag / missing field
+    # Columns that are malformed, outside recognized facets, or missing fields are ignored
     header = (
         "not_three_parts,"
         "unknown_facet:foo:bar,"
@@ -417,13 +414,12 @@ def test_build_csv_converters_error_and_edge_cases():
     )
     assert _build_csv_converters(header, "1.0") == {}
 
-    # 4. Mock type hint resolution error (NameError / TypeError)
+    # Gracefully ignore type hint resolution errors
     with patch("typing.get_type_hints", side_effect=NameError("Mock name error")):
         assert _build_csv_converters("payload:onset:value", "1.0") == {}
 
 
 def test_prepare_annotation_for_save_id_variations():
-    # Test lines 254, 257, 261
     ann = create(
         bopp_version="1.0",
         media_id="track:save_id_test",
@@ -435,16 +431,16 @@ def test_prepare_annotation_for_save_id_variations():
     )
     assert getattr(ann, "id", msgspec.UNSET) is msgspec.UNSET
 
-    # 1. generate_id=True, validate_id=True with missing ID (line 257 ensure_annotation_id)
+    # Generate missing ID when generate_id=True and validate_id=True
     _prepare_annotation_for_save(ann, validate_id=True, generate_id=True)
     expected_id = compute_annotation_id(ann)
     assert ann.id == expected_id
 
-    # 2. generate_id=True, validate_id=True with existing ID (line 259 validate_annotation_id)
+    # Validate existing ID without regenerating when generate_id=True and validate_id=True
     _prepare_annotation_for_save(ann, validate_id=True, generate_id=True)
     assert ann.id == expected_id
 
-    # 3. generate_id=True, validate_id=False -> sets ID unconditionally (line 254)
+    # Unconditionally set ID when generate_id=True and validate_id=False
     ann_no_id = create(
         bopp_version="1.0",
         media_id="track:save_id_test2",
@@ -457,6 +453,6 @@ def test_prepare_annotation_for_save_id_variations():
     _prepare_annotation_for_save(ann_no_id, validate_id=False, generate_id=True)
     assert ann_no_id.id == compute_annotation_id(ann_no_id)
 
-    # 4. generate_id=False, validate_id=True with valid existing ID (line 261)
+    # Strictly validate existing ID when generate_id=False and validate_id=True
     _prepare_annotation_for_save(ann, validate_id=True, generate_id=False)
     assert ann.id == expected_id
