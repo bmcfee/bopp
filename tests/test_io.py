@@ -1,6 +1,3 @@
-import sys
-from fractions import Fraction
-from typing import Annotated, Any, Union
 from unittest.mock import patch
 
 import msgspec
@@ -11,10 +8,9 @@ from bopp.core import compute_annotation_id, create
 from bopp.exceptions import BoppArgumentError, BoppRegistryError, BoppValidationError
 from bopp.io import (
     _build_csv_converters,
-    _get_column_converter,
-    _is_complex_type,
+    _parse_complex_cell,
+    _parse_str_cell,
     _prepare_annotation_for_save,
-    _unwrap_type,
     load_bopp_csv,
     load_bopp_json,
     load_bopp_msgpack,
@@ -336,68 +332,23 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
     assert loaded.media_id == "track:extra_col"
 
 
-# ==========================================
-# Unit tests for type unwrapping, converters, and ID preparation
-# ==========================================
+def test_parse_complex_and_str_cell():
+    # Empty or whitespace strings evaluate safely to None for complex fields
+    assert _parse_complex_cell(None) is None  # type: ignore[arg-type]
+    assert _parse_complex_cell("   ") is None
 
-
-def test_unwrap_type_pep695_and_multi_union():
-    # Verify unwrapping of PEP 695 type aliases
-    if sys.version_info >= (3, 12):
-        namespace: dict[str, Any] = {}
-        exec("type MyAlias = int", namespace)
-        assert _unwrap_type(namespace["MyAlias"]) is int
-
-    # Multi-type union where unwrapping stops immediately without peeling
-    multi_union = Union[int, str]
-    assert _unwrap_type(multi_union) == multi_union
-
-    # Multi-type union with sentinel None leaves union untouched when non-sentinel types > 1
-    multi_union_with_none = Union[int, str, None]
-    assert _unwrap_type(multi_union_with_none) == multi_union_with_none
-
-    # Annotated metadata wrapper correctly stripped
-    annotated_type = Annotated[int, "metadata"]
-    assert _unwrap_type(annotated_type) is int
-
-
-def test_is_complex_type_branches():
-    # Union containing at least one complex type evaluates as complex
-    union_with_complex = Union[list[int], int]
-    assert _is_complex_type(union_with_complex) is True
-
-    # Custom class that is not a primitive, struct, or standard container
-    class FakeCustomClass:
-        pass
-
-    assert _is_complex_type(FakeCustomClass) is False
-
-    # String forward references containing container keywords
-    assert _is_complex_type("Fraction") is True
-    assert _is_complex_type("list[str]") is True
-    assert _is_complex_type("int") is False
-    assert _is_complex_type("Any") is True
-
-
-def test_column_converters_edge_cases():
-    converter_complex = _get_column_converter(list[list[int]])
-    assert converter_complex is not None
-    # Empty string or non-string inputs resolve safely to None
-    assert converter_complex(None) is None  # type: ignore[arg-type]
-    assert converter_complex("   ") is None
     # Valid container literal strings are evaluated via ast.literal_eval
-    assert converter_complex("[1, 2, 3]") == [1, 2, 3]
-    assert converter_complex("(4, 5)") == (4, 5)
-    assert converter_complex('{"key": "val"}') == {"key": "val"}
-    # Plain string literals not formatted as containers are left untouched
-    assert converter_complex("unbracketed_val") == "unbracketed_val"
+    assert _parse_complex_cell("[1, 2, 3]") == [1, 2, 3]
+    assert _parse_complex_cell("(4, 5)") == (4, 5)
+    assert _parse_complex_cell('{"key": "val"}') == {"key": "val"}
 
-    # String converter preserves empty strings and regular string data
-    converter_str = _get_column_converter(list[str])
-    assert converter_str is not None
-    assert converter_str("") == ""
-    assert converter_str("abc") == "abc"
-    assert converter_str("1") == "1"
+    # Plain string literals not formatted as containers are left untouched
+    assert _parse_complex_cell("unbracketed_val") == "unbracketed_val"
+
+    # String converter preserves empty strings and regular string data without numeric conversion
+    assert _parse_str_cell("") == ""
+    assert _parse_str_cell("abc") == "abc"
+    assert _parse_str_cell("007") == "007"
 
 
 def test_build_csv_converters_error_and_edge_cases():
@@ -416,9 +367,10 @@ def test_build_csv_converters_error_and_edge_cases():
     )
     assert _build_csv_converters(header, "1.0") == {}
 
-    # Gracefully ignore type hint resolution errors
-    with patch("typing.get_type_hints", side_effect=NameError("Mock name error")):
-        assert _build_csv_converters("payload:onset:value", "1.0") == {}
+    # Valid complex and string columns map to respective parsers
+    converters = _build_csv_converters("extent:score_interval:quarter,payload:tag_open:value", "1.0")
+    assert converters["extent:score_interval:quarter"] is _parse_complex_cell
+    assert converters["payload:tag_open:value"] is _parse_str_cell
 
 
 def test_prepare_annotation_for_save_id_variations():

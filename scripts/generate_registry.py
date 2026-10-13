@@ -47,6 +47,27 @@ def _is_complex_type(tp: Any) -> bool:
     return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
 
 
+def _is_string_type(tp: Any) -> bool:
+    """Determine if a type hint represents a string type (including Annotated and TypeAliasType)."""
+    if isinstance(tp, typing.TypeAliasType):
+        return _is_string_type(tp.__value__)
+
+    if hasattr(tp, "__metadata__"):
+        args = get_args(tp)
+        if args:
+            return _is_string_type(args[0])
+
+    origin = get_origin(tp)
+    if origin in (typing.Union, getattr(type(int | str), "__origin__", None)):
+        args = [arg for arg in get_args(tp) if arg is not type(None)]
+        return any(_is_string_type(arg) for arg in args)
+
+    if isinstance(tp, type):
+        return issubclass(tp, str)
+
+    return False
+
+
 def _is_complex_field(type_hint: Any) -> bool:
     """Check if the inner element type of a list array field is complex."""
     if isinstance(type_hint, typing.TypeAliasType):
@@ -70,11 +91,30 @@ def _is_complex_field(type_hint: Any) -> bool:
     return _is_complex_type(type_hint)
 
 
+def _is_string_field(type_hint: Any) -> bool:
+    """Check if the inner element type of a list array field is a string."""
+    if isinstance(type_hint, typing.TypeAliasType):
+        return _is_string_field(type_hint.__value__)
+
+    if hasattr(type_hint, "__metadata__"):
+        args = get_args(type_hint)
+        if args:
+            return _is_string_field(args[0])
+
+    origin = get_origin(type_hint)
+
+    if origin in (list, getattr(importlib.import_module("typing"), "Sequence", list)):
+        args = get_args(type_hint)
+        if args:
+            inner_type = args[0]
+            return _is_string_type(inner_type)
+
+    return _is_string_type(type_hint)
+
+
 def _is_complex_ast_node(node: ast.AST) -> bool:
     """Fallback AST check for complex field types (Fraction, list, dict, tuple, object, Any)."""
-    # Look for list[core.Fraction], list[dict], list[list[...]], etc.
     if isinstance(node, ast.Subscript):
-        # Check outer list[...]
         if isinstance(node.slice, ast.Subscript):
             return True
         if isinstance(node.slice, ast.Attribute) and node.slice.attr in _FRACTION_TYPES:
@@ -84,7 +124,6 @@ def _is_complex_ast_node(node: ast.AST) -> bool:
         ):
             return True
 
-    # Check for Annotated[list[core.Fraction], ...]
     for child in ast.walk(node):
         if isinstance(child, ast.Attribute) and child.attr in _FRACTION_TYPES:
             return True
@@ -124,8 +163,10 @@ def _resolve_absolute_module(output_file: Path, base_module: str, sub_parts: lis
 def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> None:
     # Registries structure: { tag_field: { tag_value: class_name } }
     registries = defaultdict(dict)
-    # Complex fields structure: { (tag_field, tag_value): [field_names] }
+    # Complex fields structure: { tag_field: { tag_value: [field_names] } }
     complex_fields = defaultdict(dict)
+    # String fields structure: { tag_field: { tag_value: [field_names] } }
+    string_fields = defaultdict(dict)
     # Imports structure: { submodule_import_path: set(class_names) }
     imports_by_module = defaultdict(set)
     annotation_class_info = None
@@ -163,6 +204,8 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                     imports_by_module[rel_submodule].add(node.name)
 
                     complex_cols = []
+                    string_cols = []
+
                     # 1. Try runtime type hints with module namespace resolution
                     try:
                         mod = importlib.import_module(abs_submodule)
@@ -174,6 +217,8 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                                 continue
                             if _is_complex_field(hint):
                                 complex_cols.append(field_name)
+                            elif _is_string_field(hint):
+                                string_cols.append(field_name)
                     except Exception as err:
                         sys.stderr.write(
                             f"Warning: Failed to inspect annotations for {node.name} in {abs_submodule}: {err}\n"
@@ -191,6 +236,8 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
 
                     if complex_cols:
                         complex_fields[tag_field][tag_value] = complex_cols
+                    if string_cols:
+                        string_fields[tag_field][tag_value] = string_cols
 
                 elif node.name == "Annotation":
                     annotation_class_info = node.name
@@ -227,6 +274,16 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
         for tag_field in sorted(complex_fields.keys()):
             f.write(f"    {repr(tag_field)}: {{\n")
             for tag, fields in sorted(complex_fields[tag_field].items()):
+                f.write(f"        {repr(tag)}: {fields!r},\n")
+            f.write("    },\n")
+        f.write("}\n\n")
+
+        # Emit STRING_FIELDS_REGISTRY with type annotation
+        all_exports.append("STRING_FIELDS_REGISTRY")
+        f.write("STRING_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {\n")
+        for tag_field in sorted(string_fields.keys()):
+            f.write(f"    {repr(tag_field)}: {{\n")
+            for tag, fields in sorted(string_fields[tag_field].items()):
                 f.write(f"        {repr(tag)}: {fields!r},\n")
             f.write("    },\n")
         f.write("}\n\n")

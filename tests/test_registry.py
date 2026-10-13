@@ -1,4 +1,4 @@
-"""Regression tests for complex column detection and fraction CSV loading."""
+"""Regression tests for complex column detection, string column detection, and fraction CSV loading."""
 
 import ast
 import importlib.util
@@ -12,7 +12,8 @@ from msgspec import Meta
 import bopp
 from bopp.io import load_bopp_csv, save_bopp_csv
 from bopp.models.v1.extent.score_interval import ScoreInterval
-from bopp.registries.v1 import COMPLEX_FIELDS_REGISTRY
+from bopp.models.v1.payload.tag_open import TagOpenPayload
+from bopp.registries.v1 import COMPLEX_FIELDS_REGISTRY, STRING_FIELDS_REGISTRY
 
 _spec = importlib.util.spec_from_file_location(
     "generate_registry",
@@ -43,6 +44,14 @@ def test_alias_element_types():
     assert not generate_registry._is_complex_field(list[S])
 
 
+def test_string_field_detection():
+    """String aliases and lists of strings are recognized as string fields."""
+    assert generate_registry._is_string_field(list[str])
+    assert generate_registry._is_string_field(list[S])
+    assert not generate_registry._is_string_field(list[int])
+    assert not generate_registry._is_string_field(list[A])
+
+
 def test_nested_aliases():
     """Repeated alias and Annotated wrappers preserve column element detection."""
     container = typing.TypeAliasType("Container", Annotated[A, Meta()])
@@ -52,6 +61,7 @@ def test_nested_aliases():
 
     assert generate_registry._is_complex_field(column)
     assert not generate_registry._is_complex_field(scalar_column)
+    assert generate_registry._is_string_field(scalar_column)
 
 
 @pytest.mark.parametrize("name", ["Fraction", "FractionNonnegative"])
@@ -85,6 +95,12 @@ def test_score_interval_registry():
 
     assert "quarter" in fields
     assert "duration" in fields
+
+
+def test_string_fields_registry():
+    """The generated registry includes string fields like tag_open value."""
+    fields = STRING_FIELDS_REGISTRY["payload_type"]["tag_open"]
+    assert "value" in fields
 
 
 def test_score_interval_csv_roundtrip(tmp_path):

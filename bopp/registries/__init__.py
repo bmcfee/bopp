@@ -20,6 +20,7 @@ def get_registry(version: str) -> dict[str, Any]:
         - "EXTENT_TYPE_REGISTRY": dict mapping extent tags to extent Struct types.
         - "CONFIDENCE_TYPE_REGISTRY": dict mapping confidence tags to confidence Struct types.
         - "COMPLEX_FIELDS_REGISTRY": dict mapping facet types to fields containing complex structures.
+        - "STRING_FIELDS_REGISTRY": dict mapping facet types to fields containing string values.
         - "Annotation": the root Annotation Struct class for the version.
 
     Raises
@@ -44,6 +45,7 @@ def get_registry(version: str) -> dict[str, Any]:
             "EXTENT_TYPE_REGISTRY": v1.EXTENT_TYPE_REGISTRY,
             "CONFIDENCE_TYPE_REGISTRY": v1.CONFIDENCE_TYPE_REGISTRY,
             "COMPLEX_FIELDS_REGISTRY": getattr(v1, "COMPLEX_FIELDS_REGISTRY", {}),
+            "STRING_FIELDS_REGISTRY": getattr(v1, "STRING_FIELDS_REGISTRY", {}),
             "Annotation": v1.ANNOTATION_CLASS,
         }
 

@@ -3,12 +3,9 @@ from __future__ import annotations
 import ast
 import csv
 import tomllib
-import types
-import typing
 from collections.abc import Callable
-from fractions import Fraction
 from pathlib import Path
-from typing import Any, get_args, get_origin
+from typing import Any
 
 import msgspec
 
@@ -30,152 +27,57 @@ class _VersionHeader(msgspec.Struct):
     bopp_version: str = get_current_schema_version()
 
 
-def _unwrap_type(tp: Any) -> Any:
+def _parse_complex_cell(val: str) -> Any:
     """
-    Recursively unwrap type wrappers and optional unions to reach the core type.
+    Safely evaluate container literals from a CSV cell.
 
-    Peeled wrappers include :class:`typing.TypeAliasType`, :class:`typing.Annotated`,
-    and :class:`typing.Union` / :class:`types.UnionType` instances containing
-    single concrete targets alongside sentinel types (such as ``NoneType`` or
-    :data:`msgspec.UnsetType`).
+    Preserves None for empty/whitespace cells. If the string represents a literal
+    container (list, tuple, dict), evaluates it via :func:`ast.literal_eval`.
 
     Parameters
     ----------
-    tp : Any
-        Type annotation or hint to unwrap.
+    val : str
+        The raw string read from a CSV cell.
 
     Returns
     -------
     Any
-        The core underlying concrete type or multi-type union if no single type
-        could be isolated.
+        The evaluated container or the original string.
     """
-    while True:
-        # Unwrap PEP 695 type aliases (e.g., type X = ...)
-        if isinstance(tp, typing.TypeAliasType):
-            tp = tp.__value__
-        # Unwrap Annotated[T, ...] metadata wrappers
-        elif hasattr(tp, "__metadata__"):
-            args = get_args(tp)
-            tp = args[0] if args else tp
-        # Unwrap optional / unset unions (e.g., T | None, T | UnsetType)
-        elif get_origin(tp) in (typing.Union, types.UnionType):
-            non_empty_args = [
-                arg
-                for arg in get_args(tp)
-                if arg not in (type(None), msgspec.UnsetType)
-            ]
-            # Only unwrap if exactly one non-sentinel type exists
-            if len(non_empty_args) == 1:
-                tp = non_empty_args[0]
-            else:
-                break
-        else:
-            break
-    return tp
+    if not isinstance(val, str) or not val.strip():
+        return None
+    val_stripped = val.strip()
+    if val_stripped.startswith(("[", "(", "{")):
+        return ast.literal_eval(val_stripped)
+    return val
 
 
-def _is_complex_type(tp: Any) -> bool:
+def _parse_str_cell(val: str) -> Any:
     """
-    Determine if a type hint represents a complex container or structured object.
-
-    Used by CSV deserialization to decide whether string values should undergo
-    safe literal evaluation via :func:`ast.literal_eval` rather than standard
-    primitive casting.
+    Preserve explicit string CSV values without numeric conversion.
 
     Parameters
     ----------
-    tp : Any
-        Type annotation or Python type object to inspect.
+    val : str
+        The raw string read from a CSV cell.
 
     Returns
     -------
-    bool
-        True if values of this type are containers or complex structures
-        (e.g., lists, dicts, tuples, sets, Fractions, Structs), False if primitive.
+    str
+        The preserved string value.
     """
-    if tp is Any:
-        return True
-
-    origin = get_origin(tp)
-    # Check standard container origins
-    if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
-        return True
-
-    # Check union types: if any variant argument is complex, treat the whole type as complex
-    if origin in (typing.Union, types.UnionType):
-        args = [arg for arg in get_args(tp) if arg is not type(None)]
-        return any(_is_complex_type(_unwrap_type(arg)) for arg in args)
-
-    # Check concrete classes
-    if isinstance(tp, type):
-        if issubclass(tp, (int, float, str, bool, bytes)):
-            return False
-        return issubclass(tp, (Fraction, msgspec.Struct, dict, list, tuple, set))
-
-    # Fallback inspection for stringified annotations (e.g. forward references)
-    tp_str = str(tp)
-    return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
-
-
-def _get_column_converter(type_hint: Any) -> Callable[[str], Any] | None:
-    """
-    Infer a pandas cell converter callable based on a struct field type hint.
-
-    When reading CSV data back into memory, pandas can misinterpret structured
-    representations (like serialized Python tuples or lists) as simple strings,
-    or coerce string values (such as `"01"`) into numbers. This helper constructs
-    type-specific converters to ensure correct deserialization.
-
-    Parameters
-    ----------
-    type_hint : Any
-        Type hint of the target struct field to inspect.
-
-    Returns
-    -------
-    Callable[[str], Any] or None
-        A converter callable suitable for ``pandas.read_csv(converters=...)``,
-        or None if standard pandas inference should be used.
-    """
-    unwrapped = _unwrap_type(type_hint)
-    origin = get_origin(unwrapped)
-
-    inner_type = unwrapped
-    # Extract element type if field is a sequence (e.g. list[tuple[int, int]])
-    if origin in (list, typing.Sequence):
-        args = get_args(unwrapped)
-        if args:
-            inner_type = _unwrap_type(args[0])
-
-    # If the inner element is complex (e.g. fraction tuple, list, dict), parse via ast.literal_eval
-    if _is_complex_type(inner_type):
-        def parse_complex(val: str) -> Any:
-            """Safely evaluate container literals, preserving None for empty cells."""
-            if not isinstance(val, str) or not val.strip():
-                return None
-            val_stripped = val.strip()
-            # Only evaluate literal containers, avoid syntax errors on plain text
-            if val_stripped.startswith(("[", "(", "{")):
-                return ast.literal_eval(val_stripped)
-            return val
-        return parse_complex
-
-    # If the inner element is explicitly a string, ensure pandas does not cast numeric-like strings to numbers
-    if isinstance(inner_type, type) and issubclass(inner_type, str):
-        def parse_str(val: str) -> Any:
-            """Preserve string representations, preventing numeric conversion."""
-            if val == "":
-                return ""
-            return str(val)
-        return parse_str
-
-    return None
+    if val == "":
+        return ""
+    return str(val)
 
 
 def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Callable[[str], Any]]:
     """
     Inspect the CSV header row and construct column converters using the schema registry.
+
+    Uses `COMPLEX_FIELDS_REGISTRY` to attach container parsers (e.g. for fractions,
+    nested lists, dicts) and `STRING_FIELDS_REGISTRY` to preserve explicit string values
+    without accidental numeric type inference.
 
     Parameters
     ----------
@@ -199,28 +101,22 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
 
     try:
         registry = get_registry(bopp_version)
-    except BoppRegistryError:
+    except (BoppRegistryError, ValueError):
         return converters
 
-    # Match each column against struct fields in the registry to derive converters
+    complex_registry: dict[str, dict[str, list[str]]] = registry.get("COMPLEX_FIELDS_REGISTRY", {})
+    string_registry: dict[str, dict[str, list[str]]] = registry.get("STRING_FIELDS_REGISTRY", {})
+
     for col in columns:
         parts = col.split(":")
         if len(parts) == 3:
             facet, tag, field = parts[0], parts[1], parts[2]
-            registry_key = FACET_REGISTRY_KEYS.get(facet)
-            if registry_key is not None:
-                type_registry = registry.get(registry_key, {})
-                struct_cls = type_registry.get(tag)
-                if struct_cls is not None:
-                    try:
-                        hints = typing.get_type_hints(struct_cls, include_extras=True)
-                    except (NameError, TypeError):
-                        hints = {}
-
-                    if field in hints:
-                        converter = _get_column_converter(hints[field])
-                        if converter is not None:
-                            converters[col] = converter
+            if facet in FACET_REGISTRY_KEYS:
+                tag_field = f"{facet}_type"
+                if field in complex_registry.get(tag_field, {}).get(tag, []):
+                    converters[col] = _parse_complex_cell
+                elif field in string_registry.get(tag_field, {}).get(tag, []):
+                    converters[col] = _parse_str_cell
     return converters
 
 
