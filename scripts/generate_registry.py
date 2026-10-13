@@ -3,6 +3,7 @@ import argparse
 import ast
 import importlib
 import sys
+import types
 import typing
 from collections import defaultdict
 from pathlib import Path
@@ -11,54 +12,59 @@ from typing import Any, get_args, get_origin
 _FRACTION_TYPES = ("Fraction", "FractionNonnegative")
 
 
+def _unwrap_type(tp: Any) -> Any:
+    """Recursively peel TypeAliasType, Annotated, and single-type Optional unions."""
+    while True:
+        if isinstance(tp, typing.TypeAliasType):
+            tp = tp.__value__
+        elif hasattr(tp, "__metadata__"):
+            args = get_args(tp)
+            tp = args[0] if args else tp
+        elif get_origin(tp) in (typing.Union, types.UnionType):
+            non_empty_args = [
+                arg
+                for arg in get_args(tp)
+                if arg not in (type(None), getattr(importlib.import_module("msgspec"), "UnsetType", type(None)))
+            ]
+            if len(non_empty_args) == 1:
+                tp = non_empty_args[0]
+            else:
+                break
+        else:
+            break
+    return tp
+
+
 def _is_complex_type(tp: Any) -> bool:
     """Determine if a type hint represents a complex structure (list, dict, tuple, Fraction, Any, etc.)."""
+    tp = _unwrap_type(tp)
     if tp is Any:
         return True
 
-    if isinstance(tp, typing.TypeAliasType):
-        return _is_complex_type(tp.__value__)
-
-    # 1. Unwrap Annotated[T, ...] first to inspect the underlying type T
-    if hasattr(tp, "__metadata__"):
-        args = get_args(tp)
-        if args:
-            return _is_complex_type(args[0])
-
     origin = get_origin(tp)
 
-    # 2. Check if the unwrapped origin/type is a container (list, dict, tuple, set)
     if origin in (list, dict, tuple, set, getattr(__builtins__, "frozenset", set)):
         return True
 
-    # 3. Handle Union / Optional
-    if origin is getattr(type(int | str), "__origin__", None) or origin is Any:
-        args = get_args(tp)
-        return any(_is_complex_type(arg) for arg in args if arg is not type(None))
+    if origin in (typing.Union, types.UnionType):
+        args = [arg for arg in get_args(tp) if arg is not type(None)]
+        return any(_is_complex_type(arg) for arg in args)
 
-    # 4. Check primitive scalar classes vs complex classes
     if isinstance(tp, type):
         if issubclass(tp, (int, float, str, bool, bytes)):
             return False
         return True
 
-    # 5. Check string representations for forward refs or type aliases like Fraction / dict
     tp_str = str(tp)
     return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
 
 
 def _is_string_type(tp: Any) -> bool:
     """Determine if a type hint represents a string type (including Annotated and TypeAliasType)."""
-    if isinstance(tp, typing.TypeAliasType):
-        return _is_string_type(tp.__value__)
-
-    if hasattr(tp, "__metadata__"):
-        args = get_args(tp)
-        if args:
-            return _is_string_type(args[0])
+    tp = _unwrap_type(tp)
 
     origin = get_origin(tp)
-    if origin in (typing.Union, getattr(type(int | str), "__origin__", None)):
+    if origin in (typing.Union, types.UnionType):
         args = [arg for arg in get_args(tp) if arg is not type(None)]
         return any(_is_string_type(arg) for arg in args)
 
@@ -70,18 +76,9 @@ def _is_string_type(tp: Any) -> bool:
 
 def _is_complex_field(type_hint: Any) -> bool:
     """Check if the inner element type of a list array field is complex."""
-    if isinstance(type_hint, typing.TypeAliasType):
-        return _is_complex_field(type_hint.__value__)
-
-    # Unwrap top-level Annotated if present
-    if hasattr(type_hint, "__metadata__"):
-        args = get_args(type_hint)
-        if args:
-            return _is_complex_field(args[0])
-
+    type_hint = _unwrap_type(type_hint)
     origin = get_origin(type_hint)
 
-    # Outer layer is typically list[...] for BOPP columnar arrays
     if origin in (list, getattr(importlib.import_module("typing"), "Sequence", list)):
         args = get_args(type_hint)
         if args:
@@ -93,14 +90,7 @@ def _is_complex_field(type_hint: Any) -> bool:
 
 def _is_string_field(type_hint: Any) -> bool:
     """Check if the inner element type of a list array field is a string."""
-    if isinstance(type_hint, typing.TypeAliasType):
-        return _is_string_field(type_hint.__value__)
-
-    if hasattr(type_hint, "__metadata__"):
-        args = get_args(type_hint)
-        if args:
-            return _is_string_field(args[0])
-
+    type_hint = _unwrap_type(type_hint)
     origin = get_origin(type_hint)
 
     if origin in (list, getattr(importlib.import_module("typing"), "Sequence", list)):
@@ -140,16 +130,13 @@ def _resolve_absolute_module(output_file: Path, base_module: str, sub_parts: lis
     if not base_module.startswith("."):
         return f"{base_module}.{'.'.join(sub_parts)}" if sub_parts else base_module
 
-    # Count leading dots
     clean_base = base_module.lstrip(".")
     dots_count = len(base_module) - len(clean_base)
 
-    # Find project root / package parent relative to output_file
     output_abs = output_file.resolve().parent
     for _ in range(dots_count - 1):
         output_abs = output_abs.parent
 
-    # Determine absolute import path from CWD
     rel_from_cwd = output_abs.relative_to(Path.cwd())
     pkg_parts = list(rel_from_cwd.parts)
 
@@ -161,25 +148,18 @@ def _resolve_absolute_module(output_file: Path, base_module: str, sub_parts: lis
 
 
 def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> None:
-    # Registries structure: { tag_field: { tag_value: class_name } }
     registries = defaultdict(dict)
-    # Complex fields structure: { tag_field: { tag_value: [field_names] } }
     complex_fields = defaultdict(dict)
-    # String fields structure: { tag_field: { tag_value: [field_names] } }
     string_fields = defaultdict(dict)
-    # Imports structure: { submodule_import_path: set(class_names) }
     imports_by_module = defaultdict(set)
     annotation_class_info = None
 
     input_dir = input_dir.resolve()
 
-    # Walk all .py files recursively in the generated schema tree
     for py_file in sorted(input_dir.rglob("*.py")):
-        # Skip top-level package init files or the target registry file itself
         if py_file.resolve() == output_file.resolve() or py_file.name == "__init__.py":
             continue
 
-        # Determine the relative module import path
         rel_path = py_file.relative_to(input_dir).with_suffix("")
         sub_parts = [p for p in rel_path.parts if p != "."]
 
@@ -206,7 +186,6 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                     complex_cols = []
                     string_cols = []
 
-                    # 1. Try runtime type hints with module namespace resolution
                     try:
                         mod = importlib.import_module(abs_submodule)
                         cls = getattr(mod, node.name)
@@ -224,7 +203,6 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                             f"Warning: Failed to inspect annotations for {node.name} in {abs_submodule}: {err}\n"
                         )
 
-                    # 2. Fallback to AST inspection if runtime inspection was empty or failed
                     if not complex_cols:
                         for stmt in node.body:
                             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
@@ -246,7 +224,6 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
     with output_file.open("w", encoding="utf-8") as f:
         f.write("# AUTO-GENERATED: Do not edit manually.\n\n")
 
-        # Emit explicit submodule imports
         for mod_path in sorted(imports_by_module.keys()):
             classes = ", ".join(sorted(imports_by_module[mod_path]))
             f.write(f"from {mod_path} import {classes}\n")
@@ -258,7 +235,6 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
             f.write(f"ANNOTATION_CLASS = {annotation_class_info}\n\n")
             all_exports.append("ANNOTATION_CLASS")
 
-        # Emit dictionary registries per tag_field
         for tag_field in sorted(registries.keys()):
             tags = registries[tag_field]
             dict_name = f"{tag_field.upper()}_REGISTRY"
@@ -268,7 +244,6 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                 f.write(f"    {repr(tag)}: {tags[tag]},\n")
             f.write("}\n\n")
 
-        # Emit COMPLEX_FIELDS_REGISTRY with type annotation
         all_exports.append("COMPLEX_FIELDS_REGISTRY")
         f.write("COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {\n")
         for tag_field in sorted(complex_fields.keys()):
@@ -278,7 +253,6 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
             f.write("    },\n")
         f.write("}\n\n")
 
-        # Emit STRING_FIELDS_REGISTRY with type annotation
         all_exports.append("STRING_FIELDS_REGISTRY")
         f.write("STRING_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {\n")
         for tag_field in sorted(string_fields.keys()):
