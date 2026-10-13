@@ -348,9 +348,13 @@ def test_unwrap_type_pep695_and_multi_union():
         exec("type MyAlias = int", namespace)
         assert _unwrap_type(namespace["MyAlias"]) is int
 
-    # Multi-type union where unwrap stops
+    # Multi-type union where unwrap stops immediately
     multi_union = Union[int, str]
     assert _unwrap_type(multi_union) == multi_union
+
+    # Multi-type union with None (covers line 70 else: break)
+    multi_union_with_none = Union[int, str, None]
+    assert _unwrap_type(multi_union_with_none) == Union[int, str]
 
     # Annotated wrapping an alias/union
     annotated_type = Annotated[int, "metadata"]
@@ -382,6 +386,10 @@ def test_column_converters_edge_cases():
     # None on non-string or whitespace
     assert converter_complex(None) is None  # type: ignore[arg-type]
     assert converter_complex("   ") is None
+    # Branches 146->152 and 148->152: evaluating valid container literals
+    assert converter_complex("[1, 2, 3]") == [1, 2, 3]
+    assert converter_complex("(4, 5)") == (4, 5)
+    assert converter_complex('{"key": "val"}') == {"key": "val"}
     # Literal not starting with [, (, { returns raw string
     assert converter_complex("unbracketed_val") == "unbracketed_val"
 
@@ -427,15 +435,28 @@ def test_prepare_annotation_for_save_id_variations():
     )
     assert getattr(ann, "id", msgspec.UNSET) is msgspec.UNSET
 
-    # 1. generate_id=True, validate_id=False -> sets ID unconditionally (line 254)
-    _prepare_annotation_for_save(ann, validate_id=False, generate_id=True)
+    # 1. generate_id=True, validate_id=True with missing ID (line 257 ensure_annotation_id)
+    _prepare_annotation_for_save(ann, validate_id=True, generate_id=True)
     expected_id = compute_annotation_id(ann)
     assert ann.id == expected_id
 
-    # 2. generate_id=True, validate_id=True with existing ID (line 257)
+    # 2. generate_id=True, validate_id=True with existing ID (line 259 validate_annotation_id)
     _prepare_annotation_for_save(ann, validate_id=True, generate_id=True)
     assert ann.id == expected_id
 
-    # 3. generate_id=False, validate_id=True with valid existing ID (line 261)
+    # 3. generate_id=True, validate_id=False -> sets ID unconditionally (line 254)
+    ann_no_id = create(
+        bopp_version="1.0",
+        media_id="track:save_id_test2",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.2],
+        value=[2],
+        generate_id=False,
+    )
+    _prepare_annotation_for_save(ann_no_id, validate_id=False, generate_id=True)
+    assert ann_no_id.id == compute_annotation_id(ann_no_id)
+
+    # 4. generate_id=False, validate_id=True with valid existing ID (line 261)
     _prepare_annotation_for_save(ann, validate_id=True, generate_id=False)
     assert ann.id == expected_id
