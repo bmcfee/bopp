@@ -367,15 +367,16 @@ def test_is_complex_type_branches():
     assert _is_complex_type(union_with_complex) is True
 
     # Custom class that is not a primitive, struct, or standard container
-    class DummyCustomClass:
+    class FakeCustomClass:
         pass
 
-    assert _is_complex_type(DummyCustomClass) is False
+    assert _is_complex_type(FakeCustomClass) is False
 
     # String forward references containing container keywords
     assert _is_complex_type("Fraction") is True
     assert _is_complex_type("list[str]") is True
     assert _is_complex_type("int") is False
+    assert _is_complex_type("Any") is True
 
 
 def test_column_converters_edge_cases():
@@ -396,6 +397,7 @@ def test_column_converters_edge_cases():
     assert converter_str is not None
     assert converter_str("") == ""
     assert converter_str("abc") == "abc"
+    assert converter_str("1") == "1"
 
 
 def test_build_csv_converters_error_and_edge_cases():
