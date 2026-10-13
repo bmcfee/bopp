@@ -67,7 +67,7 @@ def test_extract_header_with_scalar_facet_attributes():
         time: list[float]
         time_unit: str = "seconds"
 
-    # Annotation with facet as a non-struct to cover line 96->89
+    # Annotation with facet as a non-struct object to ensure non-struct facets are ignored
     class NonStructExtentAnnotation(msgspec.Struct):
         media_id: str
         extent: Any = "not_a_struct"
@@ -203,7 +203,7 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
 
 
 def test_to_dataframe_covers_extent_and_confidence_branches():
-    """Explicitly verify execution of lines 227 and 230 in to_dataframe."""
+    """Verify that to_dataframe extracts parallel arrays and attributes when both extent and confidence exist."""
     ann = create(
         bopp_version="1.0",
         media_id="track:facets_coverage",
@@ -214,7 +214,6 @@ def test_to_dataframe_covers_extent_and_confidence_branches():
         value=[1, 1],
         confidence=[0.85, 0.95],
     )
-    # Covers line 227 (_extract_facet_data for extent) and line 230 (_extract_facet_data for confidence)
     df = to_dataframe(ann, backend="pandas")
     assert "extent:time:time" in df.columns
     assert "confidence:likelihood:confidence" in df.columns
@@ -433,11 +432,11 @@ def test_invalid_backend():
 
 
 def test_from_dataframe_unsupported_type():
-    # Covers branches 288->290, 290->293, and line 295
+    # Verify rejection when passed a non-DataFrame object
     with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
         from_dataframe({"not": "a_dataframe"})
 
-    # Also test when polars import raises ImportError in from_dataframe (lines 292-293)
+    # Verify fallback handling when polars is not installed and input is not a pandas DataFrame
     with patch.dict("sys.modules", {"polars": None}):
         with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
             from_dataframe({"not": "a_dataframe"})
