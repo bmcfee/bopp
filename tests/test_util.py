@@ -202,6 +202,24 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
     assert "metadata" not in df.attrs
 
 
+def test_to_dataframe_covers_extent_and_confidence_branches():
+    """Explicitly verify execution of lines 227 and 230 in to_dataframe."""
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:facets_coverage",
+        payload_kind="onset",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[0.1, 0.2],
+        value=[1, 1],
+        confidence=[0.85, 0.95],
+    )
+    # Covers line 227 (_extract_facet_data for extent) and line 230 (_extract_facet_data for confidence)
+    df = to_dataframe(ann, backend="pandas")
+    assert "extent:time:time" in df.columns
+    assert "confidence:likelihood:confidence" in df.columns
+
+
 def test_pandas_dataframe_roundtrip():
     ann = create(
         bopp_version="1.0",
@@ -415,5 +433,11 @@ def test_invalid_backend():
 
 
 def test_from_dataframe_unsupported_type():
+    # Covers branches 288->290, 290->293, and line 295
     with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
         from_dataframe({"not": "a_dataframe"})
+
+    # Also test when polars import raises ImportError in from_dataframe (lines 292-293)
+    with patch.dict("sys.modules", {"polars": None}):
+        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
+            from_dataframe({"not": "a_dataframe"})
