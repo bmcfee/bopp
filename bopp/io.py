@@ -52,25 +52,6 @@ def _parse_complex_cell(val: str) -> Any:
     return val
 
 
-def _parse_str_cell(val: str) -> Any:
-    """
-    Preserve explicit string CSV values without numeric conversion.
-
-    Parameters
-    ----------
-    val : str
-        The raw string read from a CSV cell.
-
-    Returns
-    -------
-    str
-        The preserved string value.
-    """
-    if val == "":
-        return ""
-    return str(val)
-
-
 def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Callable[[str], Any]]:
     """
     Inspect the CSV header row and construct column converters using the schema registry.
@@ -116,7 +97,7 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
                 if field in complex_registry.get(tag_field, {}).get(tag, []):
                     converters[col] = _parse_complex_cell
                 elif field in string_registry.get(tag_field, {}).get(tag, []):
-                    converters[col] = _parse_str_cell
+                    converters[col] = str
     return converters
 
 
