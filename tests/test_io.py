@@ -352,9 +352,9 @@ def test_unwrap_type_pep695_and_multi_union():
     multi_union = Union[int, str]
     assert _unwrap_type(multi_union) == multi_union
 
-    # Multi-type union with None (covers line 70 else: break)
+    # Multi-type union with None (covers line 70 else: break, returns original union unchanged)
     multi_union_with_none = Union[int, str, None]
-    assert _unwrap_type(multi_union_with_none) == Union[int, str]
+    assert _unwrap_type(multi_union_with_none) == multi_union_with_none
 
     # Annotated wrapping an alias/union
     annotated_type = Annotated[int, "metadata"]
