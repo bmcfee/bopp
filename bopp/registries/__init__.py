@@ -2,6 +2,12 @@ from typing import Any
 
 from .._version import get_registry_version
 
+FACET_REGISTRY_KEYS = {
+    "extent": "EXTENT_TYPE_REGISTRY",
+    "payload": "PAYLOAD_TYPE_REGISTRY",
+    "confidence": "CONFIDENCE_TYPE_REGISTRY",
+}
+
 
 def get_registry(version: str) -> dict[str, Any]:
     """
