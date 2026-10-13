@@ -110,18 +110,33 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
 def _validate_dataframe_columns(
     columns: list[str], registry_or_version: dict[str, Any] | str
 ) -> dict[str, list[tuple[str, str, str]]]:
-    """Validate DataFrame column headers and return columns grouped by facet.
+    """
+    Validate DataFrame column headers against the schema and group them by facet.
+
+    Enforces the following validation rules:
+    1. Every column must follow the format ``"facet:type:field"`` with exactly
+       three colon-separated components.
+    2. All columns belonging to the same facet must share a single type discriminator tag.
+    3. The facet name and type tag must exist in the schema registry.
+    4. The field name must exist on the type's msgspec Struct definition.
+
+    Parameters
+    ----------
+    columns : list of str
+        DataFrame column names to validate.
+    registry_or_version : dict of str to Any or str
+        Schema registry dictionary or schema version string (e.g. ``"1.0"``).
 
     Returns
     -------
-    dict[str, list[tuple[str, str, str]]]
-        Mapping from facet name to list of (type_tag, field_name, full_col_name).
+    dict of str to list of tuple of (str, str, str)
+        Mapping from facet name (`"extent"`, `"payload"`, `"confidence"`) to
+        lists of ``(type_tag, field_name, full_col_name)`` tuples.
 
-    Rules:
-    1) Every column must have exactly three fields separated by : (facet:type:field).
-    2) All columns belonging to the same facet must have a single type.
-    3) The facet and type must exist in the registry for the given version.
-    4) The field must exist for the type struct.
+    Raises
+    ------
+    BoppValidationError
+        If any of the four structural or schema validation rules are violated.
     """
     if isinstance(registry_or_version, str):
         registry = get_registry(registry_or_version)
@@ -180,7 +195,25 @@ def _extract_facet_data(
     target_dict: dict[str, Any],
     attrs_dict: dict[str, Any],
 ) -> None:
-    """Extract array fields from a facet struct into target_dict, and non-array scalar fields into attrs_dict."""
+    """
+    Extract parallel array fields and scalar attributes from a facet struct.
+
+    Parallel list fields are formatted into column keys (``"facet:tag:field"``)
+    and stored in `target_dict` for DataFrame construction. Scalar attributes
+    are converted to built-in Python types and stored in `attrs_dict` for DataFrame
+    attribute and TOML frontmatter serialization.
+
+    Parameters
+    ----------
+    struct : msgspec.Struct or None
+        The facet struct instance (e.g. payload, extent, confidence) to inspect.
+    facet_name : str
+        Facet identifier (e.g., ``"payload"``, ``"extent"``, or ``"confidence"``).
+    target_dict : dict of str to Any
+        Dictionary accumulating columnar lists under ``"facet:tag:field"`` keys.
+    attrs_dict : dict of str to Any
+        Dictionary accumulating scalar singleton attributes for the facet.
+    """
     if struct is None or struct is msgspec.UNSET:
         return
 
