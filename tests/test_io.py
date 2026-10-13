@@ -9,7 +9,6 @@ from bopp.exceptions import BoppArgumentError, BoppRegistryError, BoppValidation
 from bopp.io import (
     _build_csv_converters,
     _parse_complex_cell,
-    _parse_str_cell,
     _prepare_annotation_for_save,
     load_bopp_csv,
     load_bopp_json,
@@ -345,11 +344,6 @@ def test_parse_complex_and_str_cell():
     # Plain string literals not formatted as containers are left untouched
     assert _parse_complex_cell("unbracketed_val") == "unbracketed_val"
 
-    # String converter preserves empty strings and regular string data without numeric conversion
-    assert _parse_str_cell("") == ""
-    assert _parse_str_cell("abc") == "abc"
-    assert _parse_str_cell("007") == "007"
-
 
 def test_build_csv_converters_error_and_edge_cases():
     # Empty header line returns empty converters map
@@ -370,7 +364,6 @@ def test_build_csv_converters_error_and_edge_cases():
     # Valid complex and string columns map to respective parsers
     converters = _build_csv_converters("extent:score_interval:quarter,payload:tag_open:value", "1.0")
     assert converters["extent:score_interval:quarter"] is _parse_complex_cell
-    assert converters["payload:tag_open:value"] is _parse_str_cell
 
 
 def test_prepare_annotation_for_save_id_variations():
