@@ -17,8 +17,8 @@ from .core import (
     validate_annotation_id,
 )
 from .exceptions import BoppArgumentError, BoppRegistryError
-from .registries import get_registry
-from .util import FACET_REGISTRY_KEYS, from_dataframe, to_dataframe
+from .registries import FACET_REGISTRY_KEYS, get_registry
+from .util import from_dataframe, to_dataframe
 
 
 class _VersionHeader(msgspec.Struct):

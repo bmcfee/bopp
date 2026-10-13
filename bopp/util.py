@@ -7,7 +7,7 @@ import msgspec
 from ._version import get_current_schema_version
 from .base import BoppBase
 from .exceptions import BoppArgumentError, BoppIOError, BoppValidationError
-from .registries import get_registry
+from .registries import FACET_REGISTRY_KEYS, get_registry
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -16,12 +16,6 @@ if TYPE_CHECKING:
 # ==========================================
 # 1. Struct <-> DataFrame Translators
 # ==========================================
-
-FACET_REGISTRY_KEYS = {
-    "extent": "EXTENT_TYPE_REGISTRY",
-    "payload": "PAYLOAD_TYPE_REGISTRY",
-    "confidence": "CONFIDENCE_TYPE_REGISTRY",
-}
 
 
 def _get_tag(struct: msgspec.Struct) -> str | None:
