@@ -44,3 +44,13 @@ intersphinx_mapping = {
 
 html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
+html_logo = "img/bopp_logo.svg"
+
+html_theme_options = {
+    "logo": {
+        "alt_text": "bopp",
+        "image": html_logo
+    },
+    "show_version_warning_banner": True,
+    "sticky_banners": True,
+}
