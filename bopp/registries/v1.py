@@ -5,10 +5,12 @@ from ..models.v1.confidence.agreement import ConfidenceByInterAnnotatorAgreement
 from ..models.v1.confidence.likelihood import LikelihoodConfidence
 from ..models.v1.confidence.variance import VarianceConfidence
 from ..models.v1.extent.midi_interval import MidiInterval
-from ..models.v1.extent.midi_tick import MidiTicks
+from ..models.v1.extent.midi_ticks import MidiTicks
 from ..models.v1.extent.pixel_box import PixelBoxExtent
-from ..models.v1.extent.score_interval import ScoreInterval
-from ..models.v1.extent.score_quarter import ScoreQuarterNotes
+from ..models.v1.extent.quarters_interval_float import QuartersIntervalFloat
+from ..models.v1.extent.quarters_interval_fraction import QuartersIntervalFraction
+from ..models.v1.extent.quarters_time_float import QuartersTimeFloat
+from ..models.v1.extent.quarters_time_fraction import QuartersTimeFraction
 from ..models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from ..models.v1.extent.time_interval import TimeIntervalExtent
 from ..models.v1.extent.times import Times
@@ -45,10 +47,12 @@ CONFIDENCE_TYPE_REGISTRY = {
 
 EXTENT_TYPE_REGISTRY = {
     'midi_interval': MidiInterval,
-    'midi_tick': MidiTicks,
+    'midi_ticks': MidiTicks,
     'pixel_box': PixelBoxExtent,
-    'score_interval': ScoreInterval,
-    'score_quarter': ScoreQuarterNotes,
+    'quarters_interval.float': QuartersIntervalFloat,
+    'quarters_interval.fraction': QuartersIntervalFraction,
+    'quarters_time.float': QuartersTimeFloat,
+    'quarters_time.fraction': QuartersTimeFraction,
     'time': Times,
     'time_frequency_box': TimeFrequencyBoxExtent,
     'time_interval': TimeIntervalExtent,
@@ -87,8 +91,8 @@ COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
         'agreement': ['n_annotators'],
     },
     'extent_type': {
-        'score_interval': ['quarter', 'duration'],
-        'score_quarter': ['quarter'],
+        'quarters_interval.fraction': ['quarter', 'duration'],
+        'quarters_time.fraction': ['quarter'],
     },
     'metadata_type': {
         'algorithm': ['parameters'],

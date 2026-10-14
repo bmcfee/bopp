@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extents/score_interval.json",
-  "title": "Score Interval",
+  "$id": "extents/quarters_interval_fraction.json",
+  "title": "Quarters Interval Fraction",
   "type": "object",
   "properties": {
     "extent_type": {
-      "const": "score_interval"
+      "const": "quarters_interval.fraction"
     },
     "quarter": {
       "$ref": "../core.json#/$defs/Array",

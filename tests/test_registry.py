@@ -11,7 +11,7 @@ from msgspec import Meta
 
 import bopp
 from bopp.io import load_bopp_csv, save_bopp_csv
-from bopp.models.v1.extent.score_interval import ScoreInterval
+from bopp.models.v1.extent.quarters_interval_fraction import QuartersIntervalFraction
 from bopp.registries.v1 import COMPLEX_FIELDS_REGISTRY
 
 _spec = importlib.util.spec_from_file_location(
@@ -26,9 +26,9 @@ B = typing.TypeAliasType("B", Annotated[list[int], Meta(min_length=2)])
 S = typing.TypeAliasType("S", Annotated[str, Meta(pattern="^a")])
 
 
-def test_score_interval_hints():
-    """Both score interval fraction columns require complex value parsing."""
-    hints = typing.get_type_hints(ScoreInterval, include_extras=True)
+def test_quarters_interval_fraction_hints():
+    """Both fractional quarter interval columns require complex value parsing."""
+    hints = typing.get_type_hints(QuartersIntervalFraction, include_extras=True)
 
     assert generate_registry._is_complex_field(hints["quarter"])
     assert generate_registry._is_complex_field(hints["duration"])
@@ -79,25 +79,25 @@ def test_scalar_ast_fallback(source):
     assert not generate_registry._is_complex_ast_node(node)
 
 
-def test_score_interval_registry():
-    """The generated registry includes both score interval fraction columns."""
-    fields = COMPLEX_FIELDS_REGISTRY["extent_type"]["score_interval"]
+def test_quarters_interval_fraction_registry():
+    """The generated registry includes both fractional quarter interval columns."""
+    fields = COMPLEX_FIELDS_REGISTRY["extent_type"]["quarters_interval.fraction"]
 
     assert "quarter" in fields
     assert "duration" in fields
 
 
-def test_score_interval_csv_roundtrip(tmp_path):
-    """CSV loading restores both score interval fraction columns."""
+def test_quarters_interval_fraction_csv_roundtrip(tmp_path):
+    """CSV loading restores both fractional quarter interval columns."""
     ann = bopp.create(
         media_id="test:reg",
         payload_kind="tag_open",
-        extent_kind="score_interval",
+        extent_kind="quarters_interval.fraction",
         quarter=[[1, 2], [3, 4]],
         duration=[[1, 4], [7, 8]],
         value=["a", "b"],
     )
-    path = tmp_path / "score_interval.csv"
+    path = tmp_path / "quarters_interval_fraction.csv"
 
     save_bopp_csv(ann, path)
     loaded = load_bopp_csv(path)

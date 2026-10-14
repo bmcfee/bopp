@@ -8,9 +8,11 @@
     { "$ref": "extent/time_interval.json" },
     { "$ref": "extent/time_frequency_box.json" },
     { "$ref": "extent/pixel_box.json" },
-    { "$ref": "extent/score_quarter.json" },
-    { "$ref": "extent/score_interval.json" },
-    { "$ref": "extent/midi_tick.json" },
+    { "$ref": "extent/quarters_time_float.json" },
+    { "$ref": "extent/quarters_time_fraction.json" },
+    { "$ref": "extent/quarters_interval_float.json" },
+    { "$ref": "extent/quarters_interval_fraction.json" },
+    { "$ref": "extent/midi_ticks.json" },
     { "$ref": "extent/midi_interval.json" }
   ],
   "discriminator": {

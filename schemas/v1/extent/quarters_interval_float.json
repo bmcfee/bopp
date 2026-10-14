@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/quarters_interval_float.json",
+  "title": "Quarters Interval Float",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "quarters_interval.float"
+    },
+    "quarter": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval start times in quarter notes.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "duration": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval durations in quarter notes.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    }
+  },
+  "required": ["extent_type", "quarter", "duration"]
+}

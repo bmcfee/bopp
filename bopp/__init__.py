@@ -54,6 +54,12 @@ from .transforms import (
     filter_by as filter_by,
 )
 from .transforms import (
+    to_float as to_float,
+)
+from .transforms import (
+    to_fraction as to_fraction,
+)
+from .transforms import (
     to_times as to_times,
 )
 from .transforms import (

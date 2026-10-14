@@ -45,6 +45,8 @@ Transforms
     :nosignatures:
 
     filter_by
+    to_float
+    to_fraction
     to_times
     trim
 

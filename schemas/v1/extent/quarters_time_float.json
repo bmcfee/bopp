@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/quarters_time_float.json",
+  "title": "Quarters Time Float",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "quarters_time.float"
+    },
+    "quarter": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of time points in quarter notes.",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["extent_type", "quarter"]
+}
