@@ -1,15 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extents/score_quarter.json",
-  "title": "Score quarter notes",
+  "$id": "extents/quarters_time_fraction.json",
+  "title": "Quarters Time Fraction",
   "type": "object",
   "properties": {
     "extent_type": {
-      "const": "score_quarter"
+      "const": "quarters_time.fraction"
     },
     "quarter": {
       "$ref": "../core.json#/$defs/Array",
-      "description": "An array of fractional quarter values.",
+      "description": "Array of time points in fractional quarter notes.",
       "items": {
         "$ref": "../core.json#/$defs/Fraction"
       }

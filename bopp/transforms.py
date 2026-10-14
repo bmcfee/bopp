@@ -21,10 +21,10 @@ DEFAULT_TARGET_FIELDS: dict[str, str] = {
     "time": "time",
     "time_interval": "time",
     "time_frequency_box": "time",
-    "midi_tick": "tick",
+    "midi_ticks": "tick",
     "midi_interval": "tick",
-    "score_quarter": "quarter",
-    "score_interval": "quarter",
+    "quarters_time.fraction": "quarter",
+    "quarters_interval.fraction": "quarter",
 }
 
 # Axis structure definition: (extent_tag, target_field) -> (kind, origin_or_min, span_or_max)
@@ -36,15 +36,15 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("time_frequency_box", "frequency"): ("min_max", "freq_min", "freq_max"),
     ("pixel_box", "x"): ("origin_span", "x", "width"),
     ("pixel_box", "y"): ("origin_span", "y", "height"),
-    ("midi_tick", "tick"): ("point", "tick", None),
+    ("midi_ticks", "tick"): ("point", "tick", None),
     ("midi_interval", "tick"): ("origin_span", "tick", "duration"),
-    ("score_quarter", "quarter"): ("point", "quarter", None),
-    ("score_interval", "quarter"): ("origin_span", "quarter", "duration"),
+    ("quarters_time.fraction", "quarter"): ("point", "quarter", None),
+    ("quarters_interval.fraction", "quarter"): ("origin_span", "quarter", "duration"),
 }
 
 FRACTION_AXES: frozenset[tuple[str, str]] = frozenset({
-    ("score_quarter", "quarter"),
-    ("score_interval", "quarter"),
+    ("quarters_time.fraction", "quarter"),
+    ("quarters_interval.fraction", "quarter"),
 })
 
 

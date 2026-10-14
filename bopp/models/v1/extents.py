@@ -9,10 +9,12 @@ from msgspec import Meta
 
 from .extent import (
     midi_interval,
-    midi_tick,
+    midi_ticks,
     pixel_box,
-    score_interval,
-    score_quarter,
+    quarters_interval_float,
+    quarters_interval_fraction,
+    quarters_time_float,
+    quarters_time_fraction,
     time_frequency_box,
     time_interval,
     times,
@@ -23,9 +25,11 @@ type AnyExtent = Annotated[
     | time_interval.TimeIntervalExtent
     | time_frequency_box.TimeFrequencyBoxExtent
     | pixel_box.PixelBoxExtent
-    | score_quarter.ScoreQuarterNotes
-    | score_interval.ScoreInterval
-    | midi_tick.MidiTicks
+    | quarters_time_float.QuartersTimeFloat
+    | quarters_time_fraction.QuartersTimeFraction
+    | quarters_interval_float.QuartersIntervalFloat
+    | quarters_interval_fraction.QuartersIntervalFraction
+    | midi_ticks.MidiTicks
     | midi_interval.MidiInterval,
     Meta(
         description="A discriminated union of all supported columnar extent types.",

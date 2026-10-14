@@ -13,8 +13,8 @@ from bopp.io import (
     save_bopp_msgpack,
 )
 from bopp.models.v1.core import Fraction, FractionNonnegative
-from bopp.models.v1.extent.score_interval import ScoreInterval
-from bopp.models.v1.extent.score_quarter import ScoreQuarterNotes
+from bopp.models.v1.extent.quarters_interval_fraction import QuartersIntervalFraction
+from bopp.models.v1.extent.quarters_time_fraction import QuartersTimeFraction
 
 
 @pytest.mark.parametrize(
@@ -41,41 +41,45 @@ def test_fraction_schema_values(target_type, value, expected_valid):
 
 
 @pytest.mark.parametrize("quarter", [[[0, 1]], [[-1, 2]]])
-def test_score_quarter_accepts_signed_numerator(quarter):
-    """Score quarters accept zero and negative numerators as tuples."""
+def test_quarters_time_fraction_accepts_signed_numerator(quarter):
+    """Fractional quarter points accept zero and negative numerators as tuples."""
     decoded = msgspec.json.decode(
-        msgspec.json.encode({"extent_type": "score_quarter", "quarter": quarter}),
-        type=ScoreQuarterNotes,
+        msgspec.json.encode(
+            {"extent_type": "quarters_time.fraction", "quarter": quarter}
+        ),
+        type=QuartersTimeFraction,
     )
     assert decoded.quarter == [tuple(value) for value in quarter]
 
 
 @pytest.mark.parametrize("quarter", [[[1, 0]], [[1, -2]], [[1, 2, 3]], [[1]]])
-def test_score_quarter_rejects_invalid_fraction(quarter):
-    """Score quarters reject nonpositive denominators and invalid lengths."""
+def test_quarters_time_fraction_rejects_invalid_fraction(quarter):
+    """Fractional quarter points reject nonpositive denominators and invalid lengths."""
     with pytest.raises(msgspec.ValidationError):
         msgspec.json.decode(
-            msgspec.json.encode({"extent_type": "score_quarter", "quarter": quarter}),
-            type=ScoreQuarterNotes,
+            msgspec.json.encode(
+                {"extent_type": "quarters_time.fraction", "quarter": quarter}
+            ),
+            type=QuartersTimeFraction,
         )
 
 
-def test_score_interval_accepts_zero_duration():
-    """Score intervals accept zero duration and a zero start quarter."""
+def test_quarters_interval_fraction_accepts_zero_duration():
+    """Fractional quarter intervals accept zero duration and a zero start quarter."""
     decoded = msgspec.json.decode(
-        b'{"extent_type": "score_interval", "quarter": [[0, 1]], "duration": [[0, 1]]}',
-        type=ScoreInterval,
+        b'{"extent_type": "quarters_interval.fraction", "quarter": [[0, 1]], "duration": [[0, 1]]}',
+        type=QuartersIntervalFraction,
     )
     assert decoded.quarter == [(0, 1)]
     assert decoded.duration == [(0, 1)]
 
 
-def test_score_interval_rejects_negative_duration():
-    """Score intervals reject negative duration numerators."""
+def test_quarters_interval_fraction_rejects_negative_duration():
+    """Fractional quarter intervals reject negative duration numerators."""
     with pytest.raises(msgspec.ValidationError):
         msgspec.json.decode(
-            b'{"extent_type": "score_interval", "quarter": [[0, 1]], "duration": [[-1, 2]]}',
-            type=ScoreInterval,
+            b'{"extent_type": "quarters_interval.fraction", "quarter": [[0, 1]], "duration": [[-1, 2]]}',
+            type=QuartersIntervalFraction,
         )
 
 
@@ -84,7 +88,7 @@ def test_create_and_validate_fraction_annotation():
     annotation = bopp.create(
         media_id="test:frac",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[0, 1], [-1, 2], [3, 4]],
         value=["a", "b", "c"],
     )
@@ -105,7 +109,7 @@ def test_fraction_annotation_roundtrip(tmp_path, save, load, suffix, keeps_id):
     annotation = bopp.create(
         media_id="test:frac",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=quarter,
         value=["a", "b", "c"],
     )
@@ -123,7 +127,7 @@ def test_json_loaded_fraction_annotation_csv_roundtrip(tmp_path):
     annotation = bopp.create(
         media_id="test:frac",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=quarter,
         value=["a", "b", "c"],
     )

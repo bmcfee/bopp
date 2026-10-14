@@ -884,11 +884,11 @@ def test_to_times_incompatible_extent():
 
 
 def test_to_times_incompatible_extent_types():
-    """Verify to_times rejects unsupported extent types like midi_tick or score_quarter."""
+    """Verify to_times rejects unsupported extent types like midi_ticks or quarters_time.fraction."""
     ann_midi = create(
         media_id="track",
         payload_kind="tag_open",
-        extent_kind="midi_tick",
+        extent_kind="midi_ticks",
         tick=[0, 480],
         value=["a", "b"],
     )
@@ -898,7 +898,7 @@ def test_to_times_incompatible_extent_types():
     ann_score = create(
         media_id="track",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[0, 1], [1, 1]],
         value=["a", "b"],
     )
@@ -1257,7 +1257,7 @@ def test_trim_fraction_points():
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[-1, 1], [-1, 2], [0, 1], [2, 4], [1, 1]],
         value=list("abcde"),
     )
@@ -1289,7 +1289,7 @@ def test_trim_fraction_intervals(reset, strict):
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_interval",
+        extent_kind="quarters_interval.fraction",
         quarter=[[-1, 2], [0, 1], [2, 4], [1, 1], [3, 2]],
         duration=[[1, 1], [2, 2], [1, 2], [1, 1], [1, 1]],
         value=list("abcde"),
@@ -1321,7 +1321,7 @@ def test_trim_fraction_interval_boundaries(strict, expected_values):
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_interval",
+        extent_kind="quarters_interval.fraction",
         quarter=[[1, 2], [1, 2], [1, 1]],
         duration=[[0, 1], [1, 2], [0, 1]],
         value=["left", "inside", "right"],
@@ -1333,9 +1333,9 @@ def test_trim_fraction_interval_boundaries(strict, expected_values):
 
 @pytest.mark.parametrize("bound", [0.5, Fraction(1, 2), [1, 2], (1, 2)])
 @pytest.mark.parametrize("decoded", [False, True])
-@pytest.mark.parametrize("extent_kind", ["score_quarter", "score_interval"])
+@pytest.mark.parametrize("extent_kind", ["quarters_time.fraction", "quarters_interval.fraction"])
 def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_kind):
-    kwargs = {"duration": [[1, 2]] * 4} if extent_kind == "score_interval" else {}
+    kwargs = {"duration": [[1, 2]] * 4} if extent_kind == "quarters_interval.fraction" else {}
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
@@ -1369,7 +1369,7 @@ def test_trim_fraction_exact_float_bound():
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_interval",
+        extent_kind="quarters_interval.fraction",
         quarter=[[0, 1]],
         duration=[[1, 1]],
         value=["a"],
@@ -1391,7 +1391,7 @@ def test_trim_fraction_malformed_bounds(bound, name):
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1405,7 +1405,7 @@ def test_trim_fraction_unsupported_bounds(bound, name):
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1417,7 +1417,7 @@ def test_trim_fraction_non_comparable_bounds():
     pt = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1429,7 +1429,7 @@ def test_trim_fraction_reversed_bounds_message():
     pt = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1446,7 +1446,7 @@ def test_trim_fraction_reversed_bounds(start, end):
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_quarter",
+        extent_kind="quarters_time.fraction",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1468,11 +1468,11 @@ def test_trim_numeric_axis_rejects_fraction_bounds(bound, name):
         trim(ann, **{name: bound})
 
 
-def test_trim_midi_tick():
+def test_trim_midi_ticks():
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="midi_tick",
+        extent_kind="midi_ticks",
         tick=[0, 240, 480, 960],
         value=list("abcd"),
     )
@@ -1498,16 +1498,16 @@ def test_trim_midi_interval():
 
 def test_trim_axis_configuration_keys():
     for tag, field, kind, span in [
-        ("midi_tick", "tick", "point", None),
+        ("midi_ticks", "tick", "point", None),
         ("midi_interval", "tick", "origin_span", "duration"),
-        ("score_quarter", "quarter", "point", None),
-        ("score_interval", "quarter", "origin_span", "duration"),
+        ("quarters_time.fraction", "quarter", "point", None),
+        ("quarters_interval.fraction", "quarter", "origin_span", "duration"),
     ]:
         assert DEFAULT_TARGET_FIELDS[tag] == field
         assert AXIS_CONFIGS[(tag, field)] == (kind, field, span)
     assert FRACTION_AXES == frozenset({
-        ("score_quarter", "quarter"),
-        ("score_interval", "quarter"),
+        ("quarters_time.fraction", "quarter"),
+        ("quarters_interval.fraction", "quarter"),
     })
 
 
@@ -1515,7 +1515,7 @@ def test_filter_by_fraction_extent():
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
-        extent_kind="score_interval",
+        extent_kind="quarters_interval.fraction",
         quarter=[[-1, 2], [2, 4], [1, 1], [3, 2]],
         duration=[[1, 2], [1, 2], [2, 1], [1, 1]],
         value=list("abcd"),
