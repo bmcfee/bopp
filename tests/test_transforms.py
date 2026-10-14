@@ -1,5 +1,8 @@
 import copy
+import math
 import warnings
+from decimal import Decimal
+from fractions import Fraction
 
 import msgspec
 import pytest
@@ -16,6 +19,9 @@ from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.mood_thayer import MoodThayerPayload
 from bopp.models.v1.payload.tag_open import TagOpenPayload
 from bopp.transforms import (
+    AXIS_CONFIGS,
+    DEFAULT_TARGET_FIELDS,
+    FRACTION_AXES,
     FilterRecord,
     _derive_parents_and_sandbox,
     _get_facet_list_fields,
@@ -177,6 +183,38 @@ def test_trim_invalid_arguments():
         trim(ann, start=1.0, end=2.0, target_field="invalid")
 
 
+def test_trim_argument_error_order():
+    tm = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=["a", "b"],
+    )
+    pb = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="pixel_box",
+        x=[0.0],
+        y=[0.0],
+        width=[1.0],
+        height=[1.0],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="At least one of"):
+        trim(tm, target_field="x")
+    with pytest.raises(BoppArgumentError, match="must be <= end"):
+        trim(tm, start=2, end=1, target_field="x")
+    with pytest.raises(BoppArgumentError, match="reset=True requires"):
+        trim(tm, end=1, reset=True, target_field="zz")
+    with pytest.raises(BoppArgumentError, match="At least one of"):
+        trim(pb)
+    with pytest.raises(BoppArgumentError, match="does not have a default target field"):
+        trim(pb, start=0)
+    with pytest.raises(BoppArgumentError, match="Unsupported target_field"):
+        trim(tm, start=0, target_field="x")
+
+
 def test_trim_warning_no_id():
     metadata = HumanAnnotationMetadata(annotator_id="user_1", tool="manual")
     ann = Annotation(
@@ -252,6 +290,43 @@ def test_trim_time_extent():
     assert trimmed.metadata.parameters["start"] == 2.0
     assert trimmed.metadata.parameters["end"] == 6.0
     assert trimmed.metadata.parameters["reset"] is True
+
+
+def test_trim_numeric_bounds_pass_through():
+    tm = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[0.0, 1.0, 2.0],
+        value=list("abc"),
+    )
+    result = trim(tm, start=1, end=math.inf)
+    assert result.extent.time == [1.0, 2.0]
+    assert result.metadata.parameters["end"] == math.inf
+
+    result = trim(tm, start=-math.inf, end=1)
+    assert result.extent.time == [0.0, 1.0]
+    assert result.metadata.parameters["start"] == -math.inf
+
+    result = trim(tm, start=Decimal("0.5"))
+    assert result.extent.time == [1.0, 2.0]
+    assert result.metadata.parameters["start"] == Decimal("0.5")
+
+
+def test_trim_no_extent_infinite_bound():
+    ann = Annotation(
+        media_id="track:1",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["pop"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    result = trim(ann, start=0, end=math.inf)
+    assert result.extent is msgspec.UNSET
+    assert result.payload == ann.payload
+    assert result.metadata.parameters["end"] == math.inf
 
 
 def test_trim_point_extent_open_ended_bounds():
@@ -824,7 +899,7 @@ def test_to_times_incompatible_extent_types():
         media_id="track",
         payload_kind="tag_open",
         extent_kind="score_quarter",
-        quarter=[0.0, 1.0],
+        quarter=[[0, 1], [1, 1]],
         value=["a", "b"],
     )
     with pytest.raises(BoppArgumentError, match="is incompatible with to_times"):
@@ -1176,3 +1251,276 @@ def test_to_times_warning_no_id_and_immutability():
     res_immut = to_times(ann_with_id, times=[1.0])
     assert ann_with_id == ann_copy
     assert res_immut.sandbox is not ann_with_id.sandbox
+
+
+def test_trim_fraction_points():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_quarter",
+        quarter=[[-1, 1], [-1, 2], [0, 1], [2, 4], [1, 1]],
+        value=list("abcde"),
+    )
+    original = copy.deepcopy(ann)
+
+    result = trim(ann, start=[-2, 4], end=Fraction(1, 2))
+    assert [list(q) for q in result.extent.quarter] == [[-1, 2], [0, 1], [1, 2]]
+    assert all(isinstance(q, list) for q in result.extent.quarter)
+    assert result.payload.value == list("bcd")
+    assert result.metadata.parameters["start"] == [-1, 2]
+    assert result.metadata.parameters["end"] == [1, 2]
+
+    shifted = trim(ann, start=Fraction(-1, 2), end=(1, 2), reset=True)
+    assert [list(q) for q in shifted.extent.quarter] == [[0, 1], [1, 2], [1, 1]]
+    assert shifted.payload.value == list("bcd")
+
+    only_start = trim(ann, start=(1, 2))
+    assert [list(q) for q in only_start.extent.quarter] == [[1, 2], [1, 1]]
+    assert only_start.payload.value == list("de")
+    only_end = trim(ann, end=0)
+    assert [list(q) for q in only_end.extent.quarter] == [[-1, 1], [-1, 2], [0, 1]]
+    assert only_end.payload.value == list("abc")
+    assert ann == original
+
+
+@pytest.mark.parametrize("reset", [False, True])
+@pytest.mark.parametrize("strict", [False, True])
+def test_trim_fraction_intervals(reset, strict):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_interval",
+        quarter=[[-1, 2], [0, 1], [2, 4], [1, 1], [3, 2]],
+        duration=[[1, 1], [2, 2], [1, 2], [1, 1], [1, 1]],
+        value=list("abcde"),
+    )
+    original = copy.deepcopy(ann)
+    result = trim(ann, start=Fraction(1, 2), end=[3, 2], strict=strict, reset=reset)
+    if strict:
+        expected_quarters = [[0, 1]] if reset else [[1, 2]]
+        expected_durations = [[1, 2]]
+        expected_values = ["c"]
+    else:
+        expected_quarters = [[0, 1], [0, 1], [1, 2]] if reset else [[1, 2], [1, 2], [1, 1]]
+        expected_durations = [[1, 2], [1, 2], [1, 2]]
+        expected_values = list("bcd")
+    assert [list(q) for q in result.extent.quarter] == expected_quarters
+    assert [list(d) for d in result.extent.duration] == expected_durations
+    assert result.payload.value == expected_values
+    assert bopp.validate(result)
+    assert ann == original
+
+    empty = trim(ann, start=[5, 1], strict=strict, reset=reset)
+    assert empty.extent.quarter == []
+    assert empty.extent.duration == []
+    assert empty.payload.value == []
+
+
+@pytest.mark.parametrize("strict, expected_values", [(False, ["inside"]), (True, ["left", "inside", "right"])])
+def test_trim_fraction_interval_boundaries(strict, expected_values):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_interval",
+        quarter=[[1, 2], [1, 2], [1, 1]],
+        duration=[[0, 1], [1, 2], [0, 1]],
+        value=["left", "inside", "right"],
+    )
+    result = trim(ann, start=(1, 2), end=1, strict=strict)
+    assert result.payload.value == expected_values
+    assert bopp.validate(result)
+
+
+@pytest.mark.parametrize("bound", [0.5, Fraction(1, 2), [1, 2], (1, 2)])
+@pytest.mark.parametrize("decoded", [False, True])
+@pytest.mark.parametrize("extent_kind", ["score_quarter", "score_interval"])
+def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_kind):
+    kwargs = {"duration": [[1, 2]] * 4} if extent_kind == "score_interval" else {}
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind=extent_kind,
+        quarter=[[-1, 2], [0, 1], [2, 4], [1, 1]],
+        value=list("abcd"),
+        **kwargs,
+    )
+    if decoded:
+        ann = msgspec.json.decode(msgspec.json.encode(ann), type=type(ann))
+        assert isinstance(ann.extent.quarter[0], tuple)
+
+    result = trim(ann, start=bound, end=Fraction(3, 2), reset=True)
+    assert [list(q) for q in result.extent.quarter] == [[0, 1], [1, 2]]
+    if kwargs:
+        assert [list(d) for d in result.extent.duration] == [[1, 2], [1, 2]]
+    assert result.payload.value == list("cd")
+    assert result.metadata.parameters["start"] == (0.5 if isinstance(bound, float) else [1, 2])
+    assert result.metadata.parameters["end"] == [3, 2]
+    assert not any(isinstance(v, Fraction) for v in result.metadata.parameters.values())
+    assert bopp.validate(result)
+    roundtrip = msgspec.json.decode(msgspec.json.encode(result), type=type(result))
+    assert roundtrip.id == result.id
+    assert [list(q) for q in roundtrip.extent.quarter] == [[0, 1], [1, 2]]
+    assert roundtrip.payload.value == result.payload.value
+    assert roundtrip.metadata.parameters == result.metadata.parameters
+    assert bopp.validate(roundtrip)
+
+
+def test_trim_fraction_exact_float_bound():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_interval",
+        quarter=[[0, 1]],
+        duration=[[1, 1]],
+        value=["a"],
+    )
+    result = trim(ann, start=0.1, end=1, reset=True)
+    expected_duration = Fraction(1) - Fraction(0.1)
+    assert [list(q) for q in result.extent.quarter] == [[0, 1]]
+    assert [list(d) for d in result.extent.duration] == [
+        [expected_duration.numerator, expected_duration.denominator]
+    ]
+    assert result.metadata.parameters["start"] == 0.1
+    assert result.metadata.parameters["end"] == 1
+    assert isinstance(result.metadata.parameters["end"], int)
+
+
+@pytest.mark.parametrize("bound", [[1, 0], [1, -2], [1, 2, 3], [], [1.0, 2], [1, "2"], [1, True], [True, 2]])
+@pytest.mark.parametrize("name", ["start", "end"])
+def test_trim_fraction_malformed_bounds(bound, name):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_quarter",
+        quarter=[[0, 1]],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="Fraction bound must be a pair of ints"):
+        trim(ann, **{name: bound})
+
+
+@pytest.mark.parametrize("bound", ["1/2", Decimal("0.5"), float("nan"), float("inf"), True])
+@pytest.mark.parametrize("name", ["start", "end"])
+def test_trim_fraction_unsupported_bounds(bound, name):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_quarter",
+        quarter=[[0, 1]],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="Trim bound must"):
+        trim(ann, **{name: bound})
+
+
+def test_trim_fraction_non_comparable_bounds():
+    pt = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_quarter",
+        quarter=[[0, 1]],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="start and end must be comparable numbers"):
+        trim(pt, start="1/2", end=Fraction(1))
+
+
+def test_trim_fraction_reversed_bounds_message():
+    pt = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_quarter",
+        quarter=[[0, 1]],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match=r"start \(0\.3\) must be <= end \(0\.1\)"):
+        trim(pt, start=0.3, end=0.1)
+    with pytest.raises(BoppArgumentError, match=r"start \(\[3, 1\]\) must be <= end \(1\)"):
+        trim(pt, start=[3, 1], end=1)
+    with pytest.raises(BoppArgumentError, match=r"start \(\[3, 1\]\) must be <= end \(1\)"):
+        trim(pt, start=(3, 1), end=1)
+
+
+@pytest.mark.parametrize("start, end", [([3, 1], 1), (Fraction(3), [1, 1]), (3.0, (1, 1)), ((3, 1), Fraction(1))])
+def test_trim_fraction_reversed_bounds(start, end):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_quarter",
+        quarter=[[0, 1]],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="start .* must be <= end"):
+        trim(ann, start=start, end=end)
+
+
+@pytest.mark.parametrize("bound", [Fraction(1, 2), [1, 2], (1, 2)])
+@pytest.mark.parametrize("name", ["start", "end"])
+def test_trim_numeric_axis_rejects_fraction_bounds(bound, name):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=list("ab"),
+    )
+    with pytest.raises(BoppArgumentError, match="bounds require a fraction axis"):
+        trim(ann, **{name: bound})
+
+
+def test_trim_midi_tick():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="midi_tick",
+        tick=[0, 240, 480, 960],
+        value=list("abcd"),
+    )
+    result = trim(ann, start=240, end=480, reset=True)
+    assert result.extent.tick == [0, 240]
+    assert result.payload.value == list("bc")
+
+
+def test_trim_midi_interval():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="midi_interval",
+        tick=[0, 240, 480, 960],
+        duration=[480, 240, 480, 240],
+        value=list("abcd"),
+    )
+    result = trim(ann, start=240, end=720)
+    assert result.extent.tick == [240, 240, 480]
+    assert result.extent.duration == [240, 240, 240]
+    assert result.payload.value == list("abc")
+
+
+def test_trim_axis_configuration_keys():
+    for tag, field, kind, span in [
+        ("midi_tick", "tick", "point", None),
+        ("midi_interval", "tick", "origin_span", "duration"),
+        ("score_quarter", "quarter", "point", None),
+        ("score_interval", "quarter", "origin_span", "duration"),
+    ]:
+        assert DEFAULT_TARGET_FIELDS[tag] == field
+        assert AXIS_CONFIGS[(tag, field)] == (kind, field, span)
+    assert FRACTION_AXES == frozenset({
+        ("score_quarter", "quarter"),
+        ("score_interval", "quarter"),
+    })
+
+
+def test_filter_by_fraction_extent():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_interval",
+        quarter=[[-1, 2], [2, 4], [1, 1], [3, 2]],
+        duration=[[1, 2], [1, 2], [2, 1], [1, 1]],
+        value=list("abcd"),
+    )
+    result = filter_by(ann, lambda q: Fraction(*q) >= 1, facet="extent", target="quarter")
+    assert [list(q) for q in result.extent.quarter] == [[1, 1], [3, 2]]
+    assert [list(d) for d in result.extent.duration] == [[2, 1], [1, 1]]
+    assert result.payload.value == list("cd")

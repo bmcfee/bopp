@@ -4,6 +4,7 @@ import copy
 import math
 import warnings
 from collections.abc import Callable
+from fractions import Fraction
 from typing import Any, Literal
 
 import msgspec
@@ -40,6 +41,14 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("score_quarter", "quarter"): ("point", "quarter", None),
     ("score_interval", "quarter"): ("origin_span", "quarter", "duration"),
 }
+
+FRACTION_AXES: frozenset[tuple[str, str]] = frozenset({
+    ("score_quarter", "quarter"),
+    ("score_interval", "quarter"),
+})
+
+
+_TrimBound = int | float | Fraction | list[int] | tuple[int, int] | None
 
 
 class FilterRecord(dict):
@@ -172,11 +181,34 @@ def _resample_struct(
     return msgspec.structs.replace(struct, **updates)
 
 
+def _coerce_trim_bound(value: _TrimBound) -> float | Fraction | None:
+    """Validate and normalize rational pairs, leaving other bounds unchanged."""
+    if isinstance(value, (list, tuple)):
+        if len(value) != 2 or not all(type(item) is int for item in value) or value[1] < 1:
+            raise BoppArgumentError("Fraction bound must be a pair of ints with denominator >= 1.")
+        return Fraction(value[0], value[1])
+    return value
+
+
+def _fraction_pair(value: Fraction) -> list[int]:
+    """Encode a reduced fraction as a JSON-compatible pair."""
+    return [value.numerator, value.denominator]
+
+
+def _trim_bound_parameter(
+    value: _TrimBound,
+) -> float | list[int] | None:
+    """Keep numeric metadata bounds unchanged and encode rational bounds as pairs."""
+    if isinstance(value, (list, tuple)):
+        value = Fraction(value[0], value[1])
+    return _fraction_pair(value) if isinstance(value, Fraction) else value
+
+
 def trim(
     annotation: BoppBase,
     *,
-    start: float | None = None,
-    end: float | None = None,
+    start: _TrimBound = None,
+    end: _TrimBound = None,
     target_field: str | None = None,
     strict: bool = False,
     reset: bool = False,
@@ -184,13 +216,19 @@ def trim(
     """
     Trim an Annotation along a spatial, temporal, or index target axis to a range [start, end].
 
+    Fraction extents accept int, finite float, Fraction, or [numerator, denominator]
+    list/tuple bounds (two ints, not bools, with denominator >= 1); numeric axes accept
+    int or float bounds. Boolean bounds are not accepted on fraction extents.
+    Fraction axes use exact arithmetic and return reduced [numerator, denominator] lists;
+    on these axes, float bounds are taken at their exact binary value via Fraction(value).
+
     Parameters
     ----------
     annotation : BoppBase
         The input Annotation model instance to trim.
-    start : float or None, optional
+    start : int, float, Fraction, list[int], tuple[int, int] or None, optional
         Start bound along the target axis. If None, no lower bound trimming is applied.
-    end : float or None, optional
+    end : int, float, Fraction, list[int], tuple[int, int] or None, optional
         End bound along the target axis. If None, no upper bound trimming is applied.
     target_field : str or None, optional
         The coordinate field along which to trim (e.g., 'time', 'x', 'y', 'tick', 'quarter', 'frequency').
@@ -213,32 +251,81 @@ def trim(
     BoppArgumentError
         If arguments are invalid or the extent/target_field combination is unsupported.
     """
+    original_start, original_end = start, end
+    start = _coerce_trim_bound(start)
+    end = _coerce_trim_bound(end)
+
     if start is None and end is None:
         raise BoppArgumentError("At least one of 'start' or 'end' must be provided.")
 
-    if start is not None and end is not None and start > end:
-        raise BoppArgumentError(f"start ({start}) must be <= end ({end}).")
+    if start is not None and end is not None:
+        try:
+            reversed_bounds = start > end
+        except TypeError as exc:
+            raise BoppArgumentError("start and end must be comparable numbers.") from exc
+        if reversed_bounds:
+            display_start = list(original_start) if isinstance(original_start, tuple) else original_start
+            display_end = list(original_end) if isinstance(original_end, tuple) else original_end
+            raise BoppArgumentError(f"start ({display_start}) must be <= end ({display_end}).")
 
     if reset and start is None:
         raise BoppArgumentError("reset=True requires 'start' to be specified.")
+
+    extent = getattr(annotation, "extent", msgspec.UNSET)
+    axis_config = None
+    fraction_axis = False
+    if extent is not msgspec.UNSET and extent is not None:
+        extent_tag = _get_tag(extent)
+        if extent_tag is None:
+            raise BoppArgumentError("Annotation extent object has no valid schema tag.")
+
+        resolved_target_field = target_field
+        if resolved_target_field is None:
+            resolved_target_field = DEFAULT_TARGET_FIELDS.get(extent_tag)
+            if resolved_target_field is None:
+                raise BoppArgumentError(
+                    f"Extent '{extent_tag}' does not have a default target field. "
+                    f"Please specify 'target_field' explicitly (e.g. 'x' or 'y')."
+                )
+
+        axis_config = AXIS_CONFIGS.get((extent_tag, resolved_target_field))
+        if axis_config is None:
+            raise BoppArgumentError(
+                f"Unsupported target_field '{resolved_target_field}' for extent tag '{extent_tag}'."
+            )
+
+        fraction_axis = (extent_tag, resolved_target_field) in FRACTION_AXES
+
+    if fraction_axis:
+        for bound in (start, end):
+            if bound is None or type(bound) is int or isinstance(bound, Fraction):
+                continue
+            if type(bound) is float:
+                if not math.isfinite(bound):
+                    raise BoppArgumentError("Trim bound must be finite.")
+            else:
+                raise BoppArgumentError("Trim bound must be an int, finite float, Fraction, or pair of ints.")
+        start = Fraction(start) if start is not None else None
+        end = Fraction(end) if end is not None else None
+    elif isinstance(start, Fraction) or isinstance(end, Fraction):
+        raise BoppArgumentError("Fraction or pair bounds require a fraction axis.")
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Trimming")
     derived_metadata = DerivedAnnotationMetadata(
         transform="trim",
         parameters={
-            "start": start,
-            "end": end,
+            "start": _trim_bound_parameter(original_start),
+            "end": _trim_bound_parameter(original_end),
             "target_field": target_field,
             "strict": strict,
             "reset": reset,
         },
     )
 
-    extent = getattr(annotation, "extent", msgspec.UNSET)
     payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
     confidence = getattr(annotation, "confidence", msgspec.UNSET)
 
-    if extent is msgspec.UNSET or extent is None:
+    if axis_config is None:
         return _rebuild_annotation(
             annotation,
             parents=new_parents,
@@ -249,34 +336,17 @@ def trim(
             confidence=confidence,
         )
 
-    extent_tag = _get_tag(extent)
-    if extent_tag is None:
-        raise BoppArgumentError("Annotation extent object has no valid schema tag.")
-
-    resolved_target_field = target_field
-    if resolved_target_field is None:
-        resolved_target_field = DEFAULT_TARGET_FIELDS.get(extent_tag)
-        if resolved_target_field is None:
-            raise BoppArgumentError(
-                f"Extent '{extent_tag}' does not have a default target field. "
-                f"Please specify 'target_field' explicitly (e.g. 'x' or 'y')."
-            )
-
-    axis_config = AXIS_CONFIGS.get((extent_tag, resolved_target_field))
-    if axis_config is None:
-        raise BoppArgumentError(
-            f"Unsupported target_field '{resolved_target_field}' for extent tag '{extent_tag}'."
-        )
-
     kind, field_a, field_b = axis_config
 
     kept_indices: list[int] = []
-    shift = start if (reset and start is not None) else 0.0
+    shift = start if (reset and start is not None) else (Fraction(0) if fraction_axis else 0.0)
 
     extent_updates: dict[str, list[Any]] = {}
 
     if kind == "point":
         pos_vals = getattr(extent, field_a)
+        if fraction_axis:
+            pos_vals = [Fraction(*value) for value in pos_vals]
         n_obs = len(pos_vals)
         new_pos = []
 
@@ -293,10 +363,13 @@ def trim(
     elif kind == "origin_span":
         origin_vals = getattr(extent, field_a)
         span_vals = getattr(extent, field_b)  # type: ignore[arg-type]
+        if fraction_axis:
+            origin_vals = [Fraction(*value) for value in origin_vals]
+            span_vals = [Fraction(*value) for value in span_vals]
         n_obs = len(origin_vals)
 
-        new_origin: list[float] = []
-        new_span: list[float] = []
+        new_origin: list[float | Fraction] = []
+        new_span: list[float | Fraction] = []
 
         for i, (p_min, span) in enumerate(zip(origin_vals, span_vals)):
             p_max = p_min + span
@@ -351,6 +424,12 @@ def trim(
 
         extent_updates[field_a] = new_min
         extent_updates[field_b] = new_max  # type: ignore[index]
+
+    if fraction_axis:
+        extent_updates = {
+            field: [_fraction_pair(value) for value in values]
+            for field, values in extent_updates.items()
+        }
 
     new_extent = _subset_struct_lists(extent, kept_indices, n_obs, overrides=extent_updates)
     new_payload = _subset_struct_lists(payload, kept_indices, n_obs)
