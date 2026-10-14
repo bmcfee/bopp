@@ -12,6 +12,10 @@ from bopp.core import create
 from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
+from bopp.models.v1.extent.quarters_interval_float import QuartersIntervalFloat
+from bopp.models.v1.extent.quarters_interval_fraction import QuartersIntervalFraction
+from bopp.models.v1.extent.quarters_time_float import QuartersTimeFloat
+from bopp.models.v1.extent.quarters_time_fraction import QuartersTimeFraction
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.metadata.derived import DerivedAnnotationMetadata
@@ -30,6 +34,8 @@ from bopp.transforms import (
     _resample_struct,
     _subset_struct_lists,
     filter_by,
+    to_float,
+    to_fraction,
     to_times,
     trim,
 )
@@ -1502,6 +1508,8 @@ def test_trim_axis_configuration_keys():
         ("midi_interval", "tick", "origin_span", "duration"),
         ("quarters_time.fraction", "quarter", "point", None),
         ("quarters_interval.fraction", "quarter", "origin_span", "duration"),
+        ("quarters_time.float", "quarter", "point", None),
+        ("quarters_interval.float", "quarter", "origin_span", "duration"),
     ]:
         assert DEFAULT_TARGET_FIELDS[tag] == field
         assert AXIS_CONFIGS[(tag, field)] == (kind, field, span)
@@ -1509,6 +1517,8 @@ def test_trim_axis_configuration_keys():
         ("quarters_time.fraction", "quarter"),
         ("quarters_interval.fraction", "quarter"),
     })
+    assert ("quarters_time.float", "quarter") not in FRACTION_AXES
+    assert ("quarters_interval.float", "quarter") not in FRACTION_AXES
 
 
 def test_filter_by_fraction_extent():
@@ -1524,3 +1534,320 @@ def test_filter_by_fraction_extent():
     assert [list(q) for q in result.extent.quarter] == [[1, 1], [3, 2]]
     assert [list(d) for d in result.extent.duration] == [[2, 1], [1, 1]]
     assert result.payload.value == list("cd")
+
+
+def test_to_fraction_points():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="quarters_time.float",
+        quarter=[0.0, 0.5, 1.25, 2.6666666666666665, -1.0],
+        value=list("abcde"),
+    )
+    original = copy.deepcopy(ann)
+    result = to_fraction(ann, max_denominator=12)
+    expected = [[0, 1], [1, 2], [5, 4], [8, 3], [-1, 1]]
+    assert isinstance(result.extent, QuartersTimeFraction)
+    assert [list(q) for q in result.extent.quarter] == expected
+    assert all(isinstance(q, list) for q in result.extent.quarter)
+    assert result.payload == ann.payload
+    assert result.parents == [ann.id]
+    assert result.id != ann.id
+    assert isinstance(result.metadata, DerivedAnnotationMetadata)
+    assert result.metadata.transform == "to_fraction"
+    assert result.metadata.parameters == {"max_denominator": 12}
+    assert bopp.validate(result)
+    roundtrip = msgspec.json.decode(msgspec.json.encode(result), type=type(result))
+    assert roundtrip.id == result.id
+    assert [list(q) for q in roundtrip.extent.quarter] == expected
+    assert bopp.validate(roundtrip)
+    assert ann == original
+
+
+@pytest.mark.parametrize("decoded", [False, True])
+def test_to_fraction_intervals(decoded):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="quarters_interval.float",
+        quarter=[0, 0.5, -1],
+        duration=[0.0, 1.25, 2.6666666666666665],
+        value=list("abc"),
+    )
+    if decoded:
+        ann = msgspec.json.decode(msgspec.json.encode(ann), type=type(ann))
+    original = copy.deepcopy(ann)
+    result = to_fraction(ann, max_denominator=12)
+    assert isinstance(result.extent, QuartersIntervalFraction)
+    assert [list(q) for q in result.extent.quarter] == [[0, 1], [1, 2], [-1, 1]]
+    assert [list(d) for d in result.extent.duration] == [[0, 1], [5, 4], [8, 3]]
+    assert result.payload == ann.payload
+    assert bopp.validate(result)
+    assert ann == original
+
+
+@pytest.mark.parametrize("quarter, bound, expected", [
+    (0.3333333333333333, 1, [0, 1]),
+    (0.3333333333333333, 2, [1, 2]),
+    (0.3333333333333333, 3, [1, 3]),
+    (2.2, 5, [11, 5]),
+])
+def test_to_fraction_denominator_bound(quarter, bound, expected):
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_time.float",
+        quarter=[quarter], value=["a"],
+    )
+    result = to_fraction(ann, max_denominator=bound)
+    assert [list(q) for q in result.extent.quarter] == [expected]
+
+
+@pytest.mark.parametrize("decoded", [False, True])
+@pytest.mark.parametrize("interval", [False, True])
+def test_to_float_quarters(decoded, interval):
+    kwargs = {"duration": [[0, 1], [2, 4], [1, 3], [3, 1], [1, 8]]} if interval else {}
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="quarters_interval.fraction" if interval else "quarters_time.fraction",
+        quarter=[[-1, 2], [0, 1], [2, 4], [1, 3], [3, 1]],
+        value=list("abcde"),
+        **kwargs,
+    )
+    if decoded:
+        ann = msgspec.json.decode(msgspec.json.encode(ann), type=type(ann))
+        assert isinstance(ann.extent.quarter[0], tuple)
+    original = copy.deepcopy(ann)
+    result = to_float(ann)
+    assert isinstance(result.extent, QuartersIntervalFloat if interval else QuartersTimeFloat)
+    assert result.extent.quarter == [-0.5, 0.0, 0.5, 0.3333333333333333, 3.0]
+    assert all(type(q) is float for q in result.extent.quarter)
+    if interval:
+        assert result.extent.duration == [0.0, 0.5, 0.3333333333333333, 3.0, 0.125]
+        assert all(type(d) is float for d in result.extent.duration)
+    assert result.payload == ann.payload
+    assert result.parents == [ann.id]
+    assert result.id != ann.id
+    assert isinstance(result.metadata, DerivedAnnotationMetadata)
+    assert result.metadata.transform == "to_float"
+    assert result.metadata.parameters == {}
+    assert bopp.validate(result)
+    roundtrip = msgspec.json.decode(msgspec.json.encode(result), type=type(result))
+    assert roundtrip.id == result.id
+    assert roundtrip.extent == result.extent
+    assert bopp.validate(roundtrip)
+    assert ann == original
+
+
+def test_quarters_conversion_roundtrips():
+    floats = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_time.float",
+        quarter=[0.0, 0.125, -0.75, 2.375], value=list("abcd"),
+    )
+    intermediate = to_fraction(floats, max_denominator=8)
+    result = to_float(intermediate)
+    assert result.extent.quarter == floats.extent.quarter
+    assert result.parents == [floats.id, intermediate.id]
+
+    fractions = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_time.fraction",
+        quarter=[[0, 1], [1, 3], [-3, 4], [11, 5], [1, 7], [19, 8]], value=list("abcdef"),
+    )
+    intermediate = to_float(fractions)
+    result = to_fraction(intermediate, max_denominator=8)
+    assert [list(q) for q in result.extent.quarter] == [list(q) for q in fractions.extent.quarter]
+    assert result.parents == [fractions.id, intermediate.id]
+
+
+@pytest.mark.parametrize("convert, kwargs, target", [
+    (to_fraction, {"max_denominator": 8}, "fraction"),
+    (to_float, {}, "float"),
+])
+@pytest.mark.parametrize("interval", [False, True])
+def test_quarters_conversion_rejects_target_extent(convert, kwargs, target, interval):
+    quarter = [[0, 1]] if target == "fraction" else [0.0]
+    extent_kind = f"quarters_{'interval' if interval else 'time'}.{target}"
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind=extent_kind,
+        quarter=quarter, value=["a"], **({"duration": quarter} if interval else {}),
+    )
+    with pytest.raises(BoppArgumentError, match=rf"{extent_kind}.*already"):
+        convert(ann, **kwargs)
+
+
+@pytest.mark.parametrize("convert, kwargs, supported", [
+    (to_fraction, {"max_denominator": 8}, "float"),
+    (to_float, {}, "fraction"),
+])
+@pytest.mark.parametrize("extent_kind", ["time", "midi_ticks", None])
+def test_quarters_conversion_unsupported_extent(convert, kwargs, supported, extent_kind):
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind=extent_kind,
+        value=["a"], **({"time": [0.0]} if extent_kind == "time" else
+                        {"tick": [0]} if extent_kind == "midi_ticks" else {}),
+    )
+    message = "no extent" if extent_kind is None else extent_kind
+    with pytest.raises(BoppArgumentError, match=message) as exc:
+        convert(ann, **kwargs)
+    assert f"quarters_time.{supported}" in str(exc.value)
+    assert f"quarters_interval.{supported}" in str(exc.value)
+    if extent_kind is None:
+        ann.extent = None
+        with pytest.raises(BoppArgumentError, match="no extent"):
+            convert(ann, **kwargs)
+
+
+@pytest.mark.parametrize("bound, message", [
+    (0, "must be >= 1"),
+    (-1, "must be >= 1"),
+    (1.5, "must be an int"),
+    (True, "must be an int"),
+    ("8", "must be an int"),
+    (None, "must be an int"),
+])
+def test_to_fraction_invalid_denominator(bound, message):
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_time.float",
+        quarter=[0.5], value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match=message) as exc:
+        to_fraction(ann, max_denominator=bound)
+    assert repr(bound) in str(exc.value)
+
+
+def test_to_fraction_required_keyword_and_validation_order():
+    ann = create(media_id="track:1", payload_kind="tag_open", value=["a"])
+    with pytest.raises(TypeError, match="max_denominator"):
+        to_fraction(ann)
+    with pytest.raises(TypeError):
+        to_fraction(ann, 8)
+    with pytest.raises(BoppArgumentError, match="no extent"):
+        to_fraction(ann, max_denominator=0)
+
+
+@pytest.mark.parametrize("value", [float("inf"), float("nan")])
+@pytest.mark.parametrize("field", ["quarter", "duration"])
+def test_to_fraction_nonfinite(value, field):
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_interval.float",
+        quarter=[0.0, 0.5], duration=[0.0, 0.5], value=list("ab"),
+    )
+    getattr(ann.extent, field)[1] = value
+    with pytest.raises(BoppArgumentError, match=rf"{field}.*index 1"):
+        to_fraction(ann, max_denominator=8)
+
+
+@pytest.mark.parametrize("convert, kwargs, extent_kind, quarter", [
+    (to_fraction, {"max_denominator": 8}, "quarters_time.float", [0.0, 0.5]),
+    (to_float, {}, "quarters_time.fraction", [[0, 1], [1, 2]]),
+])
+def test_quarters_conversion_lineage_and_facets(convert, kwargs, extent_kind, quarter):
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind=extent_kind,
+        quarter=quarter, value=list("ab"), confidence_kind="likelihood", confidence=[0.9, 0.8],
+        sandbox={"custom": [1, 2]},
+    )
+    trimmed = trim(ann, start=0)
+    original = copy.deepcopy(trimmed)
+    result = convert(trimmed, **kwargs)
+    assert result.parents == [ann.id, trimmed.id]
+    assert result.payload == trimmed.payload
+    assert result.confidence == trimmed.confidence
+    assert result.sandbox == trimmed.sandbox
+    assert result.sandbox is not trimmed.sandbox
+    assert result.sandbox["custom"] is not trimmed.sandbox["custom"]
+    assert trimmed == original
+
+    no_id = Annotation(
+        media_id="track:1", bopp_version=ann.bopp_version,
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=ann.extent, payload=ann.payload,
+    )
+    with pytest.warns(UserWarning, match="Converting an annotation with no ID"):
+        result = convert(no_id, **kwargs)
+    assert result.parents == []
+    assert bopp.validate(result)
+
+
+def test_quarters_conversion_copies_payload_and_confidence():
+    source = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_time.float",
+        quarter=[0.0, 0.5], value=list("ab"),
+        confidence_kind="likelihood", confidence=[0.5, 0.9],
+    )
+    original = copy.deepcopy(source)
+    result = to_fraction(source, max_denominator=4)
+    assert result.payload is not source.payload
+    assert result.confidence is not source.confidence
+    assert result.payload == source.payload
+    assert result.confidence == source.confidence
+
+    floats = to_float(result)
+    assert floats.payload is not result.payload
+    assert floats.confidence is not result.confidence
+    assert floats.payload == result.payload
+    assert floats.confidence == result.confidence
+
+    result.payload.value.append("c")
+    result.confidence.confidence.append(0.7)
+    assert source == original
+
+
+def test_quarters_conversion_exports():
+    assert bopp.to_fraction is bopp.transforms.to_fraction
+    assert bopp.to_float is bopp.transforms.to_float
+
+
+def test_trim_quarters_float_points():
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_time.float",
+        quarter=[-0.5, 0.0, 0.5, 1.25, 2.0], value=list("abcde"),
+    )
+    original = copy.deepcopy(ann)
+    result = trim(ann, start=0.5, end=1.25, reset=True)
+    assert result.extent.quarter == [0.0, 0.75]
+    assert result.payload.value == list("cd")
+    assert bopp.validate(result)
+    assert ann == original
+
+
+@pytest.mark.parametrize("strict", [False, True])
+def test_trim_quarters_float_intervals(strict):
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_interval.float",
+        quarter=[-0.5, 0.0, 0.5, 1.0, 1.5], duration=[1.0, 1.0, 0.5, 1.0, 1.0],
+        value=list("abcde"),
+    )
+    original = copy.deepcopy(ann)
+    result = trim(ann, start=0.5, end=1.5, strict=strict)
+    assert result.extent.quarter == ([0.5] if strict else [0.5, 0.5, 1.0])
+    assert result.extent.duration == ([0.5] if strict else [0.5, 0.5, 0.5])
+    assert result.payload.value == (list("c") if strict else list("bcd"))
+    assert bopp.validate(result)
+    assert ann == original
+
+
+@pytest.mark.parametrize("bound", [Fraction(1, 2), [1, 2]])
+@pytest.mark.parametrize("name", ["start", "end"])
+@pytest.mark.parametrize("extent_kind", ["quarters_time.float", "quarters_interval.float"])
+def test_trim_quarters_float_rejects_fraction_bounds(bound, name, extent_kind):
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind=extent_kind,
+        quarter=[0.0], value=["a"],
+        **({"duration": [1.0]} if extent_kind == "quarters_interval.float" else {}),
+    )
+    with pytest.raises(BoppArgumentError, match="bounds require a fraction axis"):
+        trim(ann, **{name: bound})
+
+
+def test_to_fraction_binary_float_near_midpoint():
+    ann = create(
+        media_id="track:1", payload_kind="tag_open", extent_kind="quarters_time.float",
+        quarter=[2.2, 1.1], value=["a", "b"],
+    )
+    # The binary float 1.1 is above the exact midpoint, so this is not a tie.
+    value = Fraction(1.1)
+    assert value > Fraction(11, 10)
+    assert abs(value - Fraction(6, 5)) < abs(value - 1)
+
+    result = to_fraction(ann, max_denominator=5)
+    assert [list(q) for q in result.extent.quarter] == [[11, 5], [6, 5]]

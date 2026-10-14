@@ -182,6 +182,24 @@ Musical scores and sheet music annotations can use quarter-note extents: `quarte
 }
 ```
 
+The `.float` and `.fraction` quarter extents convert into each other with
+`bopp.to_fraction(ann, max_denominator=...)`, which selects the nearest fraction
+whose denominator does not exceed the caller-chosen bound, and `bopp.to_float(ann)`.
+The result is a derived annotation that lists the source in `parents`.
+
+```python
+>>> ann = bopp.create(
+...     media_id="musicxml:score_001",
+...     payload_kind="lyrics",
+...     extent_kind="quarters_time.float",
+...     quarter=[0.0, 0.5, 1.25, 2.6666666666666665],
+...     value=["Hello", "world", "how", "are"],
+... )
+>>> exact_ann = bopp.to_fraction(ann, max_denominator=12)
+>>> exact_ann.extent.quarter
+[[0, 1], [1, 2], [5, 4], [8, 3]]
+```
+
 ### Optical / visual bounding boxes
 
 For visual annotations on sheet music or audio spectrogram images, the `pixel_box` extent defines 2D bounding boxes using `x`, `y`, `width`, and `height` pixel coordinates.

@@ -14,6 +14,7 @@ from .core import validate_and_set_annotation_id
 from .exceptions import BoppArgumentError, BoppValidationError
 from .models.v1.extent.times import Times
 from .models.v1.metadata.derived import DerivedAnnotationMetadata
+from .registries import get_registry
 from .util import _get_tag
 
 # Mapping default target_field when target_field is None
@@ -25,6 +26,8 @@ DEFAULT_TARGET_FIELDS: dict[str, str] = {
     "midi_interval": "tick",
     "quarters_time.fraction": "quarter",
     "quarters_interval.fraction": "quarter",
+    "quarters_time.float": "quarter",
+    "quarters_interval.float": "quarter",
 }
 
 # Axis structure definition: (extent_tag, target_field) -> (kind, origin_or_min, span_or_max)
@@ -40,12 +43,22 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("midi_interval", "tick"): ("origin_span", "tick", "duration"),
     ("quarters_time.fraction", "quarter"): ("point", "quarter", None),
     ("quarters_interval.fraction", "quarter"): ("origin_span", "quarter", "duration"),
+    ("quarters_time.float", "quarter"): ("point", "quarter", None),
+    ("quarters_interval.float", "quarter"): ("origin_span", "quarter", "duration"),
 }
 
 FRACTION_AXES: frozenset[tuple[str, str]] = frozenset({
     ("quarters_time.fraction", "quarter"),
     ("quarters_interval.fraction", "quarter"),
 })
+
+FLOAT_TO_FRACTION_EXTENTS: dict[str, str] = {
+    "quarters_time.float": "quarters_time.fraction",
+    "quarters_interval.float": "quarters_interval.fraction",
+}
+FRACTION_TO_FLOAT_EXTENTS: dict[str, str] = {
+    fraction: flt for flt, fraction in FLOAT_TO_FRACTION_EXTENTS.items()
+}
 
 
 _TrimBound = int | float | Fraction | list[int] | tuple[int, int] | None
@@ -193,6 +206,125 @@ def _coerce_trim_bound(value: _TrimBound) -> float | Fraction | None:
 def _fraction_pair(value: Fraction) -> list[int]:
     """Encode a reduced fraction as a JSON-compatible pair."""
     return [value.numerator, value.denominator]
+
+
+def _conversion_extent(
+    annotation: BoppBase, twins: dict[str, str], transform: str,
+) -> tuple[msgspec.Struct, str]:
+    """Require a convertible extent and resolve its target tag."""
+    extent = getattr(annotation, "extent", msgspec.UNSET)
+    supported = f"Convertible extent tags: {', '.join(twins)}."
+    if extent is msgspec.UNSET or extent is None:
+        raise BoppArgumentError(f"{transform}: annotation has no extent. {supported}")
+    tag = _get_tag(extent)
+    if tag is None or tag not in twins:
+        reason = "already is a target extent" if tag in twins.values() else "is not convertible"
+        raise BoppArgumentError(f"{transform}: extent {tag!r} {reason}. {supported}")
+    return extent, twins[tag]
+
+
+def _rebuild_converted_extent(
+    annotation: BoppBase,
+    target_tag: str,
+    columns: dict[str, list[Any]],
+    transform: str,
+    parameters: dict[str, Any],
+) -> BoppBase:
+    """Build a registered twin extent and derive an annotation around it."""
+    extent_cls = get_registry(annotation.bopp_version)["EXTENT_TYPE_REGISTRY"][target_tag]  # type: ignore[attr-defined]
+    parents, sandbox = _derive_parents_and_sandbox(annotation, "Converting")
+    return _rebuild_annotation(
+        annotation,
+        parents=parents,
+        sandbox=sandbox,
+        payload=copy.deepcopy(annotation.payload),  # type: ignore[attr-defined]
+        confidence=copy.deepcopy(getattr(annotation, "confidence", msgspec.UNSET)),
+        extent=extent_cls(**columns),
+        metadata=DerivedAnnotationMetadata(transform=transform, parameters=parameters),
+    )
+
+
+def to_fraction(annotation: BoppBase, *, max_denominator: int) -> BoppBase:
+    """
+    Convert a floating-point quarter extent to its fraction twin.
+
+    Each finite coordinate becomes the nearest fraction whose denominator does
+    not exceed the caller-chosen bound, using Fraction(value).limit_denominator.
+    Approximation uses the float's exact binary value; for example, 1.1 becomes
+    [6, 5] with a bound of 5 because it lies slightly above the midpoint of 1 and 6/5.
+    Results are reduced [numerator, denominator] lists with positive denominators.
+    The source is unchanged; the derived annotation preserves payload and confidence
+    and records the source in its parent lineage.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        Annotation with a convertible floating-point quarter extent.
+    max_denominator : int
+        Required positive denominator bound. Booleans are not accepted.
+
+    Returns
+    -------
+    BoppBase
+        A derived annotation with the fraction extent and a new ID.
+
+    Raises
+    ------
+    BoppArgumentError
+        If the extent is missing, unsupported, or already a fraction twin, the
+        denominator bound is invalid, or a coordinate is not finite.
+    """
+    extent, target_tag = _conversion_extent(annotation, FLOAT_TO_FRACTION_EXTENTS, "to_fraction")
+    if type(max_denominator) is not int:
+        raise BoppArgumentError(
+            f"to_fraction: max_denominator must be an int (not a bool), got {max_denominator!r}."
+        )
+    if max_denominator < 1:
+        raise BoppArgumentError(f"to_fraction: max_denominator must be >= 1, got {max_denominator}.")
+
+    columns: dict[str, list[Any]] = {}
+    for name, values in _get_facet_list_fields(extent).items():
+        columns[name] = []
+        for index, value in enumerate(values):
+            if not math.isfinite(value):
+                raise BoppArgumentError(f"Field {name!r} at index {index} must be finite.")
+            columns[name].append(_fraction_pair(Fraction(value).limit_denominator(max_denominator)))
+
+    return _rebuild_converted_extent(
+        annotation, target_tag, columns, "to_fraction", {"max_denominator": max_denominator},
+    )
+
+
+def to_float(annotation: BoppBase) -> BoppBase:
+    """
+    Convert a fraction quarter extent to its floating-point twin.
+
+    Each [numerator, denominator] list or tuple becomes a float via true division.
+    The result is exact when representable as a double and otherwise correctly
+    rounded to the nearest double. The source is unchanged; the derived annotation
+    preserves payload and confidence and records the source in its parent lineage.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        Annotation with a convertible fraction quarter extent.
+
+    Returns
+    -------
+    BoppBase
+        A derived annotation with the floating-point extent and a new ID.
+
+    Raises
+    ------
+    BoppArgumentError
+        If the extent is missing, unsupported, or already a floating-point twin.
+    """
+    extent, target_tag = _conversion_extent(annotation, FRACTION_TO_FLOAT_EXTENTS, "to_float")
+    columns = {
+        name: [numerator / denominator for numerator, denominator in values]
+        for name, values in _get_facet_list_fields(extent).items()
+    }
+    return _rebuild_converted_extent(annotation, target_tag, columns, "to_float", {})
 
 
 def _trim_bound_parameter(
