@@ -67,3 +67,13 @@ def _create_extension_template_archive(app):
 
 def setup(app):
     app.connect("builder-inited", _create_extension_template_archive)
+html_logo = "img/bopp_logo.svg"
+
+html_theme_options = {
+    "logo": {
+        "alt_text": "bopp",
+        "image": html_logo
+    },
+    "show_version_warning_banner": True,
+    "sticky_banners": True,
+}
