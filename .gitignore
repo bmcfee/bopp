@@ -29,6 +29,7 @@ docs/generated/
 docs/api/generated/
 docs/api/generated_schema
 docs/_build/
+docs/_static/
 
 # IDEs / editors
 *.swp
@@ -42,6 +43,7 @@ docs/_build/
 coverage.xml
 .tox
 tmp/
+benchmark.json
 
 # Miscellaneous
 pip-log.txt # Installer logs

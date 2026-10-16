@@ -28,3 +28,10 @@
    :hidden:
 
    schema.rst
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Extensions
+   :hidden:
+
+   extensions/index

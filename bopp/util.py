@@ -190,7 +190,7 @@ def _extract_facet_data(
             continue
 
         if isinstance(val, list):
-            target_dict[f"{facet_name}:{tag}:{field.name}"] = val
+            target_dict[f"{facet_name}:{tag}:{field.name}"] = msgspec.to_builtins(val)
         else:
             facet_attrs[field.name] = msgspec.to_builtins(val)
 

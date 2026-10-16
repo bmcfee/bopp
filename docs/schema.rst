@@ -1,5 +1,5 @@
-Schema Specifications
-=====================
+Schema
+======
 
 .. toctree::
    :maxdepth: 1
