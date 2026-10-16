@@ -20,9 +20,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="0.4331029"
-     inkscape:cx="972.05536"
-     inkscape:cy="430.6136"
+     inkscape:zoom="1.225"
+     inkscape:cx="495.51021"
+     inkscape:cy="267.34694"
      inkscape:window-width="1920"
      inkscape:window-height="1011"
      inkscape:window-x="0"
@@ -54,6 +54,38 @@
      rx="13.702407"
      id="rect1"
      style="fill:#ffffff;fill-opacity:1;stroke:#202020;stroke-opacity:1" />
+  <g
+     id="g6"
+     transform="translate(0.0175522,0.166937)">
+    <path
+       style="fill:#5af27f;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 354.27368,103.88465 h 202.18731 v 48.18899 H 354.27368 Z"
+       id="path2" />
+    <path
+       style="fill:#5aa1f2;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 454.5982,54.811111 h 51.81598 V 153.86614 H 454.5982 Z"
+       id="path3" />
+    <path
+       style="fill:#f2eb5a;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 206.13322,153.24543 h 148.14046 v 101.2298 H 206.13322 Z"
+       id="path1" />
+    <path
+       style="fill:#f2695a;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 206.13322,52.015605 h 98.09367 V 254.47524 h -98.09367 z"
+       id="rect2" />
+    <path
+       style="fill:#f2aa5a;stroke-width:2.49903;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 256.5611,52.015605 h 47.66579 V 254.47524 H 256.5611 Z"
+       id="path4" />
+    <path
+       style="fill:#5af2c0;stroke-width:1.72328;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 407.65935,103.88465 h 46.71849 v 48.18899 h -46.71849 z"
+       id="path5" />
+    <path
+       style="fill:#5a60f2;stroke-width:1.72328;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 507.65935,103.88465 h 46.71849 v 48.18899 h -46.71849 z"
+       id="path6" />
+  </g>
   <!-- Definitions & Styling -->
   <path
      id="rect42"
@@ -61,10 +93,6 @@
      class="frame"
      d="M 21.158918,4 H 569.1936 c 7.49657,0 13.53172,5.6137906 13.53172,12.586974 v 0.01942 c 0,6.973183 0.0386,12.586977 0.0386,12.586977 H 7.5981997 c 0,0 0.028996,-5.613794 0.028996,-12.586977 v -0.01942 C 7.6271957,9.6137906 13.662344,4 21.158918,4 Z"
      sodipodi:nodetypes="ssssccsss" />
-  <path
-     id="rect2"
-     style="fill:#9ade00;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
-     d="m 206.13322,52.015605 h 98.09367 V 254.47524 h -98.09367 z m 0,101.229825 h 148.14046 v 101.2298 H 206.13322 Z m 148.14046,-49.36078 h 202.18731 v 48.18899 H 354.27368 Z M 454.5982,54.811111 h 51.81598 V 153.86614 H 454.5982 Z" />
   <defs
      id="defs1">
     <style

@@ -20,9 +20,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="0.6125"
-     inkscape:cx="549.38775"
-     inkscape:cy="133.06122"
+     inkscape:zoom="2.45"
+     inkscape:cx="364.89796"
+     inkscape:cy="137.34694"
      inkscape:window-width="1920"
      inkscape:window-height="1011"
      inkscape:window-x="0"
@@ -55,10 +55,6 @@
      rx="13.757534"
      id="rect42"
      style="fill:#5aa1f2;fill-opacity:1;stroke:none;stroke-width:1.19779;stroke-dasharray:none" />
-  <path
-     id="rect2"
-     style="fill:#9ade00;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
-     d="m 206.13322,52.015605 h 98.09367 V 254.47524 h -98.09367 z m 0,101.229825 h 148.14046 v 101.2298 H 206.13322 Z m 148.14046,-49.36078 h 202.18731 v 48.18899 H 354.27368 Z M 454.5982,54.811111 h 51.81598 V 153.86614 H 454.5982 Z" />
   <defs
      id="defs1">
     <style
@@ -81,6 +77,37 @@
      y2="30.364838"
      id="line1"
      style="stroke:#202020;stroke-opacity:1" />
+  <g
+     id="g6">
+    <path
+       style="fill:#5af27f;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 354.27368,103.88465 h 202.18731 v 48.18899 H 354.27368 Z"
+       id="path2" />
+    <path
+       style="fill:#5aa1f2;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 454.5982,54.811111 h 51.81598 V 153.86614 H 454.5982 Z"
+       id="path3" />
+    <path
+       style="fill:#f2eb5a;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 206.13322,153.24543 h 148.14046 v 101.2298 H 206.13322 Z"
+       id="path1" />
+    <path
+       style="fill:#f2695a;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 206.13322,52.015605 h 98.09367 V 254.47524 h -98.09367 z"
+       id="rect2" />
+    <path
+       style="fill:#f2aa5a;stroke-width:2.49903;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 256.5611,52.015605 h 47.66579 V 254.47524 H 256.5611 Z"
+       id="path4" />
+    <path
+       style="fill:#5af2c0;stroke-width:1.72328;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 407.65935,103.88465 h 46.71849 v 48.18899 h -46.71849 z"
+       id="path5" />
+    <path
+       style="fill:#5a60f2;stroke-width:1.72328;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 507.65935,103.88465 h 46.71849 v 48.18899 h -46.71849 z"
+       id="path6" />
+  </g>
   <!-- Vertical Divider (Clef Column vs Data Grid) -->
   <!-- Horizontal Staff / Grid Lines (5 rows in body: 110 to 360, 50px increments) -->
   <!-- Vertical Data Grid Lines (11 columns of 50px width across x=190 to 740) -->
@@ -108,51 +135,46 @@
      y2="274.55673"
      id="line9"
      style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
-  <g
-     id="g1"
-     style="stroke:#2d2d2d"
-     transform="translate(-0.40180031,-0.40185852)">
-    <line
-       class="grid-line"
-       x1="10"
-       y1="104.28651"
-       x2="587.18372"
-       y2="104.28651"
-       id="line3"
-       style="stroke:#2d2d2d;stroke-opacity:1" />
-    <line
-       class="grid-line"
-       x1="10"
-       y1="154.48337"
-       x2="587.18372"
-       y2="154.48337"
-       id="line4"
-       style="stroke:#2d2d2d;stroke-opacity:1" />
-    <line
-       class="grid-line"
-       x1="10"
-       y1="204.68022"
-       x2="587.18372"
-       y2="204.68022"
-       id="line5"
-       style="stroke:#2d2d2d;stroke-opacity:1" />
-    <line
-       class="grid-line"
-       x1="10"
-       y1="254.87709"
-       x2="587.18372"
-       y2="254.87709"
-       id="line6"
-       style="stroke:#2d2d2d;stroke-opacity:1" />
-    <line
-       class="grid-line"
-       x1="6.9861293"
-       y1="53.935875"
-       x2="584.16986"
-       y2="53.935875"
-       id="line15"
-       style="stroke:#2d2d2d;stroke-opacity:1" />
-  </g>
+  <line
+     class="grid-line"
+     x1="9.5981998"
+     y1="103.88465"
+     x2="586.78192"
+     y2="103.88465"
+     id="line3"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="9.5981998"
+     y1="154.08151"
+     x2="586.78192"
+     y2="154.08151"
+     id="line4"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="9.5981998"
+     y1="204.27837"
+     x2="586.78192"
+     y2="204.27837"
+     id="line5"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="9.5981998"
+     y1="254.47523"
+     x2="586.78192"
+     y2="254.47523"
+     id="line6"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="6.5843291"
+     y1="53.534016"
+     x2="583.76807"
+     y2="53.534016"
+     id="line15"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
   <line
      class="grid-line"
      x1="356.27017"
