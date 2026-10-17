@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import ast
+import tomllib
 from pathlib import Path
 
 import msgspec
-import tomllib
 
 from ._version import get_current_schema_version
 from .base import BoppBase
