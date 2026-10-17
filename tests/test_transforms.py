@@ -203,8 +203,10 @@ def test_trim_argument_error_order():
     )
     with pytest.raises(BoppArgumentError, match="At least one of"):
         trim(tm, target_field="x")
-    with pytest.raises(BoppArgumentError, match="must be <= end"):
+    with pytest.raises(BoppArgumentError, match="Unsupported target_field"):
         trim(tm, start=2, end=1, target_field="x")
+    with pytest.raises(BoppArgumentError, match="must be <= end"):
+        trim(tm, start=2, end=1)
     with pytest.raises(BoppArgumentError, match="reset=True requires"):
         trim(tm, end=1, reset=True, target_field="zz")
     with pytest.raises(BoppArgumentError, match="At least one of"):
@@ -1421,8 +1423,61 @@ def test_trim_fraction_non_comparable_bounds():
         quarter=[[0, 1]],
         value=["a"],
     )
-    with pytest.raises(BoppArgumentError, match="start and end must be comparable numbers"):
+    with pytest.raises(BoppArgumentError, match="Trim bound must be an int, finite float, Fraction, or pair of ints"):
         trim(pt, start="1/2", end=Fraction(1))
+
+
+@pytest.mark.parametrize("bound", [Decimal("NaN"), Decimal("sNaN"), "a"])
+@pytest.mark.parametrize("name", ["start", "end"])
+def test_trim_fraction_validates_bounds_before_order(bound, name):
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="score_interval",
+        quarter=[[0, 1]],
+        duration=[[1, 1]],
+        value=["a"],
+    )
+    bounds = {"start": 0, "end": 1, name: bound}
+    with pytest.raises(BoppArgumentError, match="Trim bound must be an int, finite float, Fraction, or pair of ints"):
+        trim(ann, **bounds)
+
+
+def test_trim_numeric_non_comparable_bounds():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=list("ab"),
+    )
+    with pytest.raises(BoppArgumentError, match="start and end must be comparable numbers"):
+        trim(ann, start="a", end=1)
+
+
+def test_trim_no_extent_rejects_fraction_before_order():
+    ann = Annotation(
+        media_id="track:1",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=msgspec.UNSET,
+        payload=TagOpenPayload(value=["a"]),
+    )
+    bopp.validate_and_set_annotation_id(ann)
+    with pytest.raises(BoppArgumentError, match="Fraction or pair bounds require a fraction axis"):
+        trim(ann, start=[9, 1], end=5)
+
+
+def test_trim_numeric_rejects_fraction_before_order():
+    ann = create(
+        media_id="track:1",
+        payload_kind="tag_open",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=list("ab"),
+    )
+    with pytest.raises(BoppArgumentError, match="Fraction or pair bounds require a fraction axis"):
+        trim(ann, start=[9, 1], end=5)
 
 
 def test_trim_fraction_reversed_bounds_message():

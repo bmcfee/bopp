@@ -257,16 +257,6 @@ def trim(
     if new_start is None and new_end is None:
         raise BoppArgumentError("At least one of 'start' or 'end' must be provided.")
 
-    if new_start is not None and new_end is not None:
-        try:
-            reversed_bounds = new_start > new_end
-        except TypeError as exc:
-            raise BoppArgumentError("start and end must be comparable numbers.") from exc
-        if reversed_bounds:
-            display_start = list(start) if isinstance(start, tuple) else start
-            display_end = list(end) if isinstance(end, tuple) else end
-            raise BoppArgumentError(f"start ({display_start}) must be <= end ({display_end}).")
-
     if reset and new_start is None:
         raise BoppArgumentError("reset=True requires 'start' to be specified.")
 
@@ -308,6 +298,16 @@ def trim(
         new_end = Fraction(new_end) if new_end is not None else None
     elif isinstance(new_start, Fraction) or isinstance(new_end, Fraction):
         raise BoppArgumentError("Fraction or pair bounds require a fraction axis.")
+
+    if new_start is not None and new_end is not None:
+        try:
+            reversed_bounds = new_start > new_end
+        except TypeError as exc:
+            raise BoppArgumentError("start and end must be comparable numbers.") from exc
+        if reversed_bounds:
+            display_start = list(start) if isinstance(start, tuple) else start
+            display_end = list(end) if isinstance(end, tuple) else end
+            raise BoppArgumentError(f"start ({display_start}) must be <= end ({display_end}).")
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Trimming")
     derived_metadata = DerivedAnnotationMetadata(
