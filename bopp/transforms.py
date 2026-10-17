@@ -217,8 +217,9 @@ def trim(
     Trim an Annotation along a spatial, temporal, or index target axis to a range [start, end].
 
     Fraction extents accept int, finite float, Fraction, or [numerator, denominator]
-    list/tuple bounds (two ints, not bools, with denominator >= 1); numeric axes accept
-    int or float bounds. Boolean bounds are not accepted on fraction extents.
+    list/tuple bounds (two ints, not bools, with denominator >= 1). Numeric axes and
+    annotations without an extent accept only int or float bounds, allowing infinities
+    but rejecting NaN. Boolean bounds are not accepted on any axis.
     Fraction axes use exact arithmetic and return reduced [numerator, denominator] lists;
     on these axes, float bounds are taken at their exact binary value via Fraction(value).
 
@@ -298,16 +299,19 @@ def trim(
         new_end = Fraction(new_end) if new_end is not None else None
     elif isinstance(new_start, Fraction) or isinstance(new_end, Fraction):
         raise BoppArgumentError("Fraction or pair bounds require a fraction axis.")
+    else:
+        for bound in (new_start, new_end):
+            if bound is None:
+                continue
+            if type(bound) is not int and type(bound) is not float:
+                raise BoppArgumentError("Trim bound must be an int or float.")
+            if type(bound) is float and math.isnan(bound):
+                raise BoppArgumentError("Trim bound must not be NaN.")
 
-    if new_start is not None and new_end is not None:
-        try:
-            reversed_bounds = new_start > new_end
-        except TypeError as exc:
-            raise BoppArgumentError("start and end must be comparable numbers.") from exc
-        if reversed_bounds:
-            display_start = list(start) if isinstance(start, tuple) else start
-            display_end = list(end) if isinstance(end, tuple) else end
-            raise BoppArgumentError(f"start ({display_start}) must be <= end ({display_end}).")
+    if new_start is not None and new_end is not None and new_start > new_end:
+        display_start = list(start) if isinstance(start, tuple) else start
+        display_end = list(end) if isinstance(end, tuple) else end
+        raise BoppArgumentError(f"start ({display_start}) must be <= end ({display_end}).")
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Trimming")
     derived_metadata = DerivedAnnotationMetadata(

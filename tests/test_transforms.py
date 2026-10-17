@@ -5,6 +5,7 @@ from decimal import Decimal
 from fractions import Fraction
 
 import msgspec
+import numpy as np
 import pytest
 
 import bopp
@@ -310,9 +311,8 @@ def test_trim_numeric_bounds_pass_through():
     assert result.extent.time == [0.0, 1.0]
     assert result.metadata.parameters["start"] == -math.inf
 
-    result = trim(tm, start=Decimal("0.5"))
-    assert result.extent.time == [1.0, 2.0]
-    assert result.metadata.parameters["start"] == Decimal("0.5")
+    with pytest.raises(BoppArgumentError, match="Trim bound must be an int or float"):
+        trim(tm, start=Decimal("0.5"))
 
 
 def test_trim_no_extent_infinite_bound():
@@ -1443,7 +1443,7 @@ def test_trim_fraction_validates_bounds_before_order(bound, name):
         trim(ann, **bounds)
 
 
-def test_trim_numeric_non_comparable_bounds():
+def test_trim_numeric_rejects_string_before_order():
     ann = create(
         media_id="track:1",
         payload_kind="tag_open",
@@ -1451,8 +1451,48 @@ def test_trim_numeric_non_comparable_bounds():
         time=[0.0, 1.0],
         value=list("ab"),
     )
-    with pytest.raises(BoppArgumentError, match="start and end must be comparable numbers"):
+    with pytest.raises(BoppArgumentError, match="Trim bound must be an int or float"):
         trim(ann, start="a", end=1)
+
+
+@pytest.mark.parametrize("extent_kind", ["time", "time_interval", "midi_interval", None])
+@pytest.mark.parametrize(
+    "bound",
+    [Decimal("0.5"), Decimal("NaN"), Decimal("sNaN"), math.nan, "a", True, np.float64(0.5), np.int64(1)],
+    ids=["decimal", "decimal_nan", "decimal_snan", "nan", "string", "bool", "numpy_float", "numpy_int"],
+)
+@pytest.mark.parametrize("position", ["start", "end", "both", "start_with_end", "end_with_start"])
+def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
+    if extent_kind is None:
+        ann = Annotation(
+            media_id="track:1",
+            bopp_version="1.0.0",
+            metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+            extent=msgspec.UNSET,
+            payload=TagOpenPayload(value=["a"]),
+        )
+        bopp.validate_and_set_annotation_id(ann)
+    else:
+        coords = {"tick": [0]} if extent_kind == "midi_interval" else {"time": [0.0]}
+        if extent_kind != "time":
+            coords["duration"] = [1]
+        ann = create(
+            media_id="track:1",
+            payload_kind="tag_open",
+            extent_kind=extent_kind,
+            value=["a"],
+            **coords,
+        )
+    bounds = {
+        "start": {"start": bound},
+        "end": {"end": bound},
+        "both": {"start": bound, "end": bound},
+        "start_with_end": {"start": bound, "end": 2},
+        "end_with_start": {"start": 0, "end": bound},
+    }[position]
+    message = "Trim bound must not be NaN" if type(bound) is float else "Trim bound must be an int or float"
+    with pytest.raises(BoppArgumentError, match=message):
+        trim(ann, **bounds)
 
 
 def test_trim_no_extent_rejects_fraction_before_order():
