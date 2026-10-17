@@ -83,9 +83,6 @@ PAYLOAD_TYPE_REGISTRY = {
 }
 
 COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
-    'confidence_type': {
-        'agreement': ['n_annotators'],
-    },
     'extent_type': {
         'score_interval': ['quarter', 'duration'],
         'score_quarter': ['quarter'],
@@ -100,8 +97,28 @@ COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
         'object': ['value'],
         'onset': ['value'],
         'pitch_contour': ['value'],
-        'relation': ['relation'],
     },
 }
 
-__all__ = ['ANNOTATION_CLASS', 'COMPLEX_FIELDS_REGISTRY', 'CONFIDENCE_TYPE_REGISTRY', 'EXTENT_TYPE_REGISTRY', 'METADATA_TYPE_REGISTRY', 'PAYLOAD_TYPE_REGISTRY']
+STRING_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
+    'metadata_type': {
+        'algorithm': ['algorithm_id', 'version'],
+        'crowd': ['platform', 'consensus'],
+        'derived': ['transform', 'software', 'description'],
+        'human': ['annotator_id', 'tool'],
+        'other': ['notes'],
+        'sensor': ['device'],
+    },
+    'payload_type': {
+        'chord': ['value'],
+        'ext': ['ext_schema'],
+        'key_mode': ['value'],
+        'lyrics': ['value'],
+        'multi_segment': ['label'],
+        'relation': ['performance_id', 'value', 'relation'],
+        'segment_open': ['value'],
+        'tag_open': ['value'],
+    },
+}
+
+__all__ = ['ANNOTATION_CLASS', 'COMPLEX_FIELDS_REGISTRY', 'CONFIDENCE_TYPE_REGISTRY', 'EXTENT_TYPE_REGISTRY', 'METADATA_TYPE_REGISTRY', 'PAYLOAD_TYPE_REGISTRY', 'STRING_FIELDS_REGISTRY']
