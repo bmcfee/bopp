@@ -251,24 +251,23 @@ def trim(
     BoppArgumentError
         If arguments are invalid or the extent/target_field combination is unsupported.
     """
-    original_start, original_end = start, end
-    start = _coerce_trim_bound(start)
-    end = _coerce_trim_bound(end)
+    new_start = _coerce_trim_bound(start)
+    new_end = _coerce_trim_bound(end)
 
-    if start is None and end is None:
+    if new_start is None and new_end is None:
         raise BoppArgumentError("At least one of 'start' or 'end' must be provided.")
 
-    if start is not None and end is not None:
+    if new_start is not None and new_end is not None:
         try:
-            reversed_bounds = start > end
+            reversed_bounds = new_start > new_end
         except TypeError as exc:
             raise BoppArgumentError("start and end must be comparable numbers.") from exc
         if reversed_bounds:
-            display_start = list(original_start) if isinstance(original_start, tuple) else original_start
-            display_end = list(original_end) if isinstance(original_end, tuple) else original_end
+            display_start = list(start) if isinstance(start, tuple) else start
+            display_end = list(end) if isinstance(end, tuple) else end
             raise BoppArgumentError(f"start ({display_start}) must be <= end ({display_end}).")
 
-    if reset and start is None:
+    if reset and new_start is None:
         raise BoppArgumentError("reset=True requires 'start' to be specified.")
 
     extent = getattr(annotation, "extent", msgspec.UNSET)
@@ -297,7 +296,7 @@ def trim(
         fraction_axis = (extent_tag, resolved_target_field) in FRACTION_AXES
 
     if fraction_axis:
-        for bound in (start, end):
+        for bound in (new_start, new_end):
             if bound is None or type(bound) is int or isinstance(bound, Fraction):
                 continue
             if type(bound) is float:
@@ -305,17 +304,17 @@ def trim(
                     raise BoppArgumentError("Trim bound must be finite.")
             else:
                 raise BoppArgumentError("Trim bound must be an int, finite float, Fraction, or pair of ints.")
-        start = Fraction(start) if start is not None else None
-        end = Fraction(end) if end is not None else None
-    elif isinstance(start, Fraction) or isinstance(end, Fraction):
+        new_start = Fraction(new_start) if new_start is not None else None
+        new_end = Fraction(new_end) if new_end is not None else None
+    elif isinstance(new_start, Fraction) or isinstance(new_end, Fraction):
         raise BoppArgumentError("Fraction or pair bounds require a fraction axis.")
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Trimming")
     derived_metadata = DerivedAnnotationMetadata(
         transform="trim",
         parameters={
-            "start": _trim_bound_parameter(original_start),
-            "end": _trim_bound_parameter(original_end),
+            "start": _trim_bound_parameter(start),
+            "end": _trim_bound_parameter(end),
             "target_field": target_field,
             "strict": strict,
             "reset": reset,
@@ -339,7 +338,7 @@ def trim(
     kind, field_a, field_b = axis_config
 
     kept_indices: list[int] = []
-    shift = start if (reset and start is not None) else (Fraction(0) if fraction_axis else 0.0)
+    shift = new_start if (reset and new_start is not None) else (Fraction(0) if fraction_axis else 0.0)
 
     extent_updates: dict[str, list[Any]] = {}
 
@@ -351,9 +350,9 @@ def trim(
         new_pos = []
 
         for i, pos in enumerate(pos_vals):
-            if start is not None and pos < start:
+            if new_start is not None and pos < new_start:
                 continue
-            if end is not None and pos > end:
+            if new_end is not None and pos > new_end:
                 continue
             kept_indices.append(i)
             new_pos.append(pos - shift)
@@ -375,18 +374,18 @@ def trim(
             p_max = p_min + span
 
             if strict:
-                if start is not None and p_min < start:
+                if new_start is not None and p_min < new_start:
                     continue
-                if end is not None and p_max > end:
+                if new_end is not None and p_max > new_end:
                     continue
                 c_min, c_max = p_min, p_max
             else:
-                if start is not None and p_max <= start:
+                if new_start is not None and p_max <= new_start:
                     continue
-                if end is not None and p_min >= end:
+                if new_end is not None and p_min >= new_end:
                     continue
-                c_min = max(p_min, start) if start is not None else p_min
-                c_max = min(p_max, end) if end is not None else p_max
+                c_min = max(p_min, new_start) if new_start is not None else p_min
+                c_max = min(p_max, new_end) if new_end is not None else p_max
 
             kept_indices.append(i)
             new_origin.append(c_min - shift)
@@ -405,18 +404,18 @@ def trim(
 
         for i, (p_min, p_max) in enumerate(zip(min_vals, max_vals)):
             if strict:
-                if start is not None and p_min < start:
+                if new_start is not None and p_min < new_start:
                     continue
-                if end is not None and p_max > end:
+                if new_end is not None and p_max > new_end:
                     continue
                 c_min, c_max = p_min, p_max
             else:
-                if start is not None and p_max <= start:
+                if new_start is not None and p_max <= new_start:
                     continue
-                if end is not None and p_min >= end:
+                if new_end is not None and p_min >= new_end:
                     continue
-                c_min = max(p_min, start) if start is not None else p_min
-                c_max = min(p_max, end) if end is not None else p_max
+                c_min = max(p_min, new_start) if new_start is not None else p_min
+                c_max = min(p_max, new_end) if new_end is not None else p_max
 
             kept_indices.append(i)
             new_min.append(c_min - shift)
