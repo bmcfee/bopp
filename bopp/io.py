@@ -16,7 +16,7 @@ from .core import (
     validate_and_set_annotation_id,
     validate_annotation_id,
 )
-from .exceptions import BoppArgumentError, BoppRegistryError
+from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError
 from .registries import FACET_REGISTRY_KEYS, get_registry
 from .util import from_dataframe, to_dataframe
 
@@ -27,7 +27,7 @@ class _VersionHeader(msgspec.Struct):
     bopp_version: str = get_current_schema_version()
 
 
-def _parse_complex_cell(val: str) -> Any:
+def _parse_complex_cell(val: str | None) -> Any:
     """
     Safely evaluate container literals from a CSV cell.
 
@@ -36,7 +36,7 @@ def _parse_complex_cell(val: str) -> Any:
 
     Parameters
     ----------
-    val : str
+    val : str or None
         The raw string read from a CSV cell.
 
     Returns
@@ -44,7 +44,7 @@ def _parse_complex_cell(val: str) -> Any:
     Any
         The evaluated container or the original string.
     """
-    if not isinstance(val, str) or not val.strip():
+    if val is None or not isinstance(val, str) or not val.strip():
         return None
     val_stripped = val.strip()
     if val_stripped.startswith(("[", "(", "{")):
@@ -102,6 +102,65 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
                 elif field in string_registry.get(tag_field, {}).get(tag, []):
                     converters[col] = str
     return converters
+
+
+def _build_polars_csv_schema(
+    header_line: str, bopp_version: str
+) -> tuple[dict[str, Any], list[str]]:
+    """
+    Inspect the CSV header row and construct Polars schema overrides and complex column names.
+
+    Ensures that complex and string-typed columns are read as `pl.String` by Polars,
+    preventing unintended numeric or datetime inference and enabling post-read decoding.
+
+    Parameters
+    ----------
+    header_line : str
+        The raw header line from the CSV file containing comma-separated column names.
+    bopp_version : str
+        Schema version to query against the schema registry.
+
+    Returns
+    -------
+    tuple of (dict[str, Any], list[str])
+        A tuple consisting of the `schema_overrides` mapping column names to Polars data types,
+        and a list of column names designated as complex fields requiring decoding.
+    """
+    try:
+        import polars as pl
+    except ImportError as err:
+        raise BoppIOError("polars is required for building polars schema") from err
+
+    schema_overrides: dict[str, Any] = {}
+    complex_columns: list[str] = []
+
+    if not header_line:
+        return schema_overrides, complex_columns
+
+    reader = csv.reader([header_line.strip()])
+    columns = next(reader, [])
+
+    try:
+        registry = get_registry(bopp_version)
+    except (BoppRegistryError, ValueError):
+        return schema_overrides, complex_columns
+
+    complex_registry: dict[str, dict[str, list[str]]] = registry.get("COMPLEX_FIELDS_REGISTRY", {})
+    string_registry: dict[str, dict[str, list[str]]] = registry.get("STRING_FIELDS_REGISTRY", {})
+
+    for col in columns:
+        parts = col.split(":")
+        if len(parts) == 3:
+            facet, tag, field = parts[0], parts[1], parts[2]
+            if facet in FACET_REGISTRY_KEYS:
+                tag_field = f"{facet}_type"
+                if field in complex_registry.get(tag_field, {}).get(tag, []):
+                    schema_overrides[col] = pl.String
+                    complex_columns.append(col)
+                elif field in string_registry.get(tag_field, {}).get(tag, []):
+                    schema_overrides[col] = pl.String
+
+    return schema_overrides, complex_columns
 
 
 def _prepare_annotation_for_save(
@@ -342,7 +401,12 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
     return _load_msgspec_encoded(filepath, msgspec.msgpack, validate_id=validate_id)
 
 
-def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
+def load_bopp_csv(
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    backend: Literal["polars", "pandas"] = "polars",
+) -> BoppBase:
     """
     Read a BOPP CSV file directly into a validated Annotation struct.
 
@@ -353,14 +417,14 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
         Emits a warning if missing.
+    backend : {"polars", "pandas"}, default "polars"
+        The DataFrame framework to use for parsing tabular CSV content.
 
     Returns
     -------
     BoppBase
         Decoded and validated Annotation instance.
     """
-    import pandas as pd
-
     toml_lines = []
 
     with open(filepath, "r", encoding="utf-8") as f:
@@ -381,19 +445,49 @@ def load_bopp_csv(filepath: str | Path, *, validate_id: bool = True) -> BoppBase
             f.seek(0)
             metadata = {}
 
-        # 2. Inspect CSV header to infer column converters based on schema registry
         bopp_version = metadata.get("bopp_version", get_current_schema_version())
         header_pos = f.tell()
         header_line = f.readline()
         f.seek(header_pos)
 
-        converters = _build_csv_converters(header_line, bopp_version)
+        # 2. Hand the open file pointer to Polars or Pandas
+        if backend == "polars":
+            try:
+                import polars as pl
+            except ImportError as err:
+                raise BoppIOError("polars is required for backend='polars'") from err
 
-        # 3. Hand the open file pointer directly to Pandas with inferred converters
-        df = pd.read_csv(f, converters=converters if converters else None)
+            schema_overrides, complex_columns = _build_polars_csv_schema(
+                header_line, bopp_version
+            )
+            df = pl.read_csv(f, schema_overrides=schema_overrides if schema_overrides else None)
+
+            if complex_columns:
+                df = df.with_columns(
+                    [
+                        pl.col(c).map_elements(
+                            _parse_complex_cell, return_dtype=pl.Object
+                        )
+                        for c in complex_columns
+                    ]
+                )
+
+        elif backend == "pandas":
+            try:
+                import pandas as pd
+            except ImportError as err:
+                raise BoppIOError("pandas is required for backend='pandas'") from err
+
+            converters = _build_csv_converters(header_line, bopp_version)
+            df = pd.read_csv(f, converters=converters if converters else None)
+        else:
+            raise BoppArgumentError(f"Unsupported backend: {backend}")
 
     # Attach the singleton fields directly to the DataFrame attributes
-    df.attrs.update(metadata)
+    if hasattr(df, "attrs"):
+        df.attrs.update(metadata)
+    else:
+        df.attrs = metadata  # type: ignore[attr-defined]
 
     ann = from_dataframe(df)
 
