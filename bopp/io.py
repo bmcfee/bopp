@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import csv
 import tomllib
+import types
+import typing
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -104,14 +106,73 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
     return converters
 
 
+def _unwrap_type_hint(hint: Any) -> Any:
+    """
+    Unwrap list, union, and optional annotations to determine inner element type.
+    """
+    origin = typing.get_origin(hint)
+    if origin is list:
+        args = typing.get_args(hint)
+        if args:
+            hint = args[0]
+            origin = typing.get_origin(hint)
+
+    # Handle Union / Optional (types.UnionType in 3.10+ or typing.Union)
+    if origin is typing.Union or origin is types.UnionType:
+        args = [arg for arg in typing.get_args(hint) if arg not in (type(None), type(msgspec.UNSET))]
+        if len(args) == 1:
+            return args[0]
+        if all(arg in (int, float) for arg in args):
+            return float
+        return hint
+    return hint
+
+
+def _type_to_polars_dtype(
+    type_hint: Any,
+    field_name: str,
+    tag: str,
+    tag_field: str,
+    complex_registry: dict[str, dict[str, list[str]]],
+    string_registry: dict[str, dict[str, list[str]]],
+    pl: Any,
+) -> tuple[Any, bool]:
+    """
+    Map a struct field type annotation to a Polars DataType and complex flag.
+    """
+    if field_name in complex_registry.get(tag_field, {}).get(tag, []):
+        return pl.String, True
+
+    if field_name in string_registry.get(tag_field, {}).get(tag, []):
+        return pl.String, False
+
+    elem_type = _unwrap_type_hint(type_hint)
+
+    if elem_type is float:
+        return pl.Float64, False
+    if elem_type is int:
+        return pl.Int64, False
+    if elem_type is bool:
+        return pl.Boolean, False
+    if elem_type is str:
+        return pl.String, False
+
+    origin = typing.get_origin(elem_type)
+    if origin in (list, dict, tuple):
+        return pl.String, True
+
+    # Fallback default
+    return pl.String, False
+
+
 def _build_polars_csv_schema(
     header_line: str, bopp_version: str
 ) -> tuple[dict[str, Any], list[str]]:
     """
-    Inspect the CSV header row and construct Polars schema overrides and complex column names.
+    Inspect the CSV header row and construct an exhaustive Polars schema and complex column list.
 
-    Ensures that complex and string-typed columns are read as `pl.String` by Polars,
-    preventing unintended numeric or datetime inference and enabling post-read decoding.
+    Determines exact Polars data types upfront for every column based on the schema registry,
+    allowing Polars to bypass column type inference during CSV ingestion.
 
     Parameters
     ----------
@@ -123,19 +184,19 @@ def _build_polars_csv_schema(
     Returns
     -------
     tuple of (dict[str, Any], list[str])
-        A tuple consisting of the `schema_overrides` mapping column names to Polars data types,
-        and a list of column names designated as complex fields requiring decoding.
+        A tuple consisting of the full schema mapping every column name to a Polars data type,
+        and a list of column names designated as complex fields requiring post-read decoding.
     """
     try:
         import polars as pl
     except ImportError as err:
         raise BoppIOError("polars is required for building polars schema") from err
 
-    schema_overrides: dict[str, Any] = {}
+    schema: dict[str, Any] = {}
     complex_columns: list[str] = []
 
     if not header_line:
-        return schema_overrides, complex_columns
+        return schema, complex_columns
 
     reader = csv.reader([header_line.strip()])
     columns = next(reader, [])
@@ -143,10 +204,15 @@ def _build_polars_csv_schema(
     try:
         registry = get_registry(bopp_version)
     except (BoppRegistryError, ValueError):
-        return schema_overrides, complex_columns
+        for col in columns:
+            schema[col] = pl.String
+        return schema, complex_columns
 
     complex_registry: dict[str, dict[str, list[str]]] = registry.get("COMPLEX_FIELDS_REGISTRY", {})
     string_registry: dict[str, dict[str, list[str]]] = registry.get("STRING_FIELDS_REGISTRY", {})
+
+    # Cache type hints per struct class
+    struct_type_hints: dict[type[msgspec.Struct], dict[str, Any]] = {}
 
     for col in columns:
         parts = col.split(":")
@@ -154,13 +220,31 @@ def _build_polars_csv_schema(
             facet, tag, field = parts[0], parts[1], parts[2]
             if facet in FACET_REGISTRY_KEYS:
                 tag_field = f"{facet}_type"
-                if field in complex_registry.get(tag_field, {}).get(tag, []):
-                    schema_overrides[col] = pl.String
-                    complex_columns.append(col)
-                elif field in string_registry.get(tag_field, {}).get(tag, []):
-                    schema_overrides[col] = pl.String
+                facet_registry_key = FACET_REGISTRY_KEYS[facet]
+                facet_dict = registry.get(facet_registry_key, {})
+                struct_cls = facet_dict.get(tag)
 
-    return schema_overrides, complex_columns
+                if struct_cls is not None:
+                    if struct_cls not in struct_type_hints:
+                        try:
+                            struct_type_hints[struct_cls] = typing.get_type_hints(struct_cls)
+                        except Exception:
+                            struct_type_hints[struct_cls] = getattr(struct_cls, "__annotations__", {})
+
+                    hints = struct_type_hints[struct_cls]
+                    field_hint = hints.get(field)
+                    dtype, is_complex = _type_to_polars_dtype(
+                        field_hint, field, tag, tag_field, complex_registry, string_registry, pl
+                    )
+                    schema[col] = dtype
+                    if is_complex:
+                        complex_columns.append(col)
+                    continue
+
+        # Fallback for unrecognized columns
+        schema[col] = pl.String
+
+    return schema, complex_columns
 
 
 def _prepare_annotation_for_save(
@@ -457,10 +541,10 @@ def load_bopp_csv(
             except ImportError as err:
                 raise BoppIOError("polars is required for backend='polars'") from err
 
-            schema_overrides, complex_columns = _build_polars_csv_schema(
+            schema, complex_columns = _build_polars_csv_schema(
                 header_line, bopp_version
             )
-            df = pl.read_csv(f, schema_overrides=schema_overrides if schema_overrides else None)
+            df = pl.read_csv(f, schema=schema if schema else None)
 
             if complex_columns:
                 df = df.with_columns(
