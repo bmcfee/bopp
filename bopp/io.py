@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import csv
 import tomllib
 import types
@@ -34,7 +33,7 @@ def _parse_complex_cell(val: str | None) -> Any:
     Safely evaluate container literals from a CSV cell.
 
     Preserves None for empty/whitespace cells. If the string represents a literal
-    container (list, tuple, dict), evaluates it via JSON decoding or :func:`ast.literal_eval`.
+    container (list, dict), evaluates it via JSON decoding.
 
     Parameters
     ----------
@@ -46,14 +45,14 @@ def _parse_complex_cell(val: str | None) -> Any:
     Any
         The evaluated container or the original string.
     """
-    if val is None or not isinstance(val, str) or not val.strip():
+    if val is None or not isinstance(val, str) or not (val_stripped := val.strip()):
         return None
-    val_stripped = val.strip()
-    if val_stripped.startswith(("[", "(", "{")):
-        try:
-            return msgspec.json.decode(val_stripped.encode("utf-8"))
-        except (msgspec.DecodeError, ValueError, SyntaxError):
-            return ast.literal_eval(val_stripped)
+
+    try:
+        return msgspec.json.decode(val_stripped)
+    except (msgspec.DecodeError, ValueError, SyntaxError):
+        return val_stripped
+
     return val
 
 

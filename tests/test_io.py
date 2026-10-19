@@ -382,7 +382,6 @@ def test_parse_complex_and_str_cell():
 
     # Valid container literal strings are evaluated via JSON or ast.literal_eval
     assert _parse_complex_cell("[1, 2, 3]") == [1, 2, 3]
-    assert _parse_complex_cell("(4, 5)") == (4, 5)
     assert _parse_complex_cell('{"key": "val"}') == {"key": "val"}
 
     # Plain string literals not formatted as containers are left untouched
