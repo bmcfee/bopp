@@ -50,7 +50,7 @@ def _parse_complex_cell(val: str | None) -> Any:
     if val_stripped.startswith(("[", "(", "{")):
         try:
             return msgspec.json.decode(val_stripped.encode("utf-8"))
-        except Exception:
+        except (msgspec.DecodeError, ValueError, SyntaxError):
             return ast.literal_eval(val_stripped)
     return val
 
