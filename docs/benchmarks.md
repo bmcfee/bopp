@@ -5,6 +5,7 @@ In this section, we'll compare loading and validating annotations between differ
 serialization formats for BOPP, as well as JAMS (with and without validation) as a baseline
 reference.
 Comparisons to direct CSV loading via pandas (`pd`) and polars (`pl`) are also included.
+The BOPP CSV reader uses polars by default with subsequent decoding and schema validation checks.
 
 All comparisons are implemented on the author's development machine (intel core i7-1360P, 32GB
 ram, ubuntu 26.04.01-LTS, python 3.13.0 conda).
@@ -20,13 +21,13 @@ Extents are time values in seconds, payloads are integer-valued.
 
 | Loader       |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
 |:-------------|-----------:|------------:|--------------:|---------:|
-| jams_val     |    28405.8 |     30992.2 |        2860.9 |       26 |
-| jams_no_val  |     1376.3 |      1519.1 |         144.0 |      485 |
-| pd_csv       |      672.7 |       834.6 |         141.0 |      170 |
-| pl_csv       |      320.2 |       538.9 |         105.9 |       20 |
-| bopp_csv     |     1455.9 |      1658.4 |         298.4 |       47 |
-| bopp_json    |      162.5 |       181.3 |          28.7 |     2330 |
-| bopp_msgpack |      140.2 |       158.3 |          22.1 |     2568 |
+| jams_val     |    13695.6 |     14029.5 |         182.8 |       69 |
+| jams_no_val  |      649.2 |       693.5 |          18.6 |     1056 |
+| pd_csv       |      279.2 |       305.2 |          27.7 |      283 |
+| pl_csv       |      469.1 |      1058.1 |         314.6 |      107 |
+| bopp_csv     |     1069.3 |      1570.6 |         223.3 |      126 |
+| bopp_json    |       76.3 |        85.4 |          10.4 |     4930 |
+| bopp_msgpack |       67.7 |        75.0 |           9.8 |     3881 |
 
 
 
@@ -40,13 +41,13 @@ likelihoods are probabilities (floats in `[0, 1]`).
 
 | Loader       |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
 |:-------------|-----------:|------------:|--------------:|---------:|
-| jams_val     |     3024.6 |      3320.7 |         418.9 |      259 |
-| jams_no_val  |      275.5 |       300.9 |          24.1 |     2201 |
-| pd_csv       |      685.0 |       801.9 |          79.4 |      892 |
-| pl_csv       |      156.8 |       274.9 |         149.3 |     1485 |
-| bopp_csv     |     1857.5 |      2153.0 |         298.1 |      427 |
-| bopp_json    |      255.3 |       294.9 |          35.2 |     1922 |
-| bopp_msgpack |      286.0 |       338.9 |          48.7 |     1606 |
+| jams_val     |     1475.4 |      1551.7 |          85.9 |      641 |
+| jams_no_val  |      129.1 |       139.0 |           3.6 |     3840 |
+| pd_csv       |      293.7 |       318.6 |          16.1 |     1787 |
+| pl_csv       |      574.7 |      1252.5 |         241.3 |      542 |
+| bopp_csv     |      926.7 |      1660.4 |         260.6 |      430 |
+| bopp_json    |      120.6 |       132.5 |          12.6 |     3492 |
+| bopp_msgpack |      137.5 |       148.4 |          13.9 |     2313 |
 
 
 

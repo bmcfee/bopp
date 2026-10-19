@@ -49,7 +49,8 @@ html_logo = "img/bopp_logo.svg"
 html_theme_options = {
     "logo": {
         "alt_text": "bopp",
-        "image": html_logo
+        "image_light": "img/bopp_logo.svg",
+        "image_dark": "img/bopp_logo_dark.svg",
     },
     "show_version_warning_banner": True,
     "sticky_banners": True,

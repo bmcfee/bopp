@@ -9,7 +9,9 @@ import pytest
 from bopp.core import BoppArgumentError, BoppIOError, BoppValidationError, create
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
+from bopp.models.v1.extent.score_interval import ScoreInterval
 from bopp.models.v1.extent.times import Times
+from bopp.models.v1.payload.object import ObjectPayload
 from bopp.models.v1.payload.onset import OnsetPayload
 from bopp.util import (
     _extract_facet_data,
@@ -67,7 +69,7 @@ def test_extract_header_with_scalar_facet_attributes():
         time: list[float]
         time_unit: str = "seconds"
 
-    # Annotation with facet as a non-struct to cover line 96->89
+    # Annotation with facet as a non-struct object to ensure non-struct facets are ignored
     class NonStructExtentAnnotation(msgspec.Struct):
         media_id: str
         extent: Any = "not_a_struct"
@@ -113,6 +115,42 @@ def test_extract_facet_data_scalar_attributes():
     # When struct is None or UNSET, function returns early
     _extract_facet_data(None, "payload", target_dict, attrs_dict)
     _extract_facet_data(msgspec.UNSET, "payload", target_dict, attrs_dict)
+
+
+def test_extract_facet_data_encode_complex():
+    payload = ObjectPayload(value=[{"a": 1}, {"b": 2}])
+    target_dict: dict[str, list[Any]] = {}
+    attrs_dict: dict[str, Any] = {}
+
+    _extract_facet_data(
+        payload,
+        "payload",
+        target_dict,
+        attrs_dict,
+        encode_complex=True,
+        complex_fields={"value"},
+    )
+    assert target_dict["payload:object:value"] == ['{"a":1}', '{"b":2}']
+
+
+def test_to_dataframe_encode_complex():
+    ann = Annotation(
+        media_id="track:complex_test",
+        bopp_version="1.0",
+        payload=ObjectPayload(value=[{"k": "v"}]),
+        extent=ScoreInterval(quarter=[[0, 1]], duration=[[1, 2]]),
+    )
+
+    # With encode_complex=False, columns contain raw Python lists/dicts
+    df_raw = to_dataframe(ann, backend="pandas", encode_complex=False)
+    assert df_raw["payload:object:value"][0] == {"k": "v"}
+    assert df_raw["extent:score_interval:quarter"][0] == [0, 1]
+
+    # With encode_complex=True, columns contain JSON-encoded strings
+    df_encoded = to_dataframe(ann, backend="pandas", encode_complex=True)
+    assert df_encoded["payload:object:value"][0] == '{"k":"v"}'
+    assert df_encoded["extent:score_interval:quarter"][0] == "[0,1]"
+    assert df_encoded["extent:score_interval:duration"][0] == "[1,2]"
 
 
 def test_validate_dataframe_columns_invalid_format():
@@ -200,6 +238,23 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
 
     # Verify UNSET metadata is not attached to DataFrame attributes
     assert "metadata" not in df.attrs
+
+
+def test_to_dataframe_covers_extent_and_confidence_branches():
+    """Verify that to_dataframe extracts parallel arrays and attributes when both extent and confidence exist."""
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:facets_coverage",
+        payload_kind="onset",
+        extent_kind="time",
+        confidence_kind="likelihood",
+        time=[0.1, 0.2],
+        value=[1, 1],
+        confidence=[0.85, 0.95],
+    )
+    df = to_dataframe(ann, backend="pandas")
+    assert "extent:time:time" in df.columns
+    assert "confidence:likelihood:confidence" in df.columns
 
 
 def test_pandas_dataframe_roundtrip():
@@ -415,5 +470,11 @@ def test_invalid_backend():
 
 
 def test_from_dataframe_unsupported_type():
+    # Verify rejection when passed a non-DataFrame object
     with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
         from_dataframe({"not": "a_dataframe"})
+
+    # Verify fallback handling when polars is not installed and input is not a pandas DataFrame
+    with patch.dict("sys.modules", {"polars": None}):
+        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
+            from_dataframe({"not": "a_dataframe"})
