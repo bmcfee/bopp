@@ -139,11 +139,11 @@ def _unwrap_type_hint(hint: Any) -> Any:
 
     # Handle Union / Optional (types.UnionType in 3.10+ or typing.Union)
     if origin is typing.Union or origin is types.UnionType:
-        args = [
+        args = tuple(
             _strip_annotated(arg)
             for arg in typing.get_args(hint)
             if arg not in (type(None), type(msgspec.UNSET))
-        ]
+            )
         if len(args) == 1:
             return args[0]
         if all(arg in (int, float) for arg in args):
@@ -600,7 +600,7 @@ def load_bopp_csv(
                 raise BoppIOError("pandas is required for backend='pandas'") from err
 
             converters = _build_csv_converters(header_line, bopp_version)
-            df = pd.read_csv(f, converters=converters if converters else None)
+            df = pd.read_csv(f, converters=converters if converters else None)  # type: ignore[assignment]
         else:
             raise BoppArgumentError(f"Unsupported backend: {backend}")
 
