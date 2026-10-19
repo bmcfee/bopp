@@ -4,9 +4,12 @@ import msgspec
 import pandas as pd
 import pytest
 
-from bopp.core import create
-from bopp.exceptions import BoppArgumentError, BoppValidationError
+from bopp.core import compute_annotation_id, create
+from bopp.exceptions import BoppArgumentError, BoppRegistryError, BoppValidationError
 from bopp.io import (
+    _build_csv_converters,
+    _parse_complex_cell,
+    _prepare_annotation_for_save,
     load_bopp_csv,
     load_bopp_json,
     load_bopp_msgpack,
@@ -137,6 +140,50 @@ def test_csv_roundtrip_object_payload(tmp_path):
     assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
 
 
+def test_csv_roundtrip_object_payload_polars(tmp_path):
+    pytest.importorskip("polars")
+
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:csv_obj_polars",
+        payload_kind="object",
+        value=[{"color": "brown"}, {"color": "white"}],
+    )
+    file_path = tmp_path / "test_obj_polars.csv"
+
+    # Must succeed with Polars without raising write_csv nested type errors
+    save_bopp_csv(ann, file_path, backend="polars")
+
+    loaded = load_bopp_csv(file_path)
+    assert loaded.media_id == ann.media_id
+    assert _get_tag(loaded.payload) == "object"
+    assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
+
+
+def test_csv_roundtrip_nested_extent_polars(tmp_path):
+    pytest.importorskip("polars")
+
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:csv_extent_polars",
+        extent_kind="score_interval",
+        payload_kind="chord",
+        quarter=[(0, 1), (1, 2)],
+        duration=[(1, 2), (1, 4)],
+        value=["C:maj", "G:maj"],
+    )
+    file_path = tmp_path / "test_extent_polars.csv"
+
+    # Must succeed with Polars backend
+    save_bopp_csv(ann, file_path, backend="polars")
+
+    loaded = load_bopp_csv(file_path)
+    assert loaded.media_id == ann.media_id
+    assert getattr(loaded.payload, "value") == ["C:maj", "G:maj"]
+    assert getattr(loaded.extent, "quarter") == [(0, 1), (1, 2)]
+    assert getattr(loaded.extent, "duration") == [(1, 2), (1, 4)]
+
+
 def test_load_bopp_csv_string_with_brackets(tmp_path):
     # String tag/payload starting with '[' or '(' should not be parsed via literal_eval
     ann = create(
@@ -152,6 +199,24 @@ def test_load_bopp_csv_string_with_brackets(tmp_path):
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
     assert loaded.payload.value == ["[intro]", "(chorus)", "{verse}"]
+
+
+def test_csv_roundtrip_numeric_string_tags(tmp_path):
+    # Verify string payloads containing pure numbers like "1" or "007" are preserved as strings
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:numeric_str_test",
+        payload_kind="tag_open",
+        value=["1", "2", "007"],
+    )
+    file_path = tmp_path / "test_numeric_str.csv"
+
+    save_bopp_csv(ann, file_path)
+
+    loaded = load_bopp_csv(file_path)
+    assert loaded.media_id == ann.media_id
+    assert loaded.payload.value == ["1", "2", "007"]
+    assert all(isinstance(v, str) for v in loaded.payload.value)
 
 
 def test_load_bopp_csv_invalid_schema(tmp_path):
@@ -268,24 +333,21 @@ def test_save_bopp_csv_polars(tmp_path):
 
 
 def test_load_bopp_csv_without_frontmatter(tmp_path):
-    csv_content = (
-        "# ---\n"
-        '# media_id = "track:no_frontmatter"\n'
-        "# ---\n"
-        "payload:onset:value,extent:time:time\n1,0.1\n"
-    )
+    # Test handling of legacy or unfrontmattered CSV files
+    csv_content = "payload:onset:value,extent:time:time\n1,0.1\n"
     file_path = tmp_path / "no_frontmatter.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
-    loaded = load_bopp_csv(file_path, validate_id=True)
-    assert loaded.media_id == "track:no_frontmatter"
+    # Raises BoppValidationError because media_id is missing when frontmatter is omitted
+    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+        load_bopp_csv(file_path, validate_id=False)
 
 
 def test_load_bopp_csv_non_string_columns(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:numeric_cols",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1, 0.2],
         value=[1, 2],
@@ -311,3 +373,76 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
 
     loaded = load_bopp_csv(file_path, validate_id=True)
     assert loaded.media_id == "track:extra_col"
+
+
+def test_parse_complex_and_str_cell():
+    # Empty or whitespace strings evaluate safely to None for complex fields
+    assert _parse_complex_cell(None) is None  # type: ignore[arg-type]
+    assert _parse_complex_cell("   ") is None
+
+    # Valid container literal strings are evaluated via JSON or ast.literal_eval
+    assert _parse_complex_cell("[1, 2, 3]") == [1, 2, 3]
+    assert _parse_complex_cell('{"key": "val"}') == {"key": "val"}
+
+    # Plain string literals not formatted as containers are left untouched
+    assert _parse_complex_cell("unbracketed_val") == "unbracketed_val"
+
+
+def test_build_csv_converters_error_and_edge_cases():
+    # Empty header line returns empty converters map
+    assert _build_csv_converters("", "1.0") == {}
+
+    # Unknown schema version safely yields no converters
+    assert _build_csv_converters("payload:onset:value", "nonexistent_version") == {}
+
+    # Columns that are malformed, outside recognized facets, or missing fields are ignored
+    header = (
+        "not_three_parts,"
+        "unknown_facet:foo:bar,"
+        "payload:nonexistent_tag:value,"
+        "payload:onset:missing_field"
+    )
+    assert _build_csv_converters(header, "1.0") == {}
+
+    # Valid complex and string columns map to respective parsers
+    converters = _build_csv_converters("extent:score_interval:quarter,payload:tag_open:value", "1.0")
+    assert converters["extent:score_interval:quarter"] is _parse_complex_cell
+
+
+def test_prepare_annotation_for_save_id_variations():
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:save_id_test",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1],
+        value=[1],
+        generate_id=False,
+    )
+    assert getattr(ann, "id", msgspec.UNSET) is msgspec.UNSET
+
+    # Generate missing ID when generate_id=True and validate_id=True
+    _prepare_annotation_for_save(ann, validate_id=True, generate_id=True)
+    expected_id = compute_annotation_id(ann)
+    assert ann.id == expected_id
+
+    # Validate existing ID without regenerating when generate_id=True and validate_id=True
+    _prepare_annotation_for_save(ann, validate_id=True, generate_id=True)
+    assert ann.id == expected_id
+
+    # Unconditionally set ID when generate_id=True and validate_id=False
+    ann_no_id = create(
+        bopp_version="1.0",
+        media_id="track:save_id_test2",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.2],
+        value=[2],
+        generate_id=False,
+    )
+    _prepare_annotation_for_save(ann_no_id, validate_id=False, generate_id=True)
+    assert ann_no_id.id == compute_annotation_id(ann_no_id)
+
+    # Strictly validate existing ID when generate_id=False and validate_id=True
+    _prepare_annotation_for_save(ann, validate_id=True, generate_id=False)
+    assert ann.id == expected_id
