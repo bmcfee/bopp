@@ -237,6 +237,7 @@ def _build_polars_csv_schema(
                         field_hint, field, tag, tag_field, complex_registry, string_registry, pl
                     )
                     schema[col] = dtype
+
                     if is_complex:
                         complex_columns.append(col)
                     continue
