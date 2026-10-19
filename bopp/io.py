@@ -264,7 +264,7 @@ def _build_polars_csv_schema(
                             struct_type_hints[struct_cls] = typing.get_type_hints(
                                 struct_cls, include_extras=True
                             )
-                        except Exception:
+                        except (NameError, TypeError, AttributeError):
                             struct_type_hints[struct_cls] = getattr(struct_cls, "__annotations__", {})
 
                     hints = struct_type_hints[struct_cls]
