@@ -480,7 +480,10 @@ def to_dataframe(
             if pl_dtype is not None:
                 schema[col_name] = pl_dtype
 
-        df_pl = pl.DataFrame(data, schema=schema if schema else None)
+        if len(schema) == len(data):
+            df_pl = pl.DataFrame(data, schema=schema)
+        else:
+            df_pl = pl.DataFrame(data, schema_overrides=schema if schema else None)
         df_pl.attrs = attrs  # type: ignore[attr-defined]
         return df_pl
 
