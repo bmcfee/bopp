@@ -106,20 +106,44 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
     return converters
 
 
+def _strip_annotated(hint: Any) -> Any:
+    """Recursively strip typing.Annotated wrappers and PEP 695 type aliases."""
+    while True:
+        if typing.get_origin(hint) is typing.Annotated:
+            args = typing.get_args(hint)
+            if not args:
+                break
+            hint = args[0]
+            continue
+        # Support Python 3.12+ PEP 695 type alias statements (typing.TypeAliasType)
+        value = getattr(hint, "__value__", None)
+        if value is not None and value is not hint:
+            hint = value
+            continue
+        break
+    return hint
+
+
 def _unwrap_type_hint(hint: Any) -> Any:
     """
-    Unwrap list, union, and optional annotations to determine inner element type.
+    Unwrap list, Annotated, union, and optional annotations to determine inner element type.
     """
+    hint = _strip_annotated(hint)
+
     origin = typing.get_origin(hint)
     if origin is list:
         args = typing.get_args(hint)
         if args:
-            hint = args[0]
+            hint = _strip_annotated(args[0])
             origin = typing.get_origin(hint)
 
     # Handle Union / Optional (types.UnionType in 3.10+ or typing.Union)
     if origin is typing.Union or origin is types.UnionType:
-        args = [arg for arg in typing.get_args(hint) if arg not in (type(None), type(msgspec.UNSET))]
+        args = [
+            _strip_annotated(arg)
+            for arg in typing.get_args(hint)
+            if arg not in (type(None), type(msgspec.UNSET))
+        ]
         if len(args) == 1:
             return args[0]
         if all(arg in (int, float) for arg in args):
@@ -156,6 +180,16 @@ def _type_to_polars_dtype(
         return pl.Boolean, False
     if elem_type is str:
         return pl.String, False
+
+    if isinstance(elem_type, type):
+        if issubclass(elem_type, float):
+            return pl.Float64, False
+        if issubclass(elem_type, int):
+            return pl.Int64, False
+        if issubclass(elem_type, bool):
+            return pl.Boolean, False
+        if issubclass(elem_type, str):
+            return pl.String, False
 
     origin = typing.get_origin(elem_type)
     if origin in (list, dict, tuple):
@@ -227,7 +261,9 @@ def _build_polars_csv_schema(
                 if struct_cls is not None:
                     if struct_cls not in struct_type_hints:
                         try:
-                            struct_type_hints[struct_cls] = typing.get_type_hints(struct_cls)
+                            struct_type_hints[struct_cls] = typing.get_type_hints(
+                                struct_cls, include_extras=True
+                            )
                         except Exception:
                             struct_type_hints[struct_cls] = getattr(struct_cls, "__annotations__", {})
 
