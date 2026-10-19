@@ -347,6 +347,11 @@ def save_bopp_csv(
         If False and validate_id=False, skips ID generation and validation.
     backend : {"pandas", "pandas-pyarrow", "polars"}, default "polars"
         The DataFrame framework and backend to use during serialization.
+
+        .. warning:: `pandas` backends may not preserve all data types accurately,
+            in particular those involving optional fields or unions with string types.
+            Loading CSV files produced by the pandas backends may result in corruption
+            of content-based `id` fields.
     """
     _prepare_annotation_for_save(ann, validate_id=validate_id, generate_id=generate_id)
 
@@ -539,6 +544,11 @@ def load_bopp_csv(
         Emits a warning if missing.
     backend : {"polars", "pandas"}, default "polars"
         The DataFrame framework to use for parsing tabular CSV content.
+
+        .. warning:: `pandas` backends may not preserve all data types accurately,
+            in particular those involving optional fields or unions with string types.
+            Loading CSV files produced by the pandas backends may result in corruption
+            of content-based `id` fields.
 
     Returns
     -------
