@@ -6,7 +6,12 @@ import msgspec
 
 from ._version import get_current_schema_version
 from .base import BoppBase
-from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError, BoppValidationError
+from .exceptions import (
+    BoppArgumentError,
+    BoppIOError,
+    BoppRegistryError,
+    BoppValidationError,
+)
 from .registries import FACET_REGISTRY_KEYS, get_registry
 
 if TYPE_CHECKING:
@@ -422,17 +427,17 @@ def from_dataframe(df: Any) -> BoppBase:
     """
     # Confirm pandas/polars type dynamically
     try:
-        import pandas as pd
-        valid = isinstance(df, pd.DataFrame)
+        import polars as pl
+        valid = isinstance(df, pl.DataFrame)
     except ImportError:
         valid = False
 
     if not valid:
         try:
-            import polars as pl
-            valid = isinstance(df, pl.DataFrame)
+            import pandas as pd
+            valid = isinstance(df, pd.DataFrame)
         except ImportError:
-            pass
+            valid = False
 
     if not valid:
         raise BoppArgumentError(
@@ -459,6 +464,7 @@ def from_dataframe(df: Any) -> BoppBase:
         "media_id": media_id,
     }
 
+    # TODO: pull these from the fields of the annotation object?
     for key in ("metadata", "sandbox", "annotated_domain", "id", "parents"):
         if key in attrs:
             bopp_data[key] = attrs[key]

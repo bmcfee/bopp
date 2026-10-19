@@ -168,8 +168,8 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
         media_id="track:csv_extent_polars",
         extent_kind="score_interval",
         payload_kind="chord",
-        quarter=[[0, 1], [1, 2]],
-        duration=[[1, 2], [1, 4]],
+        quarter=[(0, 1), (1, 2)],
+        duration=[(1, 2), (1, 4)],
         value=["C:maj", "G:maj"],
     )
     file_path = tmp_path / "test_extent_polars.csv"
@@ -179,9 +179,9 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert getattr(loaded.extent, "quarter") == [[0, 1], [1, 2]]
-    assert getattr(loaded.extent, "duration") == [[1, 2], [1, 4]]
     assert getattr(loaded.payload, "value") == ["C:maj", "G:maj"]
+    assert getattr(loaded.extent, "quarter") == [(0, 1), (1, 2)]
+    assert getattr(loaded.extent, "duration") == [(1, 2), (1, 4)]
 
 
 def test_load_bopp_csv_string_with_brackets(tmp_path):
