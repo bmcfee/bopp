@@ -6,7 +6,7 @@ import msgspec
 
 from ._version import get_current_schema_version
 from .base import BoppBase
-from .exceptions import BoppArgumentError, BoppIOError, BoppValidationError
+from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError, BoppValidationError
 from .registries import FACET_REGISTRY_KEYS, get_registry
 
 if TYPE_CHECKING:
@@ -315,7 +315,7 @@ def to_dataframe(
         try:
             registry = get_registry(bopp_version)
             complex_registry = registry.get("COMPLEX_FIELDS_REGISTRY", {})
-        except Exception:
+        except (BoppRegistryError, ValueError):
             complex_registry = {}
 
     def _get_complex_fields_for_facet(struct: msgspec.Struct | None, facet_name: str) -> set[str]:
