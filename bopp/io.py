@@ -144,6 +144,7 @@ def save_bopp_csv(
     *,
     validate_id: bool = True,
     generate_id: bool = True,
+    backend: Literal["pandas", "pandas-pyarrow", "polars"] = "polars",
 ) -> None:
     """
     Write metadata as TOML frontmatter followed by tabular data to a CSV file.
@@ -166,7 +167,7 @@ def save_bopp_csv(
     _prepare_annotation_for_save(ann, validate_id=validate_id, generate_id=generate_id)
 
     # Serializing to dataframe stores header information in the attrs
-    df = to_dataframe(ann)
+    df = to_dataframe(ann, backend=backend)
     header = getattr(df, "attrs", {})
 
     # 1. Convert the metadata dictionary to a TOML string
@@ -189,7 +190,7 @@ def save_bopp_csv(
             df.to_csv(f, index=False)
         elif hasattr(df, "write_csv"):
             # Is this a polars dataframe?
-            df.write_csv(f)
+            df.write_csv(f, quote_style="non_numeric")
         else:
             raise BoppArgumentError(f"Unknown dataframe type: {type(df)}")
 
