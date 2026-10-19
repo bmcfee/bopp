@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+import types
+import typing
+from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
 
 import msgspec
 
@@ -188,6 +190,69 @@ def _validate_dataframe_columns(
     return grouped_cols
 
 
+def _unwrap_type_hint(hint: Any) -> Any:
+    """Unwrap Annotated, Optional, and Union types to inspect target types."""
+    origin = get_origin(hint)
+    if origin is typing.Annotated:
+        args = get_args(hint)
+        return _unwrap_type_hint(args[0]) if args else hint
+    return hint
+
+
+def _field_type_to_polars_dtype(
+    field_type: Any,
+    pl: Any,
+    *,
+    is_encoded_complex: bool = False,
+) -> Any | None:
+    """
+    Map a struct field type (e.g. list[float], list[int], list[str]) to a Polars DataType.
+    """
+    if is_encoded_complex:
+        return pl.String
+
+    unwrapped = _unwrap_type_hint(field_type)
+    origin = get_origin(unwrapped)
+
+    # We expect facet columnar fields to be list[T]
+    if origin in (list, list):
+        args = get_args(unwrapped)
+        inner = args[0] if args else Any
+    else:
+        inner = unwrapped
+
+    inner = _unwrap_type_hint(inner)
+    inner_origin = get_origin(inner)
+
+    # Flatten unions (e.g. float | int, Optional[float])
+    if inner_origin in (typing.Union, types.UnionType):
+        union_args = [
+            _unwrap_type_hint(arg)
+            for arg in get_args(inner)
+            if arg not in (type(None), None, msgspec.UnsetType)
+        ]
+        if any(arg is float for arg in union_args):
+            return pl.Float64
+        if any(arg is int for arg in union_args):
+            return pl.Int64
+        if any(arg is str or (isinstance(arg, type) and issubclass(arg, str)) for arg in union_args):
+            return pl.String
+        if any(arg is bool for arg in union_args):
+            return pl.Boolean
+        return None
+
+    if inner is float:
+        return pl.Float64
+    if inner is int:
+        return pl.Int64
+    if inner is str or (isinstance(inner, type) and issubclass(inner, str)):
+        return pl.String
+    if inner is bool:
+        return pl.Boolean
+
+    return None
+
+
 def _extract_facet_data(
     struct: msgspec.Struct | None,
     facet_name: str,
@@ -196,6 +261,7 @@ def _extract_facet_data(
     *,
     encode_complex: bool = False,
     complex_fields: set[str] | None = None,
+    column_types: dict[str, tuple[Any, bool]] | None = None,
 ) -> None:
     """
     Extract parallel array fields and scalar attributes from a facet struct.
@@ -219,6 +285,8 @@ def _extract_facet_data(
         Whether to JSON-encode nested/complex column elements to strings.
     complex_fields : set of str or None, default None
         Explicit names of fields that contain complex/nested structures.
+    column_types : dict of str to tuple of (Any, bool) or None, default None
+        Dictionary mapping column names to (field_type, is_encoded_complex).
     """
     if struct is None or struct is msgspec.UNSET:
         return
@@ -237,6 +305,7 @@ def _extract_facet_data(
 
         if isinstance(val, list):
             col_key = f"{facet_name}:{tag}:{field.name}"
+            is_complex = False
             if encode_complex:
                 is_complex = (
                     complex_fields is not None and field.name in complex_fields
@@ -256,6 +325,9 @@ def _extract_facet_data(
                     target_dict[col_key] = val
             else:
                 target_dict[col_key] = val
+
+            if column_types is not None:
+                column_types[col_key] = (field.type, is_complex)
         else:
             facet_attrs[field.name] = msgspec.to_builtins(val)
 
@@ -332,6 +404,8 @@ def to_dataframe(
         tag_key = f"{facet_name}_type"
         return set(complex_registry.get(tag_key, {}).get(tag, []))
 
+    column_types: dict[str, tuple[Any, bool]] = {}
+
     payload_struct = getattr(annotation, "payload", None)
     _extract_facet_data(
         payload_struct,
@@ -340,6 +414,7 @@ def to_dataframe(
         attrs,
         encode_complex=encode_complex,
         complex_fields=_get_complex_fields_for_facet(payload_struct, "payload"),
+        column_types=column_types,
     )
 
     if hasattr(annotation, "extent"):
@@ -351,6 +426,7 @@ def to_dataframe(
             attrs,
             encode_complex=encode_complex,
             complex_fields=_get_complex_fields_for_facet(extent_struct, "extent"),
+            column_types=column_types,
         )
     if hasattr(annotation, "confidence"):
         confidence_struct = getattr(annotation, "confidence", None)
@@ -361,6 +437,7 @@ def to_dataframe(
             attrs,
             encode_complex=encode_complex,
             complex_fields=_get_complex_fields_for_facet(confidence_struct, "confidence"),
+            column_types=column_types,
         )
 
     metadata = getattr(annotation, "metadata", None)
@@ -397,7 +474,13 @@ def to_dataframe(
         except ImportError as err:
             raise BoppIOError("polars is required for backend='polars'") from err
 
-        df_pl = pl.DataFrame(data)
+        schema: dict[str, Any] = {}
+        for col_name, (field_type, is_complex) in column_types.items():
+            pl_dtype = _field_type_to_polars_dtype(field_type, pl, is_encoded_complex=is_complex)
+            if pl_dtype is not None:
+                schema[col_name] = pl_dtype
+
+        df_pl = pl.DataFrame(data, schema=schema if schema else None)
         df_pl.attrs = attrs  # type: ignore[attr-defined]
         return df_pl
 
