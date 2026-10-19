@@ -5,7 +5,7 @@ import csv
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import msgspec
 
@@ -32,7 +32,7 @@ def _parse_complex_cell(val: str) -> Any:
     Safely evaluate container literals from a CSV cell.
 
     Preserves None for empty/whitespace cells. If the string represents a literal
-    container (list, tuple, dict), evaluates it via :func:`ast.literal_eval`.
+    container (list, tuple, dict), evaluates it via JSON decoding or :func:`ast.literal_eval`.
 
     Parameters
     ----------
@@ -48,7 +48,10 @@ def _parse_complex_cell(val: str) -> Any:
         return None
     val_stripped = val.strip()
     if val_stripped.startswith(("[", "(", "{")):
-        return ast.literal_eval(val_stripped)
+        try:
+            return msgspec.json.decode(val_stripped.encode("utf-8"))
+        except Exception:
+            return ast.literal_eval(val_stripped)
     return val
 
 
@@ -163,11 +166,14 @@ def save_bopp_csv(
         If True and validate_id=True, generates an ID if missing; if validate_id=False,
         unconditionally overrides any existing ID with a freshly computed one.
         If False and validate_id=False, skips ID generation and validation.
+    backend : {"pandas", "pandas-pyarrow", "polars"}, default "polars"
+        The DataFrame framework and backend to use during serialization.
     """
     _prepare_annotation_for_save(ann, validate_id=validate_id, generate_id=generate_id)
 
-    # Serializing to dataframe stores header information in the attrs
-    df = to_dataframe(ann, backend=backend)
+    # Serializing to dataframe stores header information in attrs
+    # We encode complex fields as JSON strings for CSV compatibility across backends
+    df = to_dataframe(ann, backend=backend, encode_complex=True)
     header = getattr(df, "attrs", {})
 
     # 1. Convert the metadata dictionary to a TOML string

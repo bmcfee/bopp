@@ -9,7 +9,9 @@ import pytest
 from bopp.core import BoppArgumentError, BoppIOError, BoppValidationError, create
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
+from bopp.models.v1.extent.score_interval import ScoreInterval
 from bopp.models.v1.extent.times import Times
+from bopp.models.v1.payload.object import ObjectPayload
 from bopp.models.v1.payload.onset import OnsetPayload
 from bopp.util import (
     _extract_facet_data,
@@ -113,6 +115,42 @@ def test_extract_facet_data_scalar_attributes():
     # When struct is None or UNSET, function returns early
     _extract_facet_data(None, "payload", target_dict, attrs_dict)
     _extract_facet_data(msgspec.UNSET, "payload", target_dict, attrs_dict)
+
+
+def test_extract_facet_data_encode_complex():
+    payload = ObjectPayload(value=[{"a": 1}, {"b": 2}])
+    target_dict: dict[str, list[Any]] = {}
+    attrs_dict: dict[str, Any] = {}
+
+    _extract_facet_data(
+        payload,
+        "payload",
+        target_dict,
+        attrs_dict,
+        encode_complex=True,
+        complex_fields={"value"},
+    )
+    assert target_dict["payload:object:value"] == ['{"a":1}', '{"b":2}']
+
+
+def test_to_dataframe_encode_complex():
+    ann = Annotation(
+        media_id="track:complex_test",
+        bopp_version="1.0",
+        payload=ObjectPayload(value=[{"k": "v"}]),
+        extent=ScoreInterval(quarter=[[0, 1]], duration=[[1, 2]]),
+    )
+
+    # With encode_complex=False, columns contain raw Python lists/dicts
+    df_raw = to_dataframe(ann, backend="pandas", encode_complex=False)
+    assert df_raw["payload:object:value"][0] == {"k": "v"}
+    assert df_raw["extent:score_interval:quarter"][0] == [0, 1]
+
+    # With encode_complex=True, columns contain JSON-encoded strings
+    df_encoded = to_dataframe(ann, backend="pandas", encode_complex=True)
+    assert df_encoded["payload:object:value"][0] == '{"k":"v"}'
+    assert df_encoded["extent:score_interval:quarter"][0] == "[0,1]"
+    assert df_encoded["extent:score_interval:duration"][0] == "[1,2]"
 
 
 def test_validate_dataframe_columns_invalid_format():

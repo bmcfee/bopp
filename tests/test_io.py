@@ -140,6 +140,50 @@ def test_csv_roundtrip_object_payload(tmp_path):
     assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
 
 
+def test_csv_roundtrip_object_payload_polars(tmp_path):
+    pytest.importorskip("polars")
+
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:csv_obj_polars",
+        payload_kind="object",
+        value=[{"color": "brown"}, {"color": "white"}],
+    )
+    file_path = tmp_path / "test_obj_polars.csv"
+
+    # Must succeed with Polars without raising write_csv nested type errors
+    save_bopp_csv(ann, file_path, backend="polars")
+
+    loaded = load_bopp_csv(file_path)
+    assert loaded.media_id == ann.media_id
+    assert _get_tag(loaded.payload) == "object"
+    assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
+
+
+def test_csv_roundtrip_nested_extent_polars(tmp_path):
+    pytest.importorskip("polars")
+
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:csv_extent_polars",
+        extent_kind="score_interval",
+        payload_kind="chord",
+        quarter=[[0, 1], [1, 2]],
+        duration=[[1, 2], [1, 4]],
+        value=["C:maj", "G:maj"],
+    )
+    file_path = tmp_path / "test_extent_polars.csv"
+
+    # Must succeed with Polars backend
+    save_bopp_csv(ann, file_path, backend="polars")
+
+    loaded = load_bopp_csv(file_path)
+    assert loaded.media_id == ann.media_id
+    assert getattr(loaded.extent, "quarter") == [[0, 1], [1, 2]]
+    assert getattr(loaded.extent, "duration") == [[1, 2], [1, 4]]
+    assert getattr(loaded.payload, "value") == ["C:maj", "G:maj"]
+
+
 def test_load_bopp_csv_string_with_brackets(tmp_path):
     # String tag/payload starting with '[' or '(' should not be parsed via literal_eval
     ann = create(
@@ -336,7 +380,7 @@ def test_parse_complex_and_str_cell():
     assert _parse_complex_cell(None) is None  # type: ignore[arg-type]
     assert _parse_complex_cell("   ") is None
 
-    # Valid container literal strings are evaluated via ast.literal_eval
+    # Valid container literal strings are evaluated via JSON or ast.literal_eval
     assert _parse_complex_cell("[1, 2, 3]") == [1, 2, 3]
     assert _parse_complex_cell("(4, 5)") == (4, 5)
     assert _parse_complex_cell('{"key": "val"}') == {"key": "val"}

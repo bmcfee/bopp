@@ -188,6 +188,9 @@ def _extract_facet_data(
     facet_name: str,
     target_dict: dict[str, Any],
     attrs_dict: dict[str, Any],
+    *,
+    encode_complex: bool = False,
+    complex_fields: set[str] | None = None,
 ) -> None:
     """
     Extract parallel array fields and scalar attributes from a facet struct.
@@ -207,6 +210,10 @@ def _extract_facet_data(
         Dictionary accumulating columnar lists under ``"facet:tag:field"`` keys.
     attrs_dict : dict of str to Any
         Dictionary accumulating scalar singleton attributes for the facet.
+    encode_complex : bool, default False
+        Whether to JSON-encode nested/complex column elements to strings.
+    complex_fields : set of str or None, default None
+        Explicit names of fields that contain complex/nested structures.
     """
     if struct is None or struct is msgspec.UNSET:
         return
@@ -224,7 +231,26 @@ def _extract_facet_data(
             continue
 
         if isinstance(val, list):
-            target_dict[f"{facet_name}:{tag}:{field.name}"] = val
+            col_key = f"{facet_name}:{tag}:{field.name}"
+            if encode_complex:
+                is_complex = (
+                    complex_fields is not None and field.name in complex_fields
+                ) or any(
+                    isinstance(item, (list, dict, tuple, msgspec.Struct))
+                    for item in val
+                    if item is not None
+                )
+                if is_complex:
+                    target_dict[col_key] = [
+                        msgspec.json.encode(item).decode("utf-8")
+                        if item is not None and item is not msgspec.UNSET
+                        else None
+                        for item in val
+                    ]
+                else:
+                    target_dict[col_key] = val
+            else:
+                target_dict[col_key] = val
         else:
             facet_attrs[field.name] = msgspec.to_builtins(val)
 
@@ -235,6 +261,8 @@ def _extract_facet_data(
 def to_dataframe(
     annotation: BoppBase,
     backend: Literal["pandas", "pandas-pyarrow", "polars"] = "pandas",
+    *,
+    encode_complex: bool = False,
 ) -> pd.DataFrame | pl.DataFrame:
     """
     Convert an Annotation instance into a Pandas or Polars DataFrame.
@@ -248,6 +276,9 @@ def to_dataframe(
         The Annotation struct instance to convert.
     backend : {"pandas", "pandas-pyarrow", "polars"}, default "pandas"
         The DataFrame framework and backend to return.
+    encode_complex : bool, default False
+        Whether to JSON-encode nested/complex columns (e.g. lists of fractions or dicts)
+        into strings. Set to True when serializing to tabular formats like CSV.
 
     Returns
     -------
@@ -272,17 +303,60 @@ def to_dataframe(
     'audio:123'
     """
     data: dict[str, Any] = {}
+    bopp_version = getattr(annotation, "bopp_version", get_current_schema_version())
 
     attrs = {
-        "bopp_version": getattr(annotation, "bopp_version", get_current_schema_version()),
+        "bopp_version": bopp_version,
         "media_id": getattr(annotation, "media_id", None),
     }
 
-    _extract_facet_data(annotation.payload, "payload", data, attrs)  # type: ignore[attr-defined]
+    complex_registry: dict[str, dict[str, list[str]]] = {}
+    if encode_complex:
+        try:
+            registry = get_registry(bopp_version)
+            complex_registry = registry.get("COMPLEX_FIELDS_REGISTRY", {})
+        except Exception:
+            complex_registry = {}
+
+    def _get_complex_fields_for_facet(struct: msgspec.Struct | None, facet_name: str) -> set[str]:
+        if struct is None or struct is msgspec.UNSET:
+            return set()
+        tag = _get_tag(struct)
+        if not tag:
+            return set()
+        tag_key = f"{facet_name}_type"
+        return set(complex_registry.get(tag_key, {}).get(tag, []))
+
+    payload_struct = getattr(annotation, "payload", None)
+    _extract_facet_data(
+        payload_struct,
+        "payload",
+        data,
+        attrs,
+        encode_complex=encode_complex,
+        complex_fields=_get_complex_fields_for_facet(payload_struct, "payload"),
+    )
+
     if hasattr(annotation, "extent"):
-        _extract_facet_data(annotation.extent, "extent", data, attrs)
+        extent_struct = getattr(annotation, "extent", None)
+        _extract_facet_data(
+            extent_struct,
+            "extent",
+            data,
+            attrs,
+            encode_complex=encode_complex,
+            complex_fields=_get_complex_fields_for_facet(extent_struct, "extent"),
+        )
     if hasattr(annotation, "confidence"):
-        _extract_facet_data(annotation.confidence, "confidence", data, attrs)
+        confidence_struct = getattr(annotation, "confidence", None)
+        _extract_facet_data(
+            confidence_struct,
+            "confidence",
+            data,
+            attrs,
+            encode_complex=encode_complex,
+            complex_fields=_get_complex_fields_for_facet(confidence_struct, "confidence"),
+        )
 
     metadata = getattr(annotation, "metadata", None)
     if metadata is not None and metadata is not msgspec.UNSET:
