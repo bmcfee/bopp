@@ -10,7 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Micromamba
         uses: mamba-org/setup-micromamba@v1
@@ -41,7 +41,11 @@ jobs:
           pytest
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: bmcfee/bopp
+          flags: unittests
+          fail_ci_if_error: true
+          verbose: true
+          name: codecov-umbrella

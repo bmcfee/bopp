@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg
-   viewBox="0 0 541.18372 278.75012"
-   width="541.18372"
-   height="278.75012"
+   viewBox="0 0 1126.7354 278.37235"
+   width="1126.7354"
+   height="278.37234"
    version="1.1"
    id="svg29"
-   sodipodi:docname="bopp-logo-2.svg"
+   sodipodi:docname="bopp-logo-2-notext.svg"
    inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -20,9 +20,9 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="1.225"
-     inkscape:cx="239.18367"
-     inkscape:cy="125.30612"
+     inkscape:zoom="2.45"
+     inkscape:cx="364.89796"
+     inkscape:cy="137.34694"
      inkscape:window-width="1920"
      inkscape:window-height="1011"
      inkscape:window-x="0"
@@ -33,8 +33,8 @@
     <inkscape:grid
        id="grid4"
        units="px"
-       originx="0"
-       originy="0"
+       originx="49.598172"
+       originy="-0.1888949"
        spacingx="1"
        spacingy="0.99999999"
        empcolor="#0099e5"
@@ -48,17 +48,13 @@
   <!-- Definitions & Styling -->
   <rect
      class="frame"
-     x="3.2581024"
-     y="3.0174217"
-     width="534.66748"
-     height="55.072605"
-     rx="12.580412"
+     x="2.8286133"
+     y="2.828537"
+     width="584.69513"
+     height="27.536301"
+     rx="13.757534"
      id="rect42"
-     style="fill:#268bd2;fill-opacity:1;stroke:none;stroke-width:1.61984;stroke-dasharray:none" />
-  <path
-     id="rect2"
-     style="fill:#6c71c4;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
-     d="m 156.53502,52.204494 h 98.09367 V 254.66412 h -98.09367 z m 0,101.229816 h 148.14046 v 101.2298 H 156.53502 Z m 148.14046,-49.36078 h 202.18731 v 48.18899 H 304.67548 Z M 405,55 h 51.81598 v 99.05502 H 405 Z" />
+     style="fill:#5aa1f2;fill-opacity:1;stroke:none;stroke-width:1.19779;stroke-dasharray:none" />
   <defs
      id="defs1">
     <style
@@ -72,141 +68,167 @@
     </style>
   </defs>
   <!-- Outer Rounded Table Frame -->
-  <rect
-     class="frame"
-     x="4.2406845"
-     y="4"
-     width="532.70233"
-     height="270.75012"
-     rx="12.534173"
-     id="rect1"
-     style="fill:none;fill-opacity:1;stroke:#202020;stroke-opacity:1" />
   <!-- Horizontal Header Separator -->
   <line
      class="header-line"
-     x1="4"
-     y1="53.876675"
-     x2="537.18372"
-     y2="53.876675"
+     x1="6.7991333"
+     y1="30.364838"
+     x2="583.56299"
+     y2="30.364838"
      id="line1"
      style="stroke:#202020;stroke-opacity:1" />
-  <!-- Vertical Divider (Clef Column vs Data Grid) -->
-  <line
-     class="divider"
-     x1="106.50462"
-     y1="4.0419044"
-     x2="106.50462"
-     y2="274.70822"
-     id="line2"
-     style="stroke:#202020;stroke-opacity:1" />
-  <!-- Horizontal Staff / Grid Lines (5 rows in body: 110 to 360, 50px increments) -->
   <g
-     id="horizontal-grid-lines"
-     transform="matrix(0.78409369,0,0,1.0039372,-43.045622,-56.556418)"
-     style="stroke:#202020;stroke-opacity:1">
-    <line
-       class="grid-line"
-       x1="60"
-       y1="160"
-       x2="740"
-       y2="160"
-       id="line3"
-       style="stroke:#202020;stroke-opacity:1" />
-    <line
-       class="grid-line"
-       x1="60"
-       y1="210"
-       x2="740"
-       y2="210"
-       id="line4"
-       style="stroke:#202020;stroke-opacity:1" />
-    <line
-       class="grid-line"
-       x1="60"
-       y1="260"
-       x2="740"
-       y2="260"
-       id="line5"
-       style="stroke:#202020;stroke-opacity:1" />
-    <line
-       class="grid-line"
-       x1="60"
-       y1="310"
-       x2="740"
-       y2="310"
-       id="line6"
-       style="stroke:#202020;stroke-opacity:1" />
+     id="g6">
+    <path
+       style="fill:#5af27f;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 354.27368,103.88465 h 202.18731 v 48.18899 H 354.27368 Z"
+       id="path2" />
+    <path
+       style="fill:#5aa1f2;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 454.5982,54.811111 h 51.81598 V 153.86614 H 454.5982 Z"
+       id="path3" />
+    <path
+       style="fill:#f2eb5a;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 206.13322,153.24543 h 148.14046 v 101.2298 H 206.13322 Z"
+       id="path1" />
+    <path
+       style="fill:#f2695a;stroke-width:3.585;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 206.13322,52.015605 h 98.09367 V 254.47524 h -98.09367 z"
+       id="rect2" />
+    <path
+       style="fill:#f2aa5a;stroke-width:2.49903;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 256.5611,52.015605 h 47.66579 V 254.47524 H 256.5611 Z"
+       id="path4" />
+    <path
+       style="fill:#5af2c0;stroke-width:1.72328;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 407.65935,103.88465 h 46.71849 v 48.18899 h -46.71849 z"
+       id="path5" />
+    <path
+       style="fill:#5a60f2;stroke-width:1.72328;stroke-linecap:round;paint-order:stroke fill markers"
+       d="m 507.65935,103.88465 h 46.71849 v 48.18899 h -46.71849 z"
+       id="path6" />
   </g>
+  <!-- Vertical Divider (Clef Column vs Data Grid) -->
+  <!-- Horizontal Staff / Grid Lines (5 rows in body: 110 to 360, 50px increments) -->
   <!-- Vertical Data Grid Lines (11 columns of 50px width across x=190 to 740) -->
   <line
      class="grid-line"
-     x1="156.53502"
-     y1="52.204494"
-     x2="156.53502"
-     y2="274.72101"
+     x1="206.10861"
+     y1="57.509422"
+     x2="206.10861"
+     y2="274.55673"
      id="line7"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <line
      class="grid-line"
-     x1="206.58185"
-     y1="52.204494"
-     x2="206.58185"
-     y2="274.72101"
+     x1="256.16248"
+     y1="57.509422"
+     x2="256.16248"
+     y2="274.55673"
      id="line8"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <line
      class="grid-line"
-     x1="256.62869"
-     y1="52.204494"
-     x2="256.62869"
-     y2="274.72101"
+     x1="306.21637"
+     y1="57.509422"
+     x2="306.21637"
+     y2="274.55673"
      id="line9"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <line
      class="grid-line"
-     x1="306.67548"
-     y1="52.204494"
-     x2="306.67548"
-     y2="274.72101"
+     x1="9.5981998"
+     y1="103.88465"
+     x2="586.78192"
+     y2="103.88465"
+     id="line3"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="9.5981998"
+     y1="154.08151"
+     x2="586.78192"
+     y2="154.08151"
+     id="line4"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="9.5981998"
+     y1="204.27837"
+     x2="586.78192"
+     y2="204.27837"
+     id="line5"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="9.5981998"
+     y1="254.47523"
+     x2="586.78192"
+     y2="254.47523"
+     id="line6"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="6.5843291"
+     y1="53.534016"
+     x2="583.76807"
+     y2="53.534016"
+     id="line15"
+     style="stroke:#2d2d2d;stroke-opacity:1" />
+  <line
+     class="grid-line"
+     x1="356.27017"
+     y1="57.509422"
+     x2="356.27017"
+     y2="274.55673"
      id="line10"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <line
      class="grid-line"
-     x1="356.72232"
-     y1="52.204494"
-     x2="356.72232"
-     y2="274.72101"
+     x1="406.32401"
+     y1="57.509422"
+     x2="406.32401"
+     y2="274.55673"
      id="line11"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <line
      class="grid-line"
-     x1="406.76913"
-     y1="52.204494"
-     x2="406.76913"
-     y2="274.72101"
+     x1="456.37784"
+     y1="57.509422"
+     x2="456.37784"
+     y2="274.55673"
      id="line12"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <line
      class="grid-line"
-     x1="456.81598"
-     y1="52.204494"
-     x2="456.81598"
-     y2="274.72101"
+     x1="506.43173"
+     y1="57.509422"
+     x2="506.43173"
+     y2="274.55673"
      id="line13"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <line
      class="grid-line"
-     x1="506.86279"
-     y1="52.204494"
-     x2="506.86279"
-     y2="274.72101"
+     x1="556.4856"
+     y1="57.509422"
+     x2="556.4856"
+     y2="274.55673"
      id="line14"
-     style="stroke:#202020;stroke-opacity:1" />
+     style="fill:#2d2d2d;stroke:#202020;stroke-opacity:1" />
   <!-- Percussion Clef (Two parallel vertical bars centered in clef column, spanning middle 3 rows) -->
+  <!-- Braille Notation: "bopp" (2 cols per cell, 1 col spacing, vertically centered in rows 2–4) -->
+  <line
+     class="divider"
+     x1="149.59821"
+     y1="4.4199524"
+     x2="149.59821"
+     y2="271.16168"
+     id="line2"
+     style="stroke:#202020;stroke-opacity:1" />
   <g
      id="percussion-clef"
-     transform="matrix(1.0874635,0,0,0.67758862,-82.011594,-4.1475803)"
-     style="fill:#002b36">
+     transform="matrix(1.5002726,0,0,0.67758862,-109.9435,-4.0490795)"
+     style="fill:#2d2d2d">
     <rect
        class="clef-bar"
        x="97"
@@ -215,7 +237,7 @@
        height="150"
        rx="2"
        id="rect16"
-       style="fill:#002b36" />
+       style="fill:#2d2d2d" />
     <rect
        class="clef-bar"
        x="133"
@@ -224,7 +246,20 @@
        height="150"
        rx="2"
        id="rect17"
-       style="fill:#002b36" />
+       style="fill:#2d2d2d" />
   </g>
-  <!-- Braille Notation: "bopp" (2 cols per cell, 1 col spacing, vertically centered in rows 2–4) -->
+  <rect
+     class="frame"
+     x="4"
+     y="4"
+     width="582.35229"
+     height="270.37234"
+     rx="13.702407"
+     id="rect1"
+     style="fill:none;fill-opacity:1;stroke:#202020;stroke-opacity:1" />
+  <path
+     style="font-size:192px;line-height:1.25;font-family:Dongle;-inkscape-font-specification:Dongle;text-align:center;letter-spacing:20px;text-anchor:middle;fill:#2d2d2d;stroke-width:1.46303"
+     d="m 670.91725,195.62118 q -7.86523,0 -14.04505,-2.80901 -6.17982,-2.52811 -10.67424,-7.02253 v 1.12361 q 0,4.21351 -3.08991,6.46072 -2.80901,2.24721 -6.46073,2.24721 -3.65171,0 -6.74163,-2.24721 -2.80901,-2.24721 -2.80901,-6.46072 V 80.170827 q 0,-4.775315 2.80901,-7.022524 3.08992,-2.52811 6.74163,-2.52811 3.65172,0 6.46073,2.52811 3.08991,2.247209 3.08991,7.022524 v 39.326153 q 4.49442,-4.49441 10.67424,-7.02252 6.17982,-2.52811 14.04505,-2.52811 12.35965,0 21.62939,5.61802 9.55064,5.33712 14.88776,14.88776 5.33712,9.55063 5.33712,21.62938 0,12.35965 -5.33712,22.47209 -5.33712,9.83154 -14.88776,15.44956 -9.26974,5.61802 -21.62939,5.61802 z m -1.6854,-17.41587 q 10.95514,0 17.69677,-7.02253 6.74162,-7.30342 6.74162,-19.10127 0,-11.23604 -6.74162,-17.97767 -6.74163,-6.74163 -17.69677,-6.74163 -10.67424,0 -16.85407,6.74163 -6.17982,6.74163 -6.17982,17.97767 0,11.79785 6.17982,19.10127 6.17983,7.02253 16.85407,7.02253 z m 130.38492,17.41587 q -12.35965,0 -22.47209,-5.61802 -9.83153,-5.61802 -15.44956,-15.44956 -5.61802,-10.11244 -5.61802,-22.47209 0,-12.07875 5.61802,-21.62938 5.61803,-9.55064 15.44956,-14.88776 10.11244,-5.61802 22.47209,-5.61802 12.35965,0 22.19119,5.61802 9.83154,5.33712 15.44956,14.88776 5.89892,9.55063 5.89892,21.62938 0,12.35965 -5.89892,22.47209 -5.61802,9.83154 -15.44956,15.44956 -9.83154,5.61802 -22.19119,5.61802 z m 0,-17.41587 q 10.95515,0 17.69677,-7.02253 6.74163,-7.30342 6.74163,-19.10127 0,-11.23604 -6.74163,-17.97767 -6.74162,-6.74163 -17.69677,-6.74163 -11.23604,0 -17.97767,6.74163 -6.46072,6.74163 -6.46072,17.97767 0,11.79785 6.46072,19.10127 6.74163,7.02253 17.97767,7.02253 z m 133.47494,17.41587 q -7.86523,0 -14.04505,-2.80901 -6.17983,-2.52811 -10.67424,-7.02253 v 39.04525 q 0,4.21352 -3.08992,6.46073 -2.80901,2.24721 -6.46072,2.24721 -3.65172,0 -6.74163,-2.24721 -2.80901,-2.24721 -2.80901,-6.46073 v -103.9334 q 0,-4.77532 2.80901,-7.02253 3.08991,-2.52811 6.74163,-2.52811 3.37081,0 6.17982,2.24721 2.80901,1.96631 3.37082,5.89892 4.49441,-4.21351 10.67424,-6.74162 6.17982,-2.80901 14.04505,-2.80901 12.35965,0 21.62939,5.61802 9.55063,5.33712 14.88775,14.88776 5.33712,9.55063 5.33712,21.62938 0,12.35965 -5.33712,22.47209 -5.33712,9.83154 -14.88775,15.44956 -9.26974,5.61802 -21.62939,5.61802 z m -1.6854,-17.41587 q 10.95514,0 17.69676,-7.02253 6.74163,-7.30342 6.74163,-19.10127 0,-11.23604 -6.74163,-17.97767 -6.74162,-6.74163 -17.69676,-6.74163 -10.67425,0 -16.85407,6.74163 -6.17982,6.74163 -6.17982,17.97767 0,11.79785 6.17982,19.10127 6.17982,7.02253 16.85407,7.02253 z m 133.47479,17.41587 q -7.8653,0 -14.0451,-2.80901 -6.1798,-2.52811 -10.6742,-7.02253 v 39.04525 q 0,4.21352 -3.09,6.46073 -2.809,2.24721 -6.4607,2.24721 -3.6517,0 -6.7416,-2.24721 -2.809,-2.24721 -2.809,-6.46073 v -103.9334 q 0,-4.77532 2.809,-7.02253 3.0899,-2.52811 6.7416,-2.52811 3.3708,0 6.1798,2.24721 2.809,1.96631 3.3709,5.89892 4.4944,-4.21351 10.6742,-6.74162 6.1798,-2.80901 14.045,-2.80901 12.3597,0 21.6294,5.61802 9.5507,5.33712 14.8878,14.88776 5.3371,9.55063 5.3371,21.62938 0,12.35965 -5.3371,22.47209 -5.3371,9.83154 -14.8878,15.44956 -9.2697,5.61802 -21.6293,5.61802 z m -1.6854,-17.41587 q 10.9551,0 17.6967,-7.02253 6.7416,-7.30342 6.7416,-19.10127 0,-11.23604 -6.7416,-17.97767 -6.7416,-6.74163 -17.6967,-6.74163 -10.6743,0 -16.8541,6.74163 -6.1798,6.74163 -6.1798,17.97767 0,11.79785 6.1798,19.10127 6.1798,7.02253 16.8541,7.02253 z"
+     id="text1"
+     aria-label="bopp" />
 </svg>

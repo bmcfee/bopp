@@ -5,6 +5,7 @@ In this section, we'll compare loading and validating annotations between differ
 serialization formats for BOPP, as well as JAMS (with and without validation) as a baseline
 reference.
 Comparisons to direct CSV loading via pandas (`pd`) and polars (`pl`) are also included.
+The BOPP CSV reader uses polars by default with subsequent decoding and schema validation checks.
 
 All comparisons are implemented on the author's development machine (intel core i7-1360P, 32GB
 ram, ubuntu 26.04.01-LTS, python 3.13.0 conda).
