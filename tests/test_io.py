@@ -184,6 +184,80 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
     assert getattr(loaded.extent, "duration") == [(1, 2), (1, 4)]
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"payload_kind": "onset", "extent_kind": "time", "time": [0, 1.5], "value": ["a", "b"]},
+        {
+            "payload_kind": "tag_open",
+            "extent_kind": "time_interval",
+            "time": [0.0, 1.0],
+            "duration": [1, 1.5],
+            "value": ["a", "b"],
+        },
+        {"payload_kind": "tempo", "extent_kind": "time", "time": [0.0, 1.0], "value": [120, 90.5]},
+        {
+            "payload_kind": "note_hz",
+            "extent_kind": "time_interval",
+            "time": [0.0, 1.0],
+            "duration": [1.0, 1.0],
+            "value": [440, 220.5],
+        },
+        {
+            "payload_kind": "note_midi",
+            "extent_kind": "midi_interval",
+            "tick": [0, 480.5],
+            "duration": [240, 240.5],
+            "value": [60, 61.5],
+        },
+        {
+            "payload_kind": "tag_open",
+            "extent_kind": "time_frequency_box",
+            "time": [0.0, 1.0],
+            "duration": [1, 0.5],
+            "freq_min": [100, 200.5],
+            "freq_max": [1000, 2000.5],
+            "value": ["a", "b"],
+        },
+        {
+            "payload_kind": "tag_open",
+            "extent_kind": "pixel_box",
+            "x": [0, 1.5],
+            "width": [10, 2.5],
+            "y": [0, 1],
+            "height": [5, 5.5],
+            "value": ["a", "b"],
+        },
+        {
+            "payload_kind": "tag_open",
+            "extent_kind": "time",
+            "confidence_kind": "likelihood",
+            "time": [0.0, 1.0],
+            "value": ["a", "b"],
+            "confidence": [1, 0.5],
+        },
+    ],
+)
+def test_csv_roundtrip_polars_mixed_int_float(tmp_path, kwargs):
+    """Number columns holding ints and floats are written and read back as floats."""
+    ann = create(media_id="track:mixed", **kwargs)
+    file_path = tmp_path / "mixed.csv"
+
+    save_bopp_csv(ann, file_path, backend="polars")
+    loaded = load_bopp_csv(file_path, backend="polars")
+
+    for facet in ("payload", "extent", "confidence"):
+        original = getattr(ann, facet, None)
+        if not isinstance(original, msgspec.Struct):
+            continue
+        restored = getattr(loaded, facet)
+        for field in msgspec.structs.fields(original):
+            values = getattr(original, field.name)
+            if isinstance(values, list) and all(isinstance(v, (int, float)) for v in values):
+                assert getattr(restored, field.name) == [float(v) for v in values], f"{facet}.{field.name}"
+                assert all(type(v) is float for v in getattr(restored, field.name)), f"{facet}.{field.name}"
+
+
 def test_load_bopp_csv_string_with_brackets(tmp_path):
     # String tag/payload starting with '[' or '(' should not be parsed via literal_eval
     ann = create(
