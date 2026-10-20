@@ -6,14 +6,68 @@ on:
   pull_request:
     branches: [ "main" ]
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: True
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: >-
+      Python ${{ matrix.python-version }} on ${{ matrix.os }}
+      ${{ matrix.variant && format(' - {0}', matrix.variant) || '' }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.13"
+            envfile: ".github/environment-min.yml"
+            channel-priority: "strict"
+            variant: "minimal"
+
+          - os: ubuntu-latest
+            python-version: "3.15"
+            channel-priority: "strict"
+            envfile: ".github/environment-ci.yml"
+
+          - os: ubuntu-latest
+            python-version: "3.15"
+            channel-priority: "strict"
+            envfile: ".github/environment-ci.yml"
+
+          - os: ubuntu-24.04-arm
+            python-version: "3.15"
+            channel-priority: "strict"
+            envfile: ".github/environment-ci.yml"
+
+          - os: ubuntu-latest
+            python-version: "3.15"
+            channel-priority: "strict"
+            envfile: ".github/environment-ci.yml"
+
+          - os: macos-latest
+            python-version: "3.15"
+            channel-priority: "flexible"
+            envfile: ".github/environment-ci.yml"
+
+          - os: windows-latest
+            python-version: "3.15"
+            channel-priority: "flexible"
+            envfile: ".github/environment-ci.yml"
+
+
     steps:
       - uses: actions/checkout@v7
 
       - name: Setup Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: .github/environment-test.yml
           environment-name: bopp-test

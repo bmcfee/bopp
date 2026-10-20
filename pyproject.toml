@@ -7,16 +7,16 @@ name = "bopp"
 dynamic = ["version"]
 description = "Bounded Observation Payload Protocol"
 dependencies = [
-    "msgspec>=0.18.0",
+    "msgspec>=0.19.0",
     "mir_eval>=0.7",
-    "numpy>=1.20.0",
-    "scipy>=1.7.0",
+    "numpy>=2.2.0",
+    "polars>=2.0.0",
 ]
+python_requires = "3.13"
 
 [project.optional-dependencies]
 dataframe = [
     "pandas>=2.0.0",
-    "polars>=0.20.0",
     "pyarrow>=12.0.0",
 ]
 docs = [
@@ -31,7 +31,6 @@ test = [
     "pytest",
     "pytest-cov",
     "pandas>=2.0.0",
-    "polars>=0.20.0",
     "pyarrow>=12.0.0",
 ]
 benchmark = [
@@ -107,7 +106,7 @@ datamodel-codegen \\
   --output bopp/models/v1/ \\
   --output-model-type msgspec.Struct \\
   --formatters ruff-check ruff-format \\
-  --target-python-version 3.12 \\
+  --target-python-version 3.13 \\
   --use-union-operator \\
   --disable-timestamp \\
   --enable-generated-header-marker \\
