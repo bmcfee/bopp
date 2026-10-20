@@ -1,4 +1,5 @@
-from typing import Any
+import enum
+from typing import Annotated, Any, Literal
 from unittest.mock import patch
 
 import msgspec
@@ -7,15 +8,18 @@ import polars as pl
 import pytest
 
 from bopp.core import BoppArgumentError, BoppIOError, BoppValidationError, create
+from bopp.io import _type_to_polars_dtype
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.extent.score_interval import ScoreInterval
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.payload.object import ObjectPayload
 from bopp.models.v1.payload.onset import OnsetPayload
+from bopp.registries import FACET_REGISTRY_KEYS, get_registry
 from bopp.util import (
     _extract_facet_data,
     _get_tag,
+    _polars_column_dtype,
     _validate_dataframe_columns,
     extract_header,
     from_dataframe,
@@ -478,3 +482,85 @@ def test_from_dataframe_unsupported_type():
     with patch.dict("sys.modules", {"polars": None}):
         with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
             from_dataframe({"not": "a_dataframe"})
+
+
+type NonNegative = Annotated[float, msgspec.Meta(ge=0.0)]
+type NonNegativeInt = Annotated[int, msgspec.Meta(ge=0)]
+type IntOrFloat = NonNegativeInt | NonNegative
+
+
+class Controller(enum.StrEnum):
+    SUSTAIN = "sustain"
+    SOFT = "soft"
+
+
+@pytest.mark.parametrize(
+    ("field_type", "expected"),
+    [
+        (list[int], pl.Int64),
+        (list[float], pl.Float64),
+        (list[bool], pl.Boolean),
+        (list[str], pl.String),
+        (list[int | float], pl.Float64),
+        # constrained items are PEP 695 aliases in the generated models
+        (Annotated[list[NonNegative], msgspec.Meta(description="d")], pl.Float64),
+        (list[IntOrFloat], pl.Float64),
+        # nullable items and optional columns
+        (list[int | None], pl.Int64),
+        (list[bool | None], pl.Boolean),
+        (list[NonNegative | None] | msgspec.UnsetType, pl.Float64),
+        (Annotated[list[str | None], msgspec.Meta(description="d")] | None, pl.String),
+        (list[Literal["a", "b"]], pl.String),
+        (list[Controller], pl.String),
+        # no single scalar dtype: left to polars inference
+        (list[str | float], None),
+        (list[Any], None),
+        (list[list[int]], None),
+        (list[dict[str, Any]], None),
+        (str, None),
+    ],
+)
+def test_polars_column_dtype(field_type, expected):
+    assert _polars_column_dtype(field_type, pl) == expected
+
+
+def test_polars_column_dtypes_match_csv_reader():
+    """Every registered column is read from CSV with the dtype it is written with."""
+    registry = get_registry("1.0")
+    complex_registry = registry["COMPLEX_FIELDS_REGISTRY"]
+    string_registry = registry["STRING_FIELDS_REGISTRY"]
+    checked = 0
+    for facet, registry_key in FACET_REGISTRY_KEYS.items():
+        tag_field = f"{facet}_type"
+        for tag, struct_cls in registry[registry_key].items():
+            for field in msgspec.structs.fields(struct_cls):
+                written = _polars_column_dtype(field.type, pl)
+                read, is_complex = _type_to_polars_dtype(
+                    field.type, field.name, tag, tag_field, complex_registry, string_registry, pl
+                )
+                if written is None or is_complex:
+                    continue
+                assert read == written, f"{facet}:{tag}:{field.name}"
+                checked += 1
+    assert checked > 0
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        "extent:time:time",
+        "extent:time_interval:duration",
+        "extent:midi_interval:duration",
+        "extent:time_frequency_box:freq_min",
+        "extent:pixel_box:width",
+        "payload:tempo:value",
+        "payload:note_hz:value",
+        "confidence:likelihood:confidence",
+    ],
+)
+def test_polars_column_dtype_constrained_numbers(column):
+    """Number columns with constrained (aliased) items map to Float64."""
+    facet, tag, field_name = column.split(":")
+    struct_cls = get_registry("1.0")[FACET_REGISTRY_KEYS[facet]][tag]
+    field = next(f for f in msgspec.structs.fields(struct_cls) if f.name == field_name)
+    assert _polars_column_dtype(field.type, pl) == pl.Float64
