@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import tomllib
 import typing
-import warnings
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -18,7 +17,7 @@ from .core import (
     validate_annotation_id,
 )
 from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError
-from .extensions import get_extensions
+from .extensions import resolve_extensions
 from .registries import FACET_REGISTRY_KEYS, get_registry
 from .util import (
     _column_item_type,
@@ -27,6 +26,16 @@ from .util import (
     from_dataframe,
     to_dataframe,
 )
+
+__all__ = [
+    "load_bopp_csv",
+    "load_bopp_json",
+    "load_bopp_msgpack",
+    "resolve_extensions",
+    "save_bopp_csv",
+    "save_bopp_json",
+    "save_bopp_msgpack",
+]
 
 
 class _VersionHeader(msgspec.Struct):
@@ -267,75 +276,6 @@ def _prepare_annotation_for_save(
         validate_annotation_id(ann)
 
 
-def resolve_extensions(
-    ann: BoppBase,
-    *,
-    allow_missing: bool = True,
-) -> None:
-    """
-    Apply registered schema extensions to the payload of an annotation.
-
-    Converts raw payload item mappings or primitives into their registered target types
-    (typically `msgspec.Struct` models) using strict validation (`strict=True`).
-
-    Parameters
-    ----------
-    ann : BoppBase
-        The Annotation struct instance containing an extension payload.
-    allow_missing : bool, default True
-        If True, issues a warning when an extension schema identifier is not
-        found in the registry. If False, raises `BoppRegistryError`.
-
-    Raises
-    ------
-    BoppRegistryError
-        If `allow_missing` is False and the payload schema is not registered.
-    msgspec.ValidationError
-        If payload values fail validation against the extension schema.
-
-    Notes
-    -----
-    Deterministic IDs and Round-Trip Validation:
-
-    BOPP annotation IDs are deterministic UUIDv5 hashes of the serialized annotation
-    content. Because saving and validation convert extension types back to canonical
-    representations (built-in mappings/lists/scalars), validation before or after extension
-    resolution is equivalent as long as the extension type's serialization and deserialization
-    are strictly lossless and well-defined.
-
-    Enforcing `strict=True` ensures that:
-    1. Many implicit type coercions (such as string to float) are rejected. Lossless
-       integer-to-float promotion remains permitted, so canonical wire types are still required.
-    2. Data types remain predictable across environments that possess the extension schema
-       and environments that leave payload items as raw dictionaries or primitives.
-    """
-    payload = getattr(ann, "payload", None)
-    if payload is None or payload is msgspec.UNSET:
-        return
-
-    bopp_version = getattr(ann, "bopp_version", get_current_schema_version())
-    extension_cls = get_registry(bopp_version)["PAYLOAD_TYPE_REGISTRY"]["ext"]
-    if not isinstance(payload, extension_cls):
-        return
-
-    ext_schema = getattr(payload, "ext_schema", None)
-    extensions = get_extensions()
-    if not isinstance(ext_schema, str) or ext_schema not in extensions:
-        if allow_missing:
-            warnings.warn(
-                f"No extension registered for schema '{ext_schema}'. Skipping validation.",
-                UserWarning,
-                stacklevel=2,
-            )
-            return
-        raise BoppRegistryError(
-            f"Extension schema '{ext_schema}' not found in registry."
-        )
-
-    extension_type = extensions[ext_schema]
-    payload.value = msgspec.convert(payload.value, list[extension_type], strict=True)  # type: ignore[valid-type]
-
-
 def save_bopp_csv(
     ann: BoppBase,
     filepath: str | Path,
@@ -457,6 +397,7 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True, resolve_ex
     if resolve_ext:
         resolve_extensions(ann)
     return ann
+
 
 def save_bopp_json(
     annotation: BoppBase,

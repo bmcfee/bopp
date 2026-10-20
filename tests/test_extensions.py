@@ -15,13 +15,13 @@ from bopp.extensions import (
     ExtensionRegistry,
     get_extensions,
     reset_extensions,
+    resolve_extensions,
     update_extensions,
 )
 from bopp.io import (
     load_bopp_csv,
     load_bopp_json,
     load_bopp_msgpack,
-    resolve_extensions,
     save_bopp_csv,
     save_bopp_json,
     save_bopp_msgpack,

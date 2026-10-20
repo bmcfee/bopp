@@ -51,6 +51,9 @@ from .core import (
 from .evaluation import (
     evaluate as evaluate,
 )
+from .extensions import (
+    resolve_extensions as resolve_extensions,
+)
 from .transforms import (
     filter_by as filter_by,
 )

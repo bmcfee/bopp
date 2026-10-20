@@ -14,6 +14,7 @@ from .exceptions import (
     BoppRegistryError,
     BoppValidationError,
 )
+from .extensions import resolve_extensions
 from .registries import get_registry
 
 BOPP_NAMESPACE = uuid.UUID("a9b3e1c0-42f8-4e89-8d62-b9123456789a")
@@ -29,6 +30,7 @@ __all__ = [
     "compute_annotation_id",
     "create",
     "ensure_annotation_id",
+    "resolve_extensions",
     "validate",
     "validate_and_set_annotation_id",
     "validate_annotation_id",
@@ -285,8 +287,6 @@ def create(
     )
 
     if resolve_ext and payload_kind == "ext":
-        from .io import resolve_extensions
-
         resolve_extensions(ann)
 
     if generate_id:
