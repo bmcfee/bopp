@@ -292,6 +292,14 @@ def test_get_extensions_when_already_initialized():
         reset_extensions()
 
 
+def test_resolve_extensions_none_or_unset_payload():
+    """Verify resolve_extensions safely exits when payload is None or UNSET."""
+    for payload_val in (None, msgspec.UNSET):
+        dummy_ann = SimpleNamespace(payload=payload_val)
+        resolve_extensions(dummy_ann)
+        assert dummy_ann.payload is payload_val
+
+
 def test_resolve_extensions_non_extension_payload():
     ann = create(
         bopp_version="1.0",
