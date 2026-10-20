@@ -185,6 +185,64 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
 
 
 @pytest.mark.parametrize(
+    "ann_factory",
+    [
+        # score_quarter extent with fractional tuple (quarter)
+        lambda: create(
+            bopp_version="1.0",
+            media_id="track:score_quarter_polars",
+            extent_kind="score_quarter",
+            payload_kind="chord",
+            quarter=[(0, 1), (3, 4)],
+            value=["C:maj", "G:7"],
+        ),
+        # pitch_contour payload with nested dictionaries
+        lambda: create(
+            bopp_version="1.0",
+            media_id="track:pitch_contour_polars",
+            extent_kind="time",
+            payload_kind="pitch_contour",
+            time=[0.0, 0.01],
+            value=[
+                {"index": 0, "frequency": 440.0, "voicing": 1.0},
+                {"index": 1, "frequency": 442.5, "voicing": 1.0},
+            ],
+        ),
+        # ext payload with scalar ext_schema attribute and list of nested dicts
+        lambda: create(
+            bopp_version="1.0",
+            media_id="track:ext_polars",
+            extent_kind="time",
+            payload_kind="ext",
+            ext_schema="https://example.com/schema.json",
+            time=[0.1, 0.5],
+            value=[{"feature": "val1", "flags": [1, 2]}, {"feature": "val2", "flags": [3]}],
+        ),
+    ],
+)
+def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
+    pytest.importorskip("polars")
+
+    ann = ann_factory()
+    file_path = tmp_path / f"test_complex_{ann.payload.payload_type}_polars.csv"
+
+    save_bopp_csv(ann, file_path, backend="polars")
+    loaded = load_bopp_csv(file_path, backend="polars")
+
+    assert loaded.media_id == ann.media_id
+    assert _get_tag(loaded.payload) == _get_tag(ann.payload)
+    if ann.extent is not None:
+        assert _get_tag(loaded.extent) == _get_tag(ann.extent)
+
+    for facet in ("payload", "extent"):
+        orig_facet = getattr(ann, facet, None)
+        loaded_facet = getattr(loaded, facet, None)
+        if orig_facet is not None:
+            for field in msgspec.structs.fields(orig_facet):
+                assert getattr(loaded_facet, field.name) == getattr(orig_facet, field.name)
+
+
+@pytest.mark.parametrize(
     "kwargs",
     [
         {"payload_kind": "onset", "extent_kind": "time", "time": [0, 1.5], "value": ["a", "b"]},
