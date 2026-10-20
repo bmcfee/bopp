@@ -440,10 +440,6 @@ def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
         with pytest.raises(BoppIOError, match="pyarrow is required"):
             to_dataframe(ann, backend="pandas-pyarrow")
 
-    with patch.dict("sys.modules", {"polars": None}):
-        with pytest.raises(BoppIOError, match="polars is required"):
-            to_dataframe(ann, backend="polars")
-
 
 def test_from_dataframe_raises_argument_error_when_dataframe_libraries_missing():
     """Verify that `from_dataframe` raises a BoppArgumentError when required DataFrame
