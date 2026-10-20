@@ -224,7 +224,8 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
     pytest.importorskip("polars")
 
     ann = ann_factory()
-    file_path = tmp_path / f"test_complex_{ann.payload.payload_type}_polars.csv"
+    payload_tag = _get_tag(ann.payload)
+    file_path = tmp_path / f"test_complex_{payload_tag}_polars.csv"
 
     save_bopp_csv(ann, file_path, backend="polars")
     loaded = load_bopp_csv(file_path, backend="polars")
