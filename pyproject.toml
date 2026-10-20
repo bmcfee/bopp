@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.2.0",
     "polars>=2.0.0",
 ]
+python_requires = "3.13"
 
 [project.optional-dependencies]
 dataframe = [
@@ -105,7 +106,7 @@ datamodel-codegen \\
   --output bopp/models/v1/ \\
   --output-model-type msgspec.Struct \\
   --formatters ruff-check ruff-format \\
-  --target-python-version 3.12 \\
+  --target-python-version 3.13 \\
   --use-union-operator \\
   --disable-timestamp \\
   --enable-generated-header-marker \\
