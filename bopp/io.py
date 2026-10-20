@@ -165,10 +165,7 @@ def _build_polars_csv_schema(
         A tuple consisting of the full schema mapping every column name to a Polars data type,
         and a list of column names designated as complex fields requiring post-read decoding.
     """
-    try:
-        import polars as pl
-    except ImportError as err:
-        raise BoppIOError("polars is required for building polars schema") from err
+    import polars as pl
 
     schema: dict[str, Any] = {}
     complex_columns: list[str] = []
@@ -527,10 +524,7 @@ def load_bopp_csv(
 
         # 2. Hand the open file pointer to Polars or Pandas
         if backend == "polars":
-            try:
-                import polars as pl
-            except ImportError as err:
-                raise BoppIOError("polars is required for backend='polars'") from err
+            import polars as pl
 
             schema, complex_columns = _build_polars_csv_schema(
                 header_line, bopp_version

@@ -508,10 +508,7 @@ def to_dataframe(
         return df_pd
 
     elif backend == "polars":
-        try:
-            import polars as pl
-        except ImportError as err:
-            raise BoppIOError("polars is required for backend='polars'") from err
+        import polars as pl
 
         schema: dict[str, Any] = {}
         for col_name, (field_type, is_complex) in column_types.items():
