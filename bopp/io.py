@@ -360,6 +360,7 @@ def _load_msgspec_encoded(
     codec: Any,
     *,
     validate_id: bool,
+    resolve_ext: bool,
 ) -> BoppBase:
     with open(filepath, "rb") as f:
         data = f.read()
@@ -370,6 +371,9 @@ def _load_msgspec_encoded(
 
     if validate_id:
         validate_annotation_id(ann)
+
+    if resolve_ext:
+        resolve_extensions(ann)
 
     return ann
 
@@ -393,10 +397,7 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True, resolve_ex
         Decoded and validated Annotation instance.
     """
 
-    ann = _load_msgspec_encoded(filepath, msgspec.json, validate_id=validate_id)
-    if resolve_ext:
-        resolve_extensions(ann)
-    return ann
+    return _load_msgspec_encoded(filepath, msgspec.json, validate_id=validate_id, resolve_ext=resolve_ext)
 
 
 def save_bopp_json(
@@ -490,11 +491,7 @@ def load_bopp_msgpack(
     BoppBase
         Decoded and validated Annotation instance.
     """
-    ann = _load_msgspec_encoded(filepath, msgspec.msgpack, validate_id=validate_id)
-    if resolve_ext:
-        resolve_extensions(ann)
-
-    return ann
+    return _load_msgspec_encoded(filepath, msgspec.msgpack, validate_id=validate_id, resolve_ext=resolve_ext)
 
 
 def load_bopp_csv(
