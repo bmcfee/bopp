@@ -190,67 +190,106 @@ def _validate_dataframe_columns(
     return grouped_cols
 
 
-def _unwrap_type_hint(hint: Any) -> Any:
-    """Unwrap Annotated, Optional, and Union types to inspect target types."""
-    origin = get_origin(hint)
-    if origin is typing.Annotated:
-        args = get_args(hint)
-        return _unwrap_type_hint(args[0]) if args else hint
-    return hint
+_NULL_TYPES = (type(None), msgspec.UnsetType)
 
 
-def _field_type_to_polars_dtype(
-    field_type: Any,
-    pl: Any,
-    *,
-    is_encoded_complex: bool = False,
-) -> Any | None:
+def _strip_type_wrappers(hint: Any) -> Any:
     """
-    Map a struct field type (e.g. list[float], list[int], list[str]) to a Polars DataType.
+    Strip ``Annotated`` wrappers and PEP 695 type aliases from a type hint.
+
+    Generated models declare constrained items as aliases, e.g.
+    ``type DurationItem = Annotated[float, Meta(ge=0.0)]``.
     """
-    if is_encoded_complex:
-        return pl.String
+    while True:
+        if get_origin(hint) is typing.Annotated:
+            hint = get_args(hint)[0]
+        elif isinstance(hint, typing.TypeAliasType):
+            hint = hint.__value__
+        else:
+            return hint
 
-    unwrapped = _unwrap_type_hint(field_type)
-    origin = get_origin(unwrapped)
 
-    # We expect facet columnar fields to be list[T]
-    if origin in (list, list):
-        args = get_args(unwrapped)
-        inner = args[0] if args else Any
-    else:
-        inner = unwrapped
+def _union_arms(hint: Any) -> list[Any]:
+    """
+    Flatten a type hint into its non-null union arms.
 
-    inner = _unwrap_type_hint(inner)
-    inner_origin = get_origin(inner)
+    Wrappers and aliases are stripped at every level, nested unions (including unions of
+    aliases) are flattened, and ``None``/``UnsetType`` arms are dropped. A hint that is not
+    a union yields a single arm.
+    """
+    hint = _strip_type_wrappers(hint)
+    if get_origin(hint) not in (typing.Union, types.UnionType):
+        return [hint]
+    arms: list[Any] = []
+    for arg in get_args(hint):
+        if arg not in _NULL_TYPES:
+            arms.extend(_union_arms(arg))
+    return arms
 
-    # Flatten unions (e.g. float | int, Optional[float])
-    if inner_origin in (typing.Union, types.UnionType):
-        union_args = [
-            _unwrap_type_hint(arg)
-            for arg in get_args(inner)
-            if arg not in (type(None), None, msgspec.UnsetType)
-        ]
-        if any(arg is float for arg in union_args):
-            return pl.Float64
-        if any(arg is int for arg in union_args):
-            return pl.Int64
-        if any(arg is str or (isinstance(arg, type) and issubclass(arg, str)) for arg in union_args):
-            return pl.String
-        if any(arg is bool for arg in union_args):
-            return pl.Boolean
+
+def _column_item_type(field_type: Any) -> Any | None:
+    """
+    Return the item type ``T`` of a columnar field ``list[T]``.
+
+    Optional columns (``list[T] | UnsetType``, ``list[T] | None``) are accepted.
+    Returns None if the field is not a list column.
+    """
+    arms = _union_arms(field_type)
+    if len(arms) != 1 or get_origin(arms[0]) is not list:
         return None
+    args = get_args(arms[0])
+    return args[0] if args else Any
 
-    if inner is float:
-        return pl.Float64
-    if inner is int:
-        return pl.Int64
-    if inner is str or (isinstance(inner, type) and issubclass(inner, str)):
-        return pl.String
-    if inner is bool:
-        return pl.Boolean
 
+def _scalar_kind(tp: Any) -> str | None:
+    """Classify a scalar type as "bool", "int", "float" or "str" (subclasses such as enums included)."""
+    if not isinstance(tp, type):
+        return None
+    # bool before int: bool is a subclass of int
+    for base, kind in ((bool, "bool"), (int, "int"), (float, "float"), (str, "str")):
+        if issubclass(tp, base):
+            return kind
     return None
+
+
+def _polars_item_dtype(item_type: Any, pl: Any) -> Any | None:
+    """
+    Map a column item type to a single Polars DataType.
+
+    Nullable items map to the dtype of their non-null arms. Mixed ``int``/``float`` unions
+    map to ``Float64``. Returns None if the items have no single scalar dtype (containers,
+    ``Any``, or unions mixing strings and numbers), leaving the column to Polars inference.
+    """
+    kinds: set[str | None] = set()
+    for arm in _union_arms(item_type):
+        if get_origin(arm) is Literal:
+            kinds.update(_scalar_kind(type(value)) for value in get_args(arm))
+        else:
+            kinds.add(_scalar_kind(arm))
+
+    if kinds == {"int"}:
+        return pl.Int64
+    if kinds in ({"float"}, {"int", "float"}):
+        return pl.Float64
+    if kinds == {"bool"}:
+        return pl.Boolean
+    if kinds == {"str"}:
+        return pl.String
+    return None
+
+
+def _polars_column_dtype(field_type: Any, pl: Any) -> Any | None:
+    """
+    Map a columnar struct field type (e.g. ``list[float]``) to a Polars DataType.
+
+    Shared by DataFrame construction and CSV reading, so that a column is written and
+    read back with the same dtype. Returns None for non-list fields and for items
+    without a single scalar dtype.
+    """
+    item_type = _column_item_type(field_type)
+    if item_type is None:
+        return None
+    return _polars_item_dtype(item_type, pl)
 
 
 def _extract_facet_data(
@@ -469,14 +508,12 @@ def to_dataframe(
         return df_pd
 
     elif backend == "polars":
-        try:
-            import polars as pl
-        except ImportError as err:
-            raise BoppIOError("polars is required for backend='polars'") from err
+        import polars as pl
 
         schema: dict[str, Any] = {}
         for col_name, (field_type, is_complex) in column_types.items():
-            pl_dtype = _field_type_to_polars_dtype(field_type, pl, is_encoded_complex=is_complex)
+            # JSON-encoded complex cells are strings
+            pl_dtype = pl.String if is_complex else _polars_column_dtype(field_type, pl)
             if pl_dtype is not None:
                 schema[col_name] = pl_dtype
 

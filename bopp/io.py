@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import tomllib
-import types
 import typing
 from collections.abc import Callable
 from pathlib import Path
@@ -19,7 +18,13 @@ from .core import (
 )
 from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError
 from .registries import FACET_REGISTRY_KEYS, get_registry
-from .util import from_dataframe, to_dataframe
+from .util import (
+    _column_item_type,
+    _polars_column_dtype,
+    _strip_type_wrappers,
+    from_dataframe,
+    to_dataframe,
+)
 
 
 class _VersionHeader(msgspec.Struct):
@@ -105,52 +110,6 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
     return converters
 
 
-def _strip_annotated(hint: Any) -> Any:
-    """Recursively strip typing.Annotated wrappers and PEP 695 type aliases."""
-    while True:
-        if typing.get_origin(hint) is typing.Annotated:
-            args = typing.get_args(hint)
-            if not args:
-                break
-            hint = args[0]
-            continue
-        # Support Python 3.12+ PEP 695 type alias statements (typing.TypeAliasType)
-        value = getattr(hint, "__value__", None)
-        if value is not None and value is not hint:
-            hint = value
-            continue
-        break
-    return hint
-
-
-def _unwrap_type_hint(hint: Any) -> Any:
-    """
-    Unwrap list, Annotated, union, and optional annotations to determine inner element type.
-    """
-    hint = _strip_annotated(hint)
-
-    origin = typing.get_origin(hint)
-    if origin is list:
-        args = typing.get_args(hint)
-        if args:
-            hint = _strip_annotated(args[0])
-            origin = typing.get_origin(hint)
-
-    # Handle Union / Optional (types.UnionType in 3.10+ or typing.Union)
-    if origin is typing.Union or origin is types.UnionType:
-        args = tuple(
-            _strip_annotated(arg)
-            for arg in typing.get_args(hint)
-            if arg not in (type(None), type(msgspec.UNSET))
-            )
-        if len(args) == 1:
-            return args[0]
-        if all(arg in (int, float) for arg in args):
-            return float
-        return hint
-    return hint
-
-
 def _type_to_polars_dtype(
     type_hint: Any,
     field_name: str,
@@ -162,6 +121,10 @@ def _type_to_polars_dtype(
 ) -> tuple[Any, bool]:
     """
     Map a struct field type annotation to a Polars DataType and complex flag.
+
+    Scalar columns use the same mapping as DataFrame construction for CSV output
+    (``bopp.util._polars_column_dtype``), so every column is read back with the dtype it
+    was written with.
     """
     if field_name in complex_registry.get(tag_field, {}).get(tag, []):
         return pl.String, True
@@ -169,33 +132,15 @@ def _type_to_polars_dtype(
     if field_name in string_registry.get(tag_field, {}).get(tag, []):
         return pl.String, False
 
-    elem_type = _unwrap_type_hint(type_hint)
-
-    if elem_type is float:
-        return pl.Float64, False
-    if elem_type is int:
-        return pl.Int64, False
-    if elem_type is bool:
-        return pl.Boolean, False
-    if elem_type is str:
-        return pl.String, False
-
-    if isinstance(elem_type, type):
-        if issubclass(elem_type, float):
-            return pl.Float64, False
-        if issubclass(elem_type, int):
-            return pl.Int64, False
-        if issubclass(elem_type, bool):
-            return pl.Boolean, False
-        if issubclass(elem_type, str):
-            return pl.String, False
-
-    origin = typing.get_origin(elem_type)
-    if origin in (list, dict, tuple):
+    item_type = _column_item_type(type_hint)
+    if item_type is not None and typing.get_origin(_strip_type_wrappers(item_type)) in (list, dict, tuple):
         return pl.String, True
 
-    # Fallback default
-    return pl.String, False
+    dtype = _polars_column_dtype(type_hint, pl)
+    if dtype is None:
+        # Fallback default
+        return pl.String, False
+    return dtype, False
 
 
 def _build_polars_csv_schema(
@@ -220,10 +165,7 @@ def _build_polars_csv_schema(
         A tuple consisting of the full schema mapping every column name to a Polars data type,
         and a list of column names designated as complex fields requiring post-read decoding.
     """
-    try:
-        import polars as pl
-    except ImportError as err:
-        raise BoppIOError("polars is required for building polars schema") from err
+    import polars as pl
 
     schema: dict[str, Any] = {}
     complex_columns: list[str] = []
@@ -582,10 +524,7 @@ def load_bopp_csv(
 
         # 2. Hand the open file pointer to Polars or Pandas
         if backend == "polars":
-            try:
-                import polars as pl
-            except ImportError as err:
-                raise BoppIOError("polars is required for backend='polars'") from err
+            import polars as pl
 
             schema, complex_columns = _build_polars_csv_schema(
                 header_line, bopp_version
