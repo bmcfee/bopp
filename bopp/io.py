@@ -515,7 +515,7 @@ def load_bopp_csv(
         Path to the BOPP CSV file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        resolve_ext : bool, default True
+    resolve_ext : bool, default True
         If True, resolves and validates extension payload values via registered extensions.
         Emits a warning if missing.
     backend : {"polars", "pandas"}, default "polars"

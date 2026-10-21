@@ -113,7 +113,7 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
             if isinstance(value, list) and value:
                 groupings_header = []
                 for g in value:
-                    g_dict: dict[str, Any] = {"name": getattr(g, "name")}
+                    g_dict: dict[str, Any] = {"name": g.name}
                     labels = getattr(g, "labels", msgspec.UNSET)
                     if labels is not msgspec.UNSET and labels is not None:
                         g_dict["labels"] = msgspec.to_builtins(labels)
@@ -539,7 +539,7 @@ def to_dataframe(
             data[col_key] = getattr(g, "ids", [])
             column_types[col_key] = (list[int], False)
 
-            g_dict: dict[str, Any] = {"name": getattr(g, "name")}
+            g_dict: dict[str, Any] = {"name": g.name}
             labels = getattr(g, "labels", msgspec.UNSET)
             if labels not in (msgspec.UNSET, None):
                 g_dict["labels"] = msgspec.to_builtins(labels)
