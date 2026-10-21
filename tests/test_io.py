@@ -7,6 +7,7 @@ import pytest
 from bopp.core import compute_annotation_id, create
 from bopp.exceptions import BoppArgumentError, BoppRegistryError, BoppValidationError
 from bopp.io import (
+    AnnotationDataFrame,
     _build_csv_converters,
     _parse_complex_cell,
     _prepare_annotation_for_save,
@@ -299,11 +300,11 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
 )
 def test_csv_roundtrip_polars_mixed_int_float(tmp_path, kwargs):
     """Number columns holding ints and floats are written and read back as floats."""
-    ann = create(media_id="track:mixed", **kwargs)
+    ann = create(media_id="track:mixed", generate_id=False, **kwargs)
     file_path = tmp_path / "mixed.csv"
 
-    save_bopp_csv(ann, file_path, backend="polars")
-    loaded = load_bopp_csv(file_path, backend="polars")
+    save_bopp_csv(ann, file_path, backend="polars", generate_id=False, validate_id=False)
+    loaded = load_bopp_csv(file_path, backend="polars", validate_id=False)
 
     for facet in ("payload", "extent", "confidence"):
         original = getattr(ann, facet, None)
@@ -370,10 +371,12 @@ def test_load_bopp_csv_invalid_schema(tmp_path):
 
 
 def test_csv_column_validation_rules():
+    header = {"media_id": "track:col_rules", "bopp_version": "1.0"}
+
     # Rule 1: Column format does not have 3 colon-separated parts
     df_invalid_format = pd.DataFrame({"payload:onset": [1, 2]})
     with pytest.raises(BoppValidationError, match="Invalid column format"):
-        from_dataframe(df_invalid_format)
+        from_dataframe(df_invalid_format, header)
 
     # Rule 2: Facet has multiple types
     df_mixed_types = pd.DataFrame({
@@ -382,21 +385,21 @@ def test_csv_column_validation_rules():
         "payload:onset:value": [1, 1],
     })
     with pytest.raises(BoppValidationError, match="Mixed types for facet 'extent'"):
-        from_dataframe(df_mixed_types)
+        from_dataframe(df_mixed_types, header)
 
     # Rule 3: Unrecognized facet or type
     df_invalid_type = pd.DataFrame({
         "payload:nonexistent_type:value": [1, 2]
     })
     with pytest.raises(BoppValidationError, match="Unrecognized type 'nonexistent_type'"):
-        from_dataframe(df_invalid_type)
+        from_dataframe(df_invalid_type, header)
 
     # Rule 4: Field does not exist on target type struct
     df_invalid_field = pd.DataFrame({
         "payload:onset:invalid_field_name": [1, 2]
     })
     with pytest.raises(BoppValidationError, match="Field 'invalid_field_name' in column .* does not exist"):
-        from_dataframe(df_invalid_field)
+        from_dataframe(df_invalid_field, header)
 
 
 def test_save_and_load_with_validate_id_false(tmp_path):
@@ -441,7 +444,8 @@ def test_save_bopp_csv_unknown_dataframe_type(tmp_path):
     class MockUnsupportedDataFrame:
         pass
 
-    with patch("bopp.io.to_dataframe", return_value=MockUnsupportedDataFrame()):
+    mock_ann_df = AnnotationDataFrame(df=MockUnsupportedDataFrame(), header={"media_id": "test"})
+    with patch("bopp.io.to_dataframe", return_value=mock_ann_df):
         with pytest.raises(BoppArgumentError, match="Unknown dataframe type"):
             save_bopp_csv(ann, file_path)
 
@@ -459,7 +463,11 @@ def test_save_bopp_csv_polars(tmp_path):
     )
     file_path = tmp_path / "polars_test.csv"
 
-    with patch("bopp.io.to_dataframe", return_value=polars.DataFrame({"payload:onset:value": [1]})):
+    mock_ann_df = AnnotationDataFrame(
+        df=polars.DataFrame({"payload:onset:value": [1]}),
+        header={"media_id": "track:polars_test"},
+    )
+    with patch("bopp.io.to_dataframe", return_value=mock_ann_df):
         save_bopp_csv(ann, file_path)
 
     assert file_path.exists()

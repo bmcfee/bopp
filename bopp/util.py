@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import types
 import typing
-from typing import TYPE_CHECKING, Any, Literal, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args, get_origin
 
 import msgspec
 
@@ -23,6 +23,22 @@ if TYPE_CHECKING:
 # ==========================================
 # 1. Struct <-> DataFrame Translators
 # ==========================================
+
+
+class AnnotationDataFrame(NamedTuple):
+    """
+    Container pairing an annotation DataFrame with its scalar metadata header.
+
+    Attributes
+    ----------
+    df : pandas.DataFrame or polars.DataFrame
+        DataFrame holding parallel columnar arrays from the annotation facets.
+    header : dict of str to Any
+        Dictionary of scalar/singleton fields and metadata.
+    """
+
+    df: pd.DataFrame | pl.DataFrame
+    header: dict[str, Any]
 
 
 def _get_tag(struct: msgspec.Struct) -> str | None:
@@ -75,7 +91,7 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
 
     See Also
     --------
-    to_dataframe : Extracts parallel arrays into a DataFrame and header to `df.attrs`.
+    to_dataframe : Extracts parallel arrays and header into an AnnotationDataFrame.
 
     Examples
     --------
@@ -379,12 +395,13 @@ def to_dataframe(
     backend: Literal["pandas", "pandas-pyarrow", "polars"] = "pandas",
     *,
     encode_complex: bool = False,
-) -> pd.DataFrame | pl.DataFrame:
+) -> AnnotationDataFrame:
     """
-    Convert an Annotation instance into a Pandas or Polars DataFrame.
+    Convert an Annotation instance into a DataFrame and separate header dictionary.
 
-    Singleton metadata and scalar facet attributes are preserved in `df.attrs` (for Pandas)
-    or custom attributes (for Polars).
+    Returns an :class:`AnnotationDataFrame` namedtuple containing the DataFrame
+    (``df``) with parallel columnar arrays and the header dictionary (``header``)
+    containing singleton metadata and scalar facet attributes.
 
     Parameters
     ----------
@@ -398,30 +415,41 @@ def to_dataframe(
 
     Returns
     -------
-    pandas.DataFrame or polars.DataFrame
-        DataFrame representing parallel array fields with column names prefixed
-        by facet and tag.
+    AnnotationDataFrame
+        Namedtuple with ``df`` (Pandas or Polars DataFrame) and ``header`` (dict of metadata).
 
     See Also
     --------
-    from_dataframe : Reconstitute an Annotation struct from a DataFrame.
+    from_dataframe : Reconstitute an Annotation struct from a DataFrame and header.
     extract_header : Extract singleton header fields from an Annotation.
 
     Examples
     --------
+    Direct unpacking into dataframe and header objects:
+
     >>> from bopp.models.v1.annotation import Annotation
     >>> ann = Annotation(
     ...     media_id="audio:123",
-    ...     payload={"payload_type": "onset", "time": [0.1, 0.5]}
+    ...     payload={"payload_type": "onset", "value": [1, 2]}
     ... )
-    >>> df = to_dataframe(ann, backend="pandas")
-    >>> df.attrs["media_id"]
+    >>> df, header = to_dataframe(ann, backend="pandas")
+    >>> header["media_id"]
     'audio:123'
+    >>> df.columns.tolist()
+    ['payload:onset:value']
+
+    Accessing attributes via named fields:
+
+    >>> ann_df = to_dataframe(ann, backend="pandas")
+    >>> ann_df.header["media_id"]
+    'audio:123'
+    >>> ann_df.df.shape
+    (2, 1)
     """
     data: dict[str, Any] = {}
     bopp_version = getattr(annotation, "bopp_version", get_current_schema_version())
 
-    attrs = {
+    header: dict[str, Any] = {
         "bopp_version": bopp_version,
         "media_id": getattr(annotation, "media_id", None),
     }
@@ -450,7 +478,7 @@ def to_dataframe(
         payload_struct,
         "payload",
         data,
-        attrs,
+        header,
         encode_complex=encode_complex,
         complex_fields=_get_complex_fields_for_facet(payload_struct, "payload"),
         column_types=column_types,
@@ -462,7 +490,7 @@ def to_dataframe(
             extent_struct,
             "extent",
             data,
-            attrs,
+            header,
             encode_complex=encode_complex,
             complex_fields=_get_complex_fields_for_facet(extent_struct, "extent"),
             column_types=column_types,
@@ -473,19 +501,18 @@ def to_dataframe(
             confidence_struct,
             "confidence",
             data,
-            attrs,
+            header,
             encode_complex=encode_complex,
             complex_fields=_get_complex_fields_for_facet(confidence_struct, "confidence"),
             column_types=column_types,
         )
 
-    metadata = getattr(annotation, "metadata", None)
-    if metadata is not None and metadata is not msgspec.UNSET:
-        attrs["metadata"] = msgspec.to_builtins(metadata)
-
-    sandbox = getattr(annotation, "sandbox", msgspec.UNSET)
-    if sandbox not in (msgspec.UNSET, None):
-        attrs["sandbox"] = msgspec.to_builtins(sandbox)
+    for field in msgspec.structs.fields(annotation):
+        if field.name in FACET_REGISTRY_KEYS or field.name in ("bopp_version", "media_id"):
+            continue
+        val = getattr(annotation, field.name, msgspec.UNSET)
+        if val not in (msgspec.UNSET, None):
+            header[field.name] = msgspec.to_builtins(val)
 
     if backend in ("pandas", "pandas-pyarrow"):
         try:
@@ -503,9 +530,7 @@ def to_dataframe(
         else:
             df_pd = pd.DataFrame(data)
 
-        for k, v in attrs.items():
-            df_pd.attrs[k] = v
-        return df_pd
+        return AnnotationDataFrame(df=df_pd, header=header)
 
     elif backend == "polars":
         import polars as pl
@@ -521,33 +546,61 @@ def to_dataframe(
             df_pl = pl.DataFrame(data, schema=schema)
         else:
             df_pl = pl.DataFrame(data, schema_overrides=schema if schema else None)
-        df_pl.attrs = attrs  # type: ignore[attr-defined]
-        return df_pl
+        return AnnotationDataFrame(df=df_pl, header=header)
 
     else:
         raise BoppArgumentError(f"Unsupported backend: {backend}")
 
 
-def from_dataframe(df: Any) -> BoppBase:
+def from_dataframe(
+    df_or_tuple: Any,
+    header: dict[str, Any] | None = None,
+) -> BoppBase:
     """
-    Reconstitute a strictly typed Annotation struct from a Pandas or Polars DataFrame.
+    Reconstitute a strictly typed Annotation struct from a DataFrame and header metadata.
 
-    Expects singleton fields to be present in `df.attrs` or custom attributes.
+    Accepts the input either as a combined :class:`AnnotationDataFrame` / 2-tuple
+    ``(df, header)``, or as separate ``df`` and ``header`` arguments.
 
     Parameters
     ----------
-    df : pandas.DataFrame or polars.DataFrame
-        DataFrame with self-describing column names and attributes.
+    df_or_tuple : pandas.DataFrame, polars.DataFrame, AnnotationDataFrame, or tuple
+        DataFrame containing columnar arrays, or an ``AnnotationDataFrame`` / 2-tuple of
+        ``(df, header)``.
+    header : dict of str to Any or None, optional
+        Metadata header dictionary containing singleton fields (e.g. ``media_id``,
+        ``bopp_version``, scalar facet attributes). If None, unpacked from `df_or_tuple`.
 
     Returns
     -------
     BoppBase
-        Validated Annotation struct built from the DataFrame data.
+        Validated Annotation struct built from the DataFrame data and header.
 
     See Also
     --------
-    to_dataframe : Convert an Annotation instance into a Pandas or Polars DataFrame.
+    to_dataframe : Convert an Annotation instance into an AnnotationDataFrame.
+
+    Examples
+    --------
+    Passing an AnnotationDataFrame namedtuple or 2-tuple directly:
+
+    >>> ann_df = to_dataframe(ann)
+    >>> ann = from_dataframe(ann_df)
+
+    Unpacking and passing as separate arguments:
+
+    >>> df, header = to_dataframe(ann)
+    >>> ann = from_dataframe(df, header)
     """
+    if header is None:
+        if isinstance(df_or_tuple, tuple) and len(df_or_tuple) == 2:
+            df, header = df_or_tuple[0], df_or_tuple[1]
+        else:
+            df = df_or_tuple
+            header = {}
+    else:
+        df = df_or_tuple
+
     # Confirm pandas/polars type dynamically
     try:
         import polars as pl
@@ -567,19 +620,18 @@ def from_dataframe(df: Any) -> BoppBase:
             f"Unsupported DataFrame type: {type(df)}. Must be a pandas or polars DataFrame."
         )
 
-    attrs = getattr(df, "attrs", {})
     columns = list(df.columns)
-    bopp_version = attrs.get("bopp_version", get_current_schema_version())
+    bopp_version = header.get("bopp_version", get_current_schema_version())
 
     registry = get_registry(bopp_version)
     annotation_cls = registry["Annotation"]
 
     grouped_cols = _validate_dataframe_columns(columns, registry)
 
-    media_id = attrs.get("media_id")
+    media_id = header.get("media_id")
     if not media_id or not isinstance(media_id, str):
         raise BoppValidationError(
-            "Missing or invalid required 'media_id' in DataFrame attributes (df.attrs)."
+            "Missing or invalid required 'media_id' in DataFrame header attributes."
         )
 
     bopp_data: dict[str, Any] = {
@@ -587,10 +639,9 @@ def from_dataframe(df: Any) -> BoppBase:
         "media_id": media_id,
     }
 
-    # TODO: pull these from the fields of the annotation object?
     for key in ("metadata", "sandbox", "annotated_domain", "id", "parents"):
-        if key in attrs:
-            bopp_data[key] = attrs[key]
+        if key in header:
+            bopp_data[key] = header[key]
 
     def _get_column_list(col_name: str) -> list[Any]:
         col_series = df[col_name]
@@ -604,8 +655,8 @@ def from_dataframe(df: Any) -> BoppBase:
         facet_type = cols[0][0]
         facet_dict: dict[str, Any] = {f"{facet}_type": facet_type}
 
-        if isinstance(attrs.get(facet), dict):
-            facet_dict.update(attrs[facet])
+        if isinstance(header.get(facet), dict):
+            facet_dict.update(header[facet])
 
         for _, field_name, full_col_name in cols:
             facet_dict[field_name] = _get_column_list(full_col_name)
