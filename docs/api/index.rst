@@ -45,6 +45,10 @@ Transforms
     :nosignatures:
 
     filter_by
+    to_score_interval
+    to_score_interval_float
+    to_score_quarter
+    to_score_quarter_float
     to_times
     trim
 

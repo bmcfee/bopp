@@ -184,6 +184,26 @@ Musical scores and sheet music annotations can use score-based extents like `sco
 }
 ```
 
+Convert float score intervals to fractions with an explicit denominator bound, or back to floats:
+
+```python
+import bopp
+
+ann = bopp.create(
+    media_id="musicxml:score_001",
+    payload_kind="tag_open",
+    extent_kind="score_interval_float",
+    quarter=[-0.5, 0.0, 1.25],
+    duration=[0.5, 1.25, 0.75],
+    value=["pickup", "start", "later"],
+)
+fractions = bopp.to_score_interval(ann, max_denominator=16)
+floats = bopp.to_score_interval_float(fractions)
+```
+
+Each conversion returns a derived annotation with parent lineage and conversion metadata.
+Point extents use `to_score_quarter` and `to_score_quarter_float` in the same way.
+
 ### Optical / visual bounding boxes
 
 For visual annotations on sheet music or audio spectrogram images, the `pixel_box` extent defines 2D bounding boxes using `x`, `y`, `width`, and `height` pixel coordinates.
