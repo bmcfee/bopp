@@ -560,8 +560,7 @@ def from_dataframe(
     Reconstitute a strictly typed Annotation struct from a DataFrame and header metadata.
 
     Accepts the input either as a combined :class:`AnnotationDataFrame` / 2-tuple
-    ``(df, header)``, or as separate ``df`` and ``header`` arguments. For backwards
-    compatibility, if ``header`` is omitted, attributes stored in ``df.attrs`` are inspected.
+    ``(df, header)``, or as separate ``df`` and ``header`` arguments.
 
     Parameters
     ----------
@@ -570,8 +569,7 @@ def from_dataframe(
         ``(df, header)``.
     header : dict of str to Any or None, optional
         Metadata header dictionary containing singleton fields (e.g. ``media_id``,
-        ``bopp_version``, scalar facet attributes). If None, unpacked from `df_or_tuple`
-        or inspected from ``df.attrs``.
+        ``bopp_version``, scalar facet attributes). If None, unpacked from `df_or_tuple`.
 
     Returns
     -------
@@ -599,7 +597,7 @@ def from_dataframe(
             df, header = df_or_tuple[0], df_or_tuple[1]
         else:
             df = df_or_tuple
-            header = getattr(df, "attrs", {})
+            header = {}
     else:
         df = df_or_tuple
 
