@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import warnings
 from typing import Any
 
 import msgspec
@@ -102,7 +103,8 @@ class GroupingBase(msgspec.Struct):
     """Base class for BOPP Grouping objects.
 
     This primarily exists to implement a post-init check on distinctness of values
-    if a label mapping is provided for group identifiers.
+    if a label mapping is provided for group identifiers, and warn if non-negative
+    group IDs are unmapped.
     """
     def __post_init__(self):
         labels = getattr(self, "labels", msgspec.UNSET)
@@ -112,3 +114,15 @@ class GroupingBase(msgspec.Struct):
         # Check that the labels mapping has distinct values
         if len(set(labels.values())) != len(labels):
             raise BoppValidationError("Grouping assigns two or more labels to the same group identifier")
+
+        ids = getattr(self, "ids", msgspec.UNSET)
+        if ids is not msgspec.UNSET and ids is not None:
+            mapped_ids = set(labels.values())
+            unmapped_non_negative = {i for i in ids if i >= 0 and i not in mapped_ids}
+            if unmapped_non_negative:
+                warnings.warn(
+                    f"Grouping '{getattr(self, 'name', '')}' contains non-negative group IDs "
+                    f"not included in label mapping: {sorted(unmapped_non_negative)}",
+                    UserWarning,
+                    stacklevel=2,
+                )
