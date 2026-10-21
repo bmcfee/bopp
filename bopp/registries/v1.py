@@ -12,6 +12,7 @@ from ..models.v1.extent.score_quarter import ScoreQuarterNotes
 from ..models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from ..models.v1.extent.time_interval import TimeIntervalExtent
 from ..models.v1.extent.times import Times
+from ..models.v1.grouping import Grouping
 from ..models.v1.metadata.algorithm import AlgorithmAnnotationMetadata
 from ..models.v1.metadata.crowd import CrowdSourcedAnnotationMetadata
 from ..models.v1.metadata.derived import DerivedAnnotationMetadata
@@ -36,6 +37,8 @@ from ..models.v1.payload.tag_open import TagOpenPayload
 from ..models.v1.payload.tempo import TempoPayload
 
 ANNOTATION_CLASS = Annotation
+
+GROUPING_CLASS = Grouping
 
 CONFIDENCE_TYPE_REGISTRY = {
     'agreement': ConfidenceByInterAnnotatorAgreement,
@@ -121,4 +124,4 @@ STRING_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
     },
 }
 
-__all__ = ['ANNOTATION_CLASS', 'COMPLEX_FIELDS_REGISTRY', 'CONFIDENCE_TYPE_REGISTRY', 'EXTENT_TYPE_REGISTRY', 'METADATA_TYPE_REGISTRY', 'PAYLOAD_TYPE_REGISTRY', 'STRING_FIELDS_REGISTRY']
+__all__ = ['ANNOTATION_CLASS', 'COMPLEX_FIELDS_REGISTRY', 'CONFIDENCE_TYPE_REGISTRY', 'EXTENT_TYPE_REGISTRY', 'GROUPING_CLASS', 'METADATA_TYPE_REGISTRY', 'PAYLOAD_TYPE_REGISTRY', 'STRING_FIELDS_REGISTRY']

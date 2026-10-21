@@ -32,11 +32,18 @@ class BoppBase(msgspec.Struct):
             conf_lengths = self._get_all_column_lengths(confidence_field, "Confidence")
             all_lengths.extend(conf_lengths)
 
+        groupings_field = getattr(self, "groupings", msgspec.UNSET)
+        if groupings_field is not msgspec.UNSET and groupings_field is not None:
+            for g in groupings_field:
+                ids = getattr(g, "ids", None)
+                if isinstance(ids, list):
+                    all_lengths.append(len(ids))
+
         # Ensure all found arrays have the same length
         if len(set(all_lengths)) > 1:
             raise BoppArrayError(
                 f"Length mismatch: Found multiple array lengths {set(all_lengths)} "
-                "across Extent, Payload, and Confidence facets."
+                "across Extent, Payload, Confidence, and Groupings facets."
             )
 
     @staticmethod
