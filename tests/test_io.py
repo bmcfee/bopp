@@ -300,11 +300,11 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
 )
 def test_csv_roundtrip_polars_mixed_int_float(tmp_path, kwargs):
     """Number columns holding ints and floats are written and read back as floats."""
-    ann = create(media_id="track:mixed", **kwargs)
+    ann = create(media_id="track:mixed", generate_id=False, **kwargs)
     file_path = tmp_path / "mixed.csv"
 
-    save_bopp_csv(ann, file_path, backend="polars")
-    loaded = load_bopp_csv(file_path, backend="polars")
+    save_bopp_csv(ann, file_path, backend="polars", generate_id=False, validate_id=False)
+    loaded = load_bopp_csv(file_path, backend="polars", validate_id=False)
 
     for facet in ("payload", "extent", "confidence"):
         original = getattr(ann, facet, None)
