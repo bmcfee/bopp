@@ -492,6 +492,14 @@ def test_from_dataframe_unsupported_type():
             from_dataframe({"not": "a_dataframe"}, {"media_id": "1"})
 
 
+def test_from_dataframe_no_header():
+    df = pd.DataFrame({"extent:time:time": [0.1], "payload:onset:value": [1]})
+    header = None
+
+    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+        from_dataframe(df, header=header)
+
+
 type NonNegative = Annotated[float, msgspec.Meta(ge=0.0)]
 type NonNegativeInt = Annotated[int, msgspec.Meta(ge=0)]
 type IntOrFloat = NonNegativeInt | NonNegative

@@ -620,9 +620,6 @@ def from_dataframe(
             f"Unsupported DataFrame type: {type(df)}. Must be a pandas or polars DataFrame."
         )
 
-    if header is None:
-        header = {}
-
     columns = list(df.columns)
     bopp_version = header.get("bopp_version", get_current_schema_version())
 
