@@ -8,7 +8,9 @@ from ..models.v1.extent.midi_interval import MidiInterval
 from ..models.v1.extent.midi_tick import MidiTicks
 from ..models.v1.extent.pixel_box import PixelBoxExtent
 from ..models.v1.extent.score_interval import ScoreInterval
+from ..models.v1.extent.score_interval_float import ScoreIntervalFloat
 from ..models.v1.extent.score_quarter import ScoreQuarterNotes
+from ..models.v1.extent.score_quarter_float import ScoreQuarterNotesFloat
 from ..models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from ..models.v1.extent.time_interval import TimeIntervalExtent
 from ..models.v1.extent.times import Times
@@ -48,7 +50,9 @@ EXTENT_TYPE_REGISTRY = {
     'midi_tick': MidiTicks,
     'pixel_box': PixelBoxExtent,
     'score_interval': ScoreInterval,
+    'score_interval_float': ScoreIntervalFloat,
     'score_quarter': ScoreQuarterNotes,
+    'score_quarter_float': ScoreQuarterNotesFloat,
     'time': Times,
     'time_frequency_box': TimeFrequencyBoxExtent,
     'time_interval': TimeIntervalExtent,

@@ -165,6 +165,8 @@ For symbolic MIDI data, extents can be defined in MIDI ticks using `midi_ticks` 
 
 ### Score position
 
+Sources that store quarter positions as floats can use `score_quarter_float` or `score_interval_float`. These float twins allow negative positions for pickups and nonnegative interval durations.
+
 Musical scores and sheet music annotations can use score-based extents like `score_quarter` (quarter note offsets) or `score_interval`. This example places lyric syllables at musical quarter note positions.
 
 ```json

@@ -25,6 +25,8 @@ DEFAULT_TARGET_FIELDS: dict[str, str] = {
     "midi_interval": "tick",
     "score_quarter": "quarter",
     "score_interval": "quarter",
+    "score_quarter_float": "quarter",
+    "score_interval_float": "quarter",
 }
 
 # Axis structure definition: (extent_tag, target_field) -> (kind, origin_or_min, span_or_max)
@@ -40,6 +42,8 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("midi_interval", "tick"): ("origin_span", "tick", "duration"),
     ("score_quarter", "quarter"): ("point", "quarter", None),
     ("score_interval", "quarter"): ("origin_span", "quarter", "duration"),
+    ("score_quarter_float", "quarter"): ("point", "quarter", None),
+    ("score_interval_float", "quarter"): ("origin_span", "quarter", "duration"),
 }
 
 FRACTION_AXES: frozenset[tuple[str, str]] = frozenset({
