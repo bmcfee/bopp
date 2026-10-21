@@ -20,6 +20,7 @@ from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError
 from .extensions import resolve_extensions
 from .registries import FACET_REGISTRY_KEYS, get_registry
 from .util import (
+    AnnotationDataFrame,
     _column_item_type,
     _polars_column_dtype,
     _strip_type_wrappers,
@@ -28,6 +29,7 @@ from .util import (
 )
 
 __all__ = [
+    "AnnotationDataFrame",
     "load_bopp_csv",
     "load_bopp_json",
     "load_bopp_msgpack",
@@ -308,10 +310,10 @@ def save_bopp_csv(
     """
     _prepare_annotation_for_save(ann, validate_id=validate_id, generate_id=generate_id)
 
-    # Serializing to dataframe stores header information in attrs
+    # Serializing to dataframe returns AnnotationDataFrame with df and header
     # We encode complex fields as JSON strings for CSV compatibility across backends
-    df = to_dataframe(ann, backend=backend, encode_complex=True)
-    header = getattr(df, "attrs", {})
+    ann_df = to_dataframe(ann, backend=backend, encode_complex=True)
+    df, header = ann_df.df, ann_df.header
 
     # 1. Convert the metadata dictionary to a TOML string
     toml_bytes = msgspec.toml.encode(header)
@@ -578,13 +580,7 @@ def load_bopp_csv(
         else:
             raise BoppArgumentError(f"Unsupported backend: {backend}")
 
-    # Attach the singleton fields directly to the DataFrame attributes
-    if hasattr(df, "attrs"):
-        df.attrs.update(metadata)
-    else:
-        df.attrs = metadata  # type: ignore[attr-defined]
-
-    ann = from_dataframe(df)
+    ann = from_dataframe(df, header=metadata)
 
     if resolve_ext:
         resolve_extensions(ann)
