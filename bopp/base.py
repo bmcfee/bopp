@@ -5,7 +5,7 @@ from typing import Any
 
 import msgspec
 
-from .exceptions import BoppArgumentError, BoppArrayError
+from .exceptions import BoppArgumentError, BoppArrayError, BoppValidationError
 
 
 class BoppBase(msgspec.Struct):
@@ -96,3 +96,19 @@ class BoppBase(msgspec.Struct):
         bundle["application/vnd.bopp+msgpack"] = base64.b64encode(msgspec.msgpack.encode(self)).decode("ascii")
 
         return bundle
+
+
+class GroupingBase(msgspec.Struct):
+    """Base class for BOPP Grouping objects.
+
+    This primarily exists to implement a post-init check on distinctness of values
+    if a label mapping is provided for group identifiers.
+    """
+    def __post_init__(self):
+        labels = getattr(self, "labels", msgspec.UNSET)
+        if labels is msgspec.UNSET or labels is None:
+            return
+
+        # Check that the labels mapping has distinct values
+        if len(set(labels.values())) != len(labels):
+            raise BoppValidationError("Grouping assigns two or more labels to the same group identifier")
