@@ -5,10 +5,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from ...base import GroupingBase
 
 
-class Grouping(Struct):
+class Grouping(GroupingBase):
     name: Annotated[str, Meta(description="Name of the grouping layer")]
     ids: Annotated[
         list[int],
