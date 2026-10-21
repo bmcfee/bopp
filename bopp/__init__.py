@@ -1,5 +1,6 @@
 """BOPP: Bounded Observation Payload Protocol."""
 from . import evaluation as evaluation
+from . import extensions as extensions
 from . import io as io
 from . import models as models
 from . import registries as registries
@@ -49,6 +50,9 @@ from .core import (
 )
 from .evaluation import (
     evaluate as evaluate,
+)
+from .extensions import (
+    resolve_extensions as resolve_extensions,
 )
 from .transforms import (
     filter_by as filter_by,

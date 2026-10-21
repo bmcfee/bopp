@@ -19,15 +19,17 @@ Beats
 
 Extents are time values in seconds, payloads are integer-valued.
 
-| Loader       |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
-|:-------------|-----------:|------------:|--------------:|---------:|
-| jams_val     |    13695.6 |     14029.5 |         182.8 |       69 |
-| jams_no_val  |      649.2 |       693.5 |          18.6 |     1056 |
-| pd_csv       |      279.2 |       305.2 |          27.7 |      283 |
-| pl_csv       |      469.1 |      1058.1 |         314.6 |      107 |
-| bopp_csv     |     1069.3 |      1570.6 |         223.3 |      126 |
-| bopp_json    |       76.3 |        85.4 |          10.4 |     4930 |
-| bopp_msgpack |       67.7 |        75.0 |           9.8 |     3881 |
+| Loader       | Validated   |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
+|:-------------|:------------|-----------:|------------:|--------------:|---------:|
+| jams_val     | ✓           |    14080.6 |     14421.6 |         233.4 |       68 |
+| jams_no_val  | ✗           |      650.2 |       703.1 |          22.8 |      942 |
+| pd_csv       | ✗           |      281.9 |       316.1 |          58.6 |      273 |
+| pl_csv       | ✗           |      340.7 |       594.5 |         248.1 |      108 |
+| bopp_csv     | ✓           |      646.2 |       802.4 |          89.3 |       96 |
+| bopp_json    | ✓           |       79.5 |        96.0 |          17.6 |     2127 |
+| bopp_msgpack | ✓           |       74.5 |        84.2 |          11.9 |     3260 |
+
+
 
 
 
@@ -39,15 +41,16 @@ disjoint time intervals.
 Extents are time intervals in seconds, payloads are chord strings under the Harte grammar,
 likelihoods are probabilities (floats in `[0, 1]`).
 
-| Loader       |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
-|:-------------|-----------:|------------:|--------------:|---------:|
-| jams_val     |     1475.4 |      1551.7 |          85.9 |      641 |
-| jams_no_val  |      129.1 |       139.0 |           3.6 |     3840 |
-| pd_csv       |      293.7 |       318.6 |          16.1 |     1787 |
-| pl_csv       |      574.7 |      1252.5 |         241.3 |      542 |
-| bopp_csv     |      926.7 |      1660.4 |         260.6 |      430 |
-| bopp_json    |      120.6 |       132.5 |          12.6 |     3492 |
-| bopp_msgpack |      137.5 |       148.4 |          13.9 |     2313 |
+| Loader       | Validated   |   Min (μs) |   Mean (μs) |   StdDev (μs) |   Rounds |
+|:-------------|:------------|-----------:|------------:|--------------:|---------:|
+| jams_val     | ✓           |     1486.3 |      1578.5 |          87.5 |      578 |
+| jams_no_val  | ✗           |      131.6 |       142.3 |           5.2 |     3802 |
+| pd_csv       | ✗           |      300.7 |       352.2 |          27.1 |     2142 |
+| pl_csv       | ✗           |      288.1 |       412.8 |          84.7 |     1377 |
+| bopp_csv     | ✓           |      771.6 |      1011.3 |         174.5 |      856 |
+| bopp_json    | ✓           |      137.3 |       149.5 |          14.6 |     2888 |
+| bopp_msgpack | ✓           |      151.4 |       166.6 |          15.6 |     2518 |
+
 
 
 

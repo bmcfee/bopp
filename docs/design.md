@@ -1,4 +1,4 @@
-# Design and development
+# Development
 
 This document provides an overview of the architecture and design of the `bopp` repository, including its code generation processes and guidance on how to make schema updates.
 
@@ -16,6 +16,7 @@ Key modules and their roles:
 * **`bopp.io`**: I/O routines for JSON, MsgPack, and CSV serialization/deserialization.
 * **`bopp.transforms`**: Functional transformations on annotations (e.g., `trim`).
 * **`bopp.util`**: Conversion utilities (DataFrame integration, header extraction).
+* **`bopp.extensions`**: Dynamic schema extension registry supporting lazy on-demand resolution via package entry points.
 
 ---
 

@@ -17,6 +17,7 @@ from .core import (
     validate_annotation_id,
 )
 from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError
+from .extensions import resolve_extensions
 from .registries import FACET_REGISTRY_KEYS, get_registry
 from .util import (
     _column_item_type,
@@ -25,6 +26,16 @@ from .util import (
     from_dataframe,
     to_dataframe,
 )
+
+__all__ = [
+    "load_bopp_csv",
+    "load_bopp_json",
+    "load_bopp_msgpack",
+    "resolve_extensions",
+    "save_bopp_csv",
+    "save_bopp_json",
+    "save_bopp_msgpack",
+]
 
 
 class _VersionHeader(msgspec.Struct):
@@ -346,6 +357,7 @@ def _load_msgspec_encoded(
     codec: Any,
     *,
     validate_id: bool,
+    resolve_ext: bool,
 ) -> BoppBase:
     with open(filepath, "rb") as f:
         data = f.read()
@@ -357,10 +369,13 @@ def _load_msgspec_encoded(
     if validate_id:
         validate_annotation_id(ann)
 
+    if resolve_ext:
+        resolve_extensions(ann)
+
     return ann
 
 
-def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
+def load_bopp_json(filepath: str | Path, *, validate_id: bool = True, resolve_ext: bool = True) -> BoppBase:
     """
     Read a BOPP JSON file directly into an Annotation model instance.
 
@@ -370,14 +385,16 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True) -> BoppBas
         Path to the BOPP JSON file to read.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        Emits a warning if missing.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------
     BoppBase
         Decoded and validated Annotation instance.
     """
-    return _load_msgspec_encoded(filepath, msgspec.json, validate_id=validate_id)
+
+    return _load_msgspec_encoded(filepath, msgspec.json, validate_id=validate_id, resolve_ext=resolve_ext)
 
 
 def save_bopp_json(
@@ -448,7 +465,12 @@ def save_bopp_msgpack(
     )
 
 
-def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> BoppBase:
+def load_bopp_msgpack(
+    filepath: str | Path,
+    *,
+    validate_id: bool = True,
+    resolve_ext: bool = True,
+) -> BoppBase:
     """
     Read a binary MsgPack file and decode it into an Annotation struct.
 
@@ -458,20 +480,22 @@ def load_bopp_msgpack(filepath: str | Path, *, validate_id: bool = True) -> Bopp
         Path to the binary MsgPack file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        Emits a warning if missing.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
 
     Returns
     -------
     BoppBase
         Decoded and validated Annotation instance.
     """
-    return _load_msgspec_encoded(filepath, msgspec.msgpack, validate_id=validate_id)
+    return _load_msgspec_encoded(filepath, msgspec.msgpack, validate_id=validate_id, resolve_ext=resolve_ext)
 
 
 def load_bopp_csv(
     filepath: str | Path,
     *,
     validate_id: bool = True,
+    resolve_ext: bool = True,
     backend: Literal["polars", "pandas"] = "polars",
 ) -> BoppBase:
     """
@@ -483,6 +507,8 @@ def load_bopp_csv(
         Path to the BOPP CSV file.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
+    resolve_ext : bool, default True
+        If True, resolves and validates extension payload values via registered extensions.
         Emits a warning if missing.
     backend : {"polars", "pandas"}, default "polars"
         The DataFrame framework to use for parsing tabular CSV content.
@@ -559,6 +585,9 @@ def load_bopp_csv(
         df.attrs = metadata  # type: ignore[attr-defined]
 
     ann = from_dataframe(df)
+
+    if resolve_ext:
+        resolve_extensions(ann)
 
     if validate_id:
         validate_annotation_id(ann)

@@ -14,6 +14,7 @@ from .exceptions import (
     BoppRegistryError,
     BoppValidationError,
 )
+from .extensions import resolve_extensions
 from .registries import get_registry
 
 BOPP_NAMESPACE = uuid.UUID("a9b3e1c0-42f8-4e89-8d62-b9123456789a")
@@ -29,6 +30,7 @@ __all__ = [
     "compute_annotation_id",
     "create",
     "ensure_annotation_id",
+    "resolve_extensions",
     "validate",
     "validate_and_set_annotation_id",
     "validate_annotation_id",
@@ -52,10 +54,9 @@ def compute_annotation_id(annotation: Any) -> str:
     str
         The computed UUIDv5 string representation.
     """
-
     data = msgspec.to_builtins(annotation, order="deterministic")
-    if 'id' in data:
-        del data['id']
+    if "id" in data:
+        del data["id"]
     canonical_bytes = msgspec.json.encode(data, order="deterministic")
     return str(uuid.uuid5(BOPP_NAMESPACE, canonical_bytes))
 
@@ -188,7 +189,8 @@ def create(
     bopp_version: str | None = None,
     sandbox: Any = msgspec.UNSET,
     generate_id: bool = True,
-    **kwargs: Any
+    resolve_ext: bool = True,
+    **kwargs: Any,
 ) -> Any:
     """
     Create a new Annotation instance for the specified BOPP version.
@@ -212,6 +214,8 @@ def create(
         Unstructured storage area for arbitrary user-defined data.
     generate_id : bool, default True
         If True, computes and assigns deterministic UUIDv5 `id` to the annotation.
+    resolve_ext : bool, default True
+        If True and payload_kind is 'ext', resolves and validates the extension payload values.
     **kwargs : Any
         Keyword arguments matching fields for the payload, extent, or
         confidence structures.
@@ -233,7 +237,7 @@ def create(
         bopp_version = get_current_schema_version()
 
     registry = get_registry(bopp_version)
-    
+
     PAYLOAD_TYPE_REGISTRY = registry["PAYLOAD_TYPE_REGISTRY"]
     EXTENT_TYPE_REGISTRY = registry["EXTENT_TYPE_REGISTRY"]
     CONFIDENCE_TYPE_REGISTRY = registry["CONFIDENCE_TYPE_REGISTRY"]
@@ -250,7 +254,7 @@ def create(
     # Extract kwargs by mutating the dictionary
     extent_obj = msgspec.UNSET
     if extent_kind is not None:
-        try: 
+        try:
             extent_cls = EXTENT_TYPE_REGISTRY[extent_kind]
         except KeyError as e:
             raise BoppRegistryError(f"Unrecognized extent kind {e}") from e
@@ -264,7 +268,7 @@ def create(
             confidence_cls = CONFIDENCE_TYPE_REGISTRY[confidence_kind]
         except KeyError as e:
             raise BoppRegistryError(f"Unrecognized confidence kind: {e}") from e
-        
+
         confidence_args = _extract_kwargs(confidence_cls, kwargs)
         confidence_obj = confidence_cls(**confidence_args)
 
@@ -281,6 +285,9 @@ def create(
         confidence=confidence_obj,
         sandbox=sandbox,
     )
+
+    if resolve_ext and payload_kind == "ext":
+        resolve_extensions(ann)
 
     if generate_id:
         ensure_annotation_id(ann)

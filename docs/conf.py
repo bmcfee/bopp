@@ -3,6 +3,9 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import shutil
+from pathlib import Path
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -25,8 +28,8 @@ extensions = [
 
 myst_enable_extensions = ["colon_fence", "attrs_inline", "linkify", "tasklist"]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ['templates']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'templates/bopp-extension-template']
 
 # -- Options for intersphinx -------------------------------------------------
 intersphinx_mapping = {
@@ -44,6 +47,26 @@ intersphinx_mapping = {
 
 html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
+
+
+def _create_extension_template_archive(app):
+    """Package the minimal extension template directory into a downloadable zip file."""
+    docs_dir = Path(app.srcdir)
+    template_dir = docs_dir / "templates" / "bopp-extension-template"
+    static_dir = docs_dir / "_static"
+
+    if template_dir.is_dir():
+        static_dir.mkdir(parents=True, exist_ok=True)
+        archive_base = static_dir / "bopp-extension-template"
+        shutil.make_archive(
+            base_name=str(archive_base),
+            format="zip",
+            root_dir=str(template_dir),
+        )
+
+
+def setup(app):
+    app.connect("builder-inited", _create_extension_template_archive)
 html_logo = "img/bopp_logo.svg"
 
 html_theme_options = {
