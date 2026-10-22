@@ -334,7 +334,7 @@ def test_trim_with_groupings():
     g2 = Grouping(name="stream", ids=[10, 11, 12, 13])
     ann = Annotation(
         media_id="track:test_media",
-        bopp_version="1.0.0",
+        bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=Times(time=[1.0, 3.0, 5.0, 8.0]),
         payload=TagOpenPayload(value=["a", "b", "c", "d"]),
@@ -760,7 +760,7 @@ def test_filter_by_groupings_facet():
     g2 = Grouping(name="track", ids=[10, 20, 20, 30])
     ann = Annotation(
         media_id="track:test_media",
-        bopp_version="1.0.0",
+        bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
         payload=TagOpenPayload(value=["a", "b", "c", "d"]),
@@ -1074,7 +1074,7 @@ def test_to_times_with_groupings():
     g2 = Grouping(name="source", ids=[10, 20])
     ann = Annotation(
         media_id="audio:track_1",
-        bopp_version="1.0.0",
+        bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 3.0]),
         payload=TagOpenPayload(value=["a", "b"]),
