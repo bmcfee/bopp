@@ -174,12 +174,8 @@ def _subset_groupings(
 
     new_groupings = []
     for g in groupings:
-        ids = getattr(g, "ids", None)
-        if isinstance(ids, list):
-            new_ids = [ids[idx] for idx in indices]
-            new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
-        else:
-            new_groupings.append(copy.deepcopy(g))
+        new_ids = [g.ids[idx] for idx in indices]
+        new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
     return new_groupings
 
 
@@ -615,10 +611,8 @@ def filter_by(
     groupings_cols: dict[str, list[int]] = {}
     if groupings is not None and groupings is not msgspec.UNSET:
         for g in groupings:
-            g_name = getattr(g, "name", None)
-            g_ids = getattr(g, "ids", None)
-            if g_name is not None and isinstance(g_ids, list):
-                groupings_cols[g_name] = g_ids
+            if g.name is not None:
+                groupings_cols[g.name] = g.ids
 
     # Determine number of observations from any available facet column
     n_obs = 0
@@ -934,7 +928,7 @@ def to_times(
     elif payload_cols:
         first_payload_col = next(iter(payload_cols.values()))
         n_source_obs = len(first_payload_col)
-    elif groupings is not None and groupings is not msgspec.UNSET and groupings:
+    elif groupings is not None and groupings is not msgspec.UNSET:
         for g in groupings:
             g_ids = getattr(g, "ids", None)
             if isinstance(g_ids, list):
