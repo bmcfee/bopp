@@ -65,6 +65,18 @@ def test_extract_header():
     assert "extent" not in header
 
 
+def test_extract_header_with_none_field():
+    ann = Annotation(
+        media_id="track:none_field",
+        bopp_version="1.0",
+        payload=OnsetPayload(value=[1]),
+        metadata=None,
+    )
+    header = extract_header(ann)
+    assert header["media_id"] == "track:none_field"
+    assert "metadata" not in header
+
+
 def test_extract_header_with_scalar_facet_attributes():
     """Verify extract_header includes scalar fields on facets when present."""
     class ScalarPayload(msgspec.Struct, tag_field="payload_type", tag="onset"):
@@ -176,6 +188,17 @@ def test_to_dataframe_encode_complex():
     assert ann_df_encoded.df["payload:object:value"][0] == '{"k":"v"}'
     assert ann_df_encoded.df["extent:score_interval:quarter"][0] == "[0,1]"
     assert ann_df_encoded.df["extent:score_interval:duration"][0] == "[1,2]"
+
+
+def test_to_dataframe_polars_empty_schema_fallback():
+    ann = Annotation(
+        media_id="track:untyped",
+        bopp_version="1.0",
+        payload=ObjectPayload(value=[{"a": 1}]),
+    )
+    ann_df = to_dataframe(ann, backend="polars", encode_complex=False)
+    assert isinstance(ann_df.df, pl.DataFrame)
+    assert ann_df.df["payload:object:value"][0] == {"a": 1}
 
 
 def test_validate_dataframe_columns_invalid_format():
