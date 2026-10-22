@@ -781,13 +781,14 @@ def test_filter_by_groupings_facet():
     assert res_rec.payload.value == ["b", "c"]
 
     # Filter when only 1 grouping is present and target is None
+    g_single = Grouping(name="pattern", ids=[0, 1], labels={"intro": 0, "verse": 1})
     ann_single_g = Annotation(
         media_id="track:test_media",
-        bopp_version="1.0.0",
+        bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 2.0]),
         payload=TagOpenPayload(value=["a", "b"]),
-        groupings=[g1],
+        groupings=[g_single],
     )
     bopp.validate_and_set_annotation_id(ann_single_g)
     res_single = filter_by(ann_single_g, lambda gid: gid == 0, facet="groupings")
