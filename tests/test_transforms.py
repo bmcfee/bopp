@@ -15,6 +15,7 @@ from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from bopp.models.v1.extent.times import Times
+from bopp.models.v1.grouping import Grouping
 from bopp.models.v1.metadata.derived import DerivedAnnotationMetadata
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.mood_thayer import MoodThayerPayload
@@ -28,7 +29,9 @@ from bopp.transforms import (
     _get_facet_list_fields,
     _get_list_fields_with_length,
     _rebuild_annotation,
+    _resample_groupings,
     _resample_struct,
+    _subset_groupings,
     _subset_struct_lists,
     filter_by,
     to_times,
@@ -122,6 +125,21 @@ def test_subset_struct_lists_helper():
     assert overridden.scores == [2.0]
 
 
+def test_subset_groupings_helper():
+    assert _subset_groupings(None, [0, 1]) is None
+    assert _subset_groupings(msgspec.UNSET, [0, 1]) is msgspec.UNSET
+
+    g1 = Grouping(name="pattern", ids=[1, 2, 3, 2], labels={"A": 1, "B": 2, "C": 3})
+    g2 = Grouping(name="source", ids=[0, 1, 0, 1])
+    subsetted = _subset_groupings([g1, g2], [1, 3])
+    assert len(subsetted) == 2
+    assert subsetted[0].name == "pattern"
+    assert subsetted[0].ids == [2, 2]
+    assert subsetted[0].labels == {"A": 1, "B": 2, "C": 3}
+    assert subsetted[1].name == "source"
+    assert subsetted[1].ids == [1, 1]
+
+
 def test_resample_struct_helper():
     assert _resample_struct(None, {}, [], {}) is None
     assert _resample_struct(msgspec.UNSET, {}, [], {}) is msgspec.UNSET
@@ -134,8 +152,21 @@ def test_resample_struct_helper():
     assert resampled.value == ["banana", "empty", "apple"]
 
 
+def test_resample_groupings_helper():
+    assert _resample_groupings(None, [], {}) is None
+    assert _resample_groupings(msgspec.UNSET, [], {}) is msgspec.UNSET
+
+    g = Grouping(name="section", ids=[0, 1], labels={"intro": 0, "verse": 1})
+    resampled = _resample_groupings([g], [0, None, 1], fill_map={"section": -1})
+    assert len(resampled) == 1
+    assert resampled[0].ids == [0, -1, 1]
+    assert resampled[0].name == "section"
+    assert resampled[0].labels == {"intro": 0, "verse": 1}
+
+
 def test_rebuild_annotation_helper():
     metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
+    g = Grouping(name="layer", ids=[1])
     ann = Annotation(
         id="old_id",
         media_id="test_media",
@@ -143,6 +174,7 @@ def test_rebuild_annotation_helper():
         metadata=metadata,
         extent=Times(time=[1.0]),
         payload=TagOpenPayload(value=["test"]),
+        groupings=[g],
     )
     rebuilt = _rebuild_annotation(
         ann,
@@ -150,12 +182,14 @@ def test_rebuild_annotation_helper():
         sandbox={"foo": "bar"},
         payload=TagOpenPayload(value=["new_test"]),
         extent=Times(time=[2.0]),
+        groupings=[Grouping(name="layer", ids=[2])],
     )
     assert rebuilt.id != "old_id"
     assert rebuilt.parents == ["old_id"]
     assert rebuilt.sandbox == {"foo": "bar"}
     assert rebuilt.payload.value == ["new_test"]
     assert rebuilt.extent.time == [2.0]
+    assert rebuilt.groupings[0].ids == [2]
 
 
 def test_trim_invalid_arguments():
@@ -254,11 +288,11 @@ def test_trim_invalid_extent_tag():
 
 
 def test_trim_no_extent():
-    metadata = HumanAnnotationMetadata(annotator_id="user_1", tool="manual")
+    metadata = HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
     ann = Annotation(
         media_id="test_media",
         bopp_version="1.0.0",
-        metadata=metadata,
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["pop"]),
     )
@@ -293,6 +327,40 @@ def test_trim_time_extent():
     assert trimmed.metadata.parameters["start"] == 2.0
     assert trimmed.metadata.parameters["end"] == 6.0
     assert trimmed.metadata.parameters["reset"] is True
+
+
+def test_trim_with_groupings():
+    g1 = Grouping(name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2})
+    g2 = Grouping(name="stream", ids=[10, 11, 12, 13])
+    ann = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=Times(time=[1.0, 3.0, 5.0, 8.0]),
+        payload=TagOpenPayload(value=["a", "b", "c", "d"]),
+        confidence=LikelihoodConfidence(confidence=[0.1, 0.3, 0.5, 0.8]),
+        groupings=[g1, g2],
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    trimmed = trim(ann, start=2.0, end=6.0, reset=True)
+    assert trimmed.extent.time == [1.0, 3.0]
+    assert trimmed.payload.value == ["b", "c"]
+    assert len(trimmed.groupings) == 2
+    assert trimmed.groupings[0].name == "pattern"
+    assert trimmed.groupings[0].ids == [1, 1]
+    assert trimmed.groupings[0].labels == {"intro": 0, "verse": 1, "outro": 2}
+    assert trimmed.groupings[1].name == "stream"
+    assert trimmed.groupings[1].ids == [11, 12]
+    assert bopp.validate(trimmed)
+
+    # Empty trim
+    empty = trim(ann, start=20.0, end=30.0)
+    assert empty.extent.time == []
+    assert empty.payload.value == []
+    assert empty.groupings[0].ids == []
+    assert empty.groupings[1].ids == []
+    assert bopp.validate(empty)
 
 
 def test_trim_numeric_bounds_pass_through():
@@ -687,6 +755,45 @@ def test_filter_by_confidence_facet():
     assert filtered.extent.time == [2.0, 3.0]
 
 
+def test_filter_by_groupings_facet():
+    g1 = Grouping(name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2})
+    g2 = Grouping(name="track", ids=[10, 20, 20, 30])
+    ann = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
+        extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
+        payload=TagOpenPayload(value=["a", "b", "c", "d"]),
+        groupings=[g1, g2],
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    # Filter by specific grouping target
+    res_verse = filter_by(ann, lambda gid: gid == 1, facet="groupings", target="pattern")
+    assert res_verse.payload.value == ["b", "c"]
+    assert res_verse.extent.time == [2.0, 3.0]
+    assert res_verse.groupings[0].ids == [1, 1]
+    assert res_verse.groupings[1].ids == [20, 20]
+    assert bopp.validate(res_verse)
+
+    # Filter with record access across multiple grouping layers
+    res_rec = filter_by(ann, lambda r: r.pattern == 1 and r.track == 20, facet="groupings")
+    assert res_rec.payload.value == ["b", "c"]
+
+    # Filter when only 1 grouping is present and target is None
+    ann_single_g = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
+        extent=Times(time=[1.0, 2.0]),
+        payload=TagOpenPayload(value=["a", "b"]),
+        groupings=[g1],
+    )
+    bopp.validate_and_set_annotation_id(ann_single_g)
+    res_single = filter_by(ann_single_g, lambda gid: gid == 0, facet="groupings")
+    assert res_single.payload.value == ["a"]
+
+
 def test_filter_by_multi_column_payload():
     # MoodThayerPayload has valence and arousal
     metadata = HumanAnnotationMetadata(annotator_id="u1", tool="gui")
@@ -711,27 +818,41 @@ def test_filter_by_multi_column_payload():
 
 
 def test_filter_by_facet_all():
-    ann = create(
+    g = Grouping(name="pattern", ids=[1, 1, 2, 1])
+    ann = Annotation(
         media_id="test_media",
-        payload_kind="tag_open",
-        extent_kind="time",
-        confidence_kind="likelihood",
-        time=[1.0, 2.0, 3.0, 4.0],
-        value=["intro", "verse", "chorus", "verse"],
-        confidence=[0.9, 0.4, 0.95, 0.85],
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
+        extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
+        payload=TagOpenPayload(value=["intro", "verse", "chorus", "verse"]),
+        confidence=LikelihoodConfidence(confidence=[0.9, 0.4, 0.95, 0.85]),
+        groupings=[g],
     )
+    bopp.validate_and_set_annotation_id(ann)
 
-    # Filter across facets using record
+    # Filter across facets using record (extent, payload, confidence, grouping)
     filtered = filter_by(
         ann,
-        lambda r: r.confidence >= 0.8 and r.value.startswith("v"),
+        lambda r: r.confidence >= 0.8 and r.value.startswith("v") and r.pattern == 1,
         facet="all",
     )
     assert filtered.payload.value == ["verse"]
     assert filtered.extent.time == [4.0]
     assert filtered.confidence.confidence == [0.85]
+    assert filtered.groupings[0].ids == [1]
 
-    # Filter across facets specifying target
+    # Filter across facets specifying target on grouping name
+    filtered_target_g = filter_by(
+        ann,
+        lambda gid: gid == 2,
+        facet="all",
+        target="pattern",
+    )
+    assert filtered_target_g.extent.time == [3.0]
+    assert filtered_target_g.payload.value == ["chorus"]
+    assert filtered_target_g.groupings[0].ids == [2]
+
+    # Filter across facets specifying target on time
     filtered_target = filter_by(
         ann,
         lambda t: t <= 2.0,
@@ -773,11 +894,27 @@ def test_filter_by_invalid_arguments():
     with pytest.raises(BoppArgumentError, match="Facet 'confidence' is not present"):
         filter_by(ann, lambda x: True, facet="confidence")
 
+    with pytest.raises(BoppArgumentError, match="Facet 'groupings' is not present"):
+        filter_by(ann, lambda x: True, facet="groupings")
+
     with pytest.raises(BoppArgumentError, match="Target field 'unknown' not found in facet 'payload'"):
         filter_by(ann, lambda x: True, target="unknown")
 
     with pytest.raises(BoppArgumentError, match="Target field 'unknown' not found in any annotation facet"):
         filter_by(ann, lambda x: True, facet="all", target="unknown")
+
+    # Groupings target not found
+    ann_with_g = Annotation(
+        media_id="test_media",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
+        extent=Times(time=[1.0]),
+        payload=TagOpenPayload(value=["a"]),
+        groupings=[Grouping(name="valid_layer", ids=[0])],
+    )
+    bopp.validate_and_set_annotation_id(ann_with_g)
+    with pytest.raises(BoppArgumentError, match="Target grouping 'invalid_layer' not found"):
+        filter_by(ann_with_g, lambda x: True, facet="groupings", target="invalid_layer")
 
 
 def test_filter_by_no_id_warning():
@@ -930,6 +1067,50 @@ def test_to_times_from_time_interval_with_sample_rate():
     assert isinstance(res.metadata, DerivedAnnotationMetadata)
     assert res.metadata.transform == "to_times"
     assert res.metadata.parameters["sample_rate"] == 1.0
+
+
+def test_to_times_with_groupings():
+    g1 = Grouping(name="pattern", ids=[1, 2], labels={"A": 1, "B": 2})
+    g2 = Grouping(name="source", ids=[10, 20])
+    ann = Annotation(
+        media_id="audio",
+        bopp_version="1.0.0",
+        metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
+        extent=Times(time=[1.0, 3.0]),
+        payload=TagOpenPayload(value=["a", "b"]),
+        confidence=LikelihoodConfidence(confidence=[0.7, 0.9]),
+        groupings=[g1, g2],
+    )
+    bopp.validate_and_set_annotation_id(ann)
+
+    # Resample with gap: t=0.0 before first event, so method='previous' has gap
+    res = to_times(
+        ann,
+        times=[0.0, 1.5, 3.0],
+        fill_value={"value": "gap_val", "confidence": 0.0, "pattern": -1, "source": -99},
+    )
+    assert res.extent.time == [0.0, 1.5, 3.0]
+    assert res.payload.value == ["gap_val", "a", "b"]
+    assert res.groupings[0].ids == [-1, 1, 2]
+    assert res.groupings[1].ids == [-99, 10, 20]
+    assert bopp.validate(res)
+
+    # Test default grouping fill value (-1)
+    res_default_fill = to_times(
+        ann,
+        times=[0.0, 1.5],
+        fill_value={"value": "gap_val"},
+    )
+    assert res_default_fill.groupings[0].ids == [-1, 1]
+    assert res_default_fill.groupings[1].ids == [-1, 10]
+
+    # Test invalid grouping fill value type
+    with pytest.raises(BoppValidationError, match="must be an integer"):
+        to_times(
+            ann,
+            times=[0.0],
+            fill_value={"value": "gap_val", "pattern": "not_an_int"},
+        )
 
 
 def test_to_times_overlap_strategies():
