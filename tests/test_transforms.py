@@ -333,7 +333,7 @@ def test_trim_with_groupings():
     g1 = Grouping(name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2})
     g2 = Grouping(name="stream", ids=[10, 11, 12, 13])
     ann = Annotation(
-        media_id="test_media",
+        media_id="track:test_media",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=Times(time=[1.0, 3.0, 5.0, 8.0]),
@@ -759,7 +759,7 @@ def test_filter_by_groupings_facet():
     g1 = Grouping(name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2})
     g2 = Grouping(name="track", ids=[10, 20, 20, 30])
     ann = Annotation(
-        media_id="test_media",
+        media_id="track:test_media",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
@@ -782,7 +782,7 @@ def test_filter_by_groupings_facet():
 
     # Filter when only 1 grouping is present and target is None
     ann_single_g = Annotation(
-        media_id="test_media",
+        media_id="track:test_media",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 2.0]),
@@ -1073,7 +1073,7 @@ def test_to_times_with_groupings():
     g1 = Grouping(name="pattern", ids=[1, 2], labels={"A": 1, "B": 2})
     g2 = Grouping(name="source", ids=[10, 20])
     ann = Annotation(
-        media_id="audio",
+        media_id="audio:track_1",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 3.0]),
