@@ -69,9 +69,9 @@ def test_json_stream_and_string_io():
     assert loaded_from_text.id == ann.id
     assert not buf_text.closed
 
-    # 2. Raw JSON string
+    # 2. Raw JSON string via StringIO
     raw_json_str = buf_text.getvalue()
-    loaded_from_str = load_bopp_json(raw_json_str)
+    loaded_from_str = load_bopp_json(io.StringIO(raw_json_str))
     assert loaded_from_str.id == ann.id
 
     # 3. Binary stream (BytesIO)
@@ -134,14 +134,14 @@ def test_csv_stream_and_string_io():
     assert loaded_stream.id == ann.id
     assert not buf.closed
 
-    # 2. Raw CSV string
+    # 2. Raw CSV string via StringIO
     raw_csv = buf.getvalue()
-    loaded_str = load_bopp_csv(raw_csv)
+    loaded_str = load_bopp_csv(io.StringIO(raw_csv))
     assert loaded_str.id == ann.id
     assert getattr(loaded_str, "sandbox", None) == {"user_note": "csv_stream"}
 
-    # 3. Raw CSV string with Pandas backend
-    loaded_pandas = load_bopp_csv(raw_csv, backend="pandas")
+    # 3. Raw CSV string via StringIO with Pandas backend
+    loaded_pandas = load_bopp_csv(io.StringIO(raw_csv), backend="pandas")
     assert loaded_pandas.id == ann.id
 
 
@@ -804,7 +804,7 @@ def test_load_bopp_csv_unsupported_backend():
         "1,0.1\n"
     )
     with pytest.raises(BoppArgumentError, match="Unsupported backend: unknown"):
-        load_bopp_csv(csv_content, backend="unknown")  # type: ignore[arg-type]
+        load_bopp_csv(io.StringIO(csv_content), backend="unknown")  # type: ignore[arg-type]
 
 
 def test_load_bopp_csv_pandas_missing():
@@ -825,4 +825,4 @@ def test_load_bopp_csv_pandas_missing():
 
     with patch("builtins.__import__", side_effect=mock_import):
         with pytest.raises(BoppIOError, match="pandas is required for backend='pandas'"):
-            load_bopp_csv(csv_content, backend="pandas")
+            load_bopp_csv(io.StringIO(csv_content), backend="pandas")

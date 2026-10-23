@@ -105,49 +105,25 @@ def _read_bytes_from_source(source: str | Path | bytes | bytearray | BinaryIO | 
             return content.encode("utf-8")
         return bytes(content)
 
-    if isinstance(source, Path):
-        return source.read_bytes()
-
-    if isinstance(source, str):
-        path = Path(source)
-        try:
-            if path.is_file():
-                return path.read_bytes()
-        except OSError:
-            pass
-        return source.encode("utf-8")
+    if isinstance(source, (str, Path)):
+        return Path(source).read_bytes()
 
     raise BoppIOError(f"Unsupported source type for binary read: {type(source)}")
 
 
 @contextlib.contextmanager
-def _open_or_yield_text_stream(source: str | Path | TextIO | io.StringIO) -> Iterator[TextIO]:
+def _open_or_yield_text_stream(source: str | Path | TextIO) -> Iterator[TextIO]:
     """
     Context manager yielding a text stream for CSV parsing.
 
     If source is an open stream (has .read), yields it directly.
-    If source is a Path or an existing filepath on disk, opens it in text mode.
-    If source is a string containing newlines or not existing as a file, wraps it in io.StringIO.
+    If source is a str or Path, opens it as a filesystem path in text mode.
     """
     if hasattr(source, "read"):
         yield source  # type: ignore[misc]
-    elif isinstance(source, Path):
+    elif isinstance(source, (str, Path)):
         with open(source, "r", encoding="utf-8") as f:
             yield f
-    elif isinstance(source, str):
-        # Check if source is an existing file path
-        is_file = False
-        if "\n" not in source and "\r" not in source:
-            try:
-                is_file = Path(source).is_file()
-            except OSError:
-                is_file = False
-
-        if is_file:
-            with open(source, "r", encoding="utf-8") as f:
-                yield f
-        else:
-            yield io.StringIO(source)
     else:
         raise BoppIOError(f"Unsupported source type for text stream: {type(source)}")
 
@@ -497,7 +473,7 @@ def load_bopp_json(
     Parameters
     ----------
     source : str, pathlib.Path, bytes, bytearray, or open file handle
-        Path to the BOPP JSON file, or an open binary/text file handle, or raw JSON bytes/string.
+        Path to the BOPP JSON file, or an open binary/text file handle, or raw JSON bytes.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
@@ -606,19 +582,19 @@ def load_bopp_msgpack(
 
 
 def load_bopp_csv(
-    source: str | Path | TextIO | io.StringIO,
+    source: str | Path | TextIO,
     *,
     validate_id: bool = True,
     resolve_ext: bool = True,
     backend: Literal["polars", "pandas"] = "polars",
 ) -> BoppBase:
     """
-    Read a BOPP CSV file, open stream, or string directly into a validated Annotation struct.
+    Read a BOPP CSV file or open text stream directly into a validated Annotation struct.
 
     Parameters
     ----------
-    source : str, pathlib.Path, or open text file handle
-        Path to the BOPP CSV file, raw CSV string, or open text stream.
+    source : str, pathlib.Path, or open text file handle / stream
+        Path to the BOPP CSV file, or an open text stream (e.g. io.StringIO).
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
