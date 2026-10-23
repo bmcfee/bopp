@@ -177,8 +177,6 @@ def _parse_complex_cell(val: str | None) -> Any:
     except (msgspec.DecodeError, ValueError, SyntaxError):
         return val_stripped
 
-    return val
-
 
 def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Callable[[str], Any]]:
     """

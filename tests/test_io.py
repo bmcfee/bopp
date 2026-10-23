@@ -1,3 +1,4 @@
+import builtins
 import io
 from unittest.mock import patch
 
@@ -15,6 +16,7 @@ from bopp.exceptions import (
 from bopp.io import (
     AnnotationDataFrame,
     _build_csv_converters,
+    _open_or_yield_text_stream,
     _parse_complex_cell,
     _prepare_annotation_for_save,
     _read_bytes_from_source,
@@ -631,6 +633,12 @@ def test_parse_complex_and_str_cell():
     assert _parse_complex_cell("unbracketed_val") == "unbracketed_val"
 
 
+def test_parse_complex_cell_non_str():
+    # Non-string, non-None values return None safely
+    assert _parse_complex_cell(123) is None  # type: ignore[arg-type]
+    assert _parse_complex_cell(object()) is None  # type: ignore[arg-type]
+
+
 def test_build_csv_converters_error_and_edge_cases():
     # Empty header line returns empty converters map
     assert _build_csv_converters("", "1.0") == {}
@@ -692,5 +700,109 @@ def test_prepare_annotation_for_save_id_variations():
 
 
 def test_read_bytes_from_source_invalid():
-    with pytest.raises(BoppIOError, match="Unsupported source type"):
+    with pytest.raises(BoppIOError, match="Unsupported source type for binary read"):
         _read_bytes_from_source(12345)  # type: ignore[arg-type]
+
+
+def test_read_bytes_from_source_buffer_types():
+    data = b'{"bopp_version": "1.0", "media_id": "track:buf_test", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+
+    # bytearray
+    loaded_bytearray = load_bopp_json(bytearray(data), validate_id=False)
+    assert loaded_bytearray.media_id == "track:buf_test"
+
+    # memoryview
+    mv = memoryview(data)
+    assert _read_bytes_from_source(mv) == data
+    loaded_mv = load_bopp_json(mv, validate_id=False)
+    assert loaded_mv.media_id == "track:buf_test"
+
+    # text stream returning str from read()
+    text_stream = io.StringIO(data.decode("utf-8"))
+    assert _read_bytes_from_source(text_stream) == data
+
+    # binary stream returning bytes from read()
+    bin_stream = io.BytesIO(data)
+    assert _read_bytes_from_source(bin_stream) == data
+
+
+def test_load_bopp_csv_invalid_source_type():
+    with pytest.raises(BoppIOError, match="Unsupported source type for text stream"):
+        load_bopp_csv(12345)  # type: ignore[arg-type]
+
+    with pytest.raises(BoppIOError, match="Unsupported source type for text stream"):
+        with _open_or_yield_text_stream(b"binary data"):  # type: ignore[arg-type]
+            pass
+
+
+class _NonSeekableTextStream:
+    """A text stream wrapper that deliberately lacks a 'seek' method."""
+
+    def __init__(self, content: str) -> None:
+        self._lines = content.splitlines(keepends=True)
+        self._pos = 0
+
+    def readline(self) -> str:
+        if self._pos < len(self._lines):
+            line = self._lines[self._pos]
+            self._pos += 1
+            return line
+        return ""
+
+    def read(self) -> str:
+        content = "".join(self._lines[self._pos:])
+        self._pos = len(self._lines)
+        return content
+
+
+def test_load_bopp_csv_non_seekable_stream():
+    csv_content = (
+        "# ---\n"
+        '# bopp_version = "1.0"\n'
+        '# media_id = "track:non_seekable"\n'
+        "# ---\n"
+        "payload:onset:value,extent:time:time\n"
+        "1,0.1\n"
+        "2,0.5\n"
+    )
+    stream = _NonSeekableTextStream(csv_content)
+    assert not hasattr(stream, "seek")
+
+    loaded = load_bopp_csv(stream, validate_id=False)  # type: ignore[arg-type]
+    assert loaded.media_id == "track:non_seekable"
+    assert loaded.payload.value == [1, 2]
+    assert loaded.extent.time == [0.1, 0.5]
+
+
+def test_load_bopp_csv_unsupported_backend():
+    csv_content = (
+        "# ---\n"
+        '# bopp_version = "1.0"\n'
+        '# media_id = "track:invalid_backend"\n'
+        "# ---\n"
+        "payload:onset:value,extent:time:time\n"
+        "1,0.1\n"
+    )
+    with pytest.raises(BoppArgumentError, match="Unsupported backend: unknown"):
+        load_bopp_csv(csv_content, backend="unknown")  # type: ignore[arg-type]
+
+
+def test_load_bopp_csv_pandas_missing():
+    csv_content = (
+        "# ---\n"
+        '# bopp_version = "1.0"\n'
+        '# media_id = "track:pandas_missing"\n'
+        "# ---\n"
+        "payload:onset:value,extent:time:time\n"
+        "1,0.1\n"
+    )
+    real_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name == "pandas":
+            raise ImportError("No module named 'pandas'")
+        return real_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=mock_import):
+        with pytest.raises(BoppIOError, match="pandas is required for backend='pandas'"):
+            load_bopp_csv(csv_content, backend="pandas")
