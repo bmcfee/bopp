@@ -370,8 +370,9 @@ def save_bopp_csv(
     ----------
     ann : BoppBase
         The Annotation struct instance to export.
-    target : str, pathlib.Path, or open text file-like object
-        Target file path or open text stream for the output CSV.
+    target : str, pathlib.Path, or typing.TextIO
+        Target file path (as str or Path) or open text stream (e.g. io.StringIO)
+        for saving the CSV output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
         When paired with generate_id=False, strictly validates the existing ID.
@@ -472,8 +473,11 @@ def load_bopp_json(
 
     Parameters
     ----------
-    source : str, pathlib.Path, bytes, bytearray, or open file handle
-        Path to the BOPP JSON file, or an open binary/text file handle, or raw JSON bytes.
+    source : str, pathlib.Path, bytes, bytearray, typing.BinaryIO, or typing.TextIO
+        Path to the BOPP JSON file (as str or Path), an open binary or text stream
+        (e.g., io.StringIO, io.BytesIO), or raw JSON bytes / bytearray.
+        Note: string inputs (str) are treated strictly as filesystem paths; wrap
+        in-memory JSON strings in `io.StringIO` or encode to `bytes`.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
@@ -501,8 +505,9 @@ def save_bopp_json(
     ----------
     annotation : BoppBase
         The Annotation instance to serialize.
-    target : str, pathlib.Path, or open file handle
-        Target file path or open binary/text stream for saving the JSON output.
+    target : str, pathlib.Path, typing.BinaryIO, or typing.TextIO
+        Target file path (as str or Path) or open binary/text stream
+        (e.g., io.StringIO, io.BytesIO) for saving the JSON output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
         When paired with generate_id=False, strictly validates the existing ID.
@@ -535,8 +540,9 @@ def save_bopp_msgpack(
     ----------
     annotation : BoppBase
         The Annotation instance to serialize.
-    target : str, pathlib.Path, or open binary stream
-        Target file path or open stream for saving the MsgPack binary output.
+    target : str, pathlib.Path, or typing.BinaryIO
+        Target file path (as str or Path) or open binary stream (e.g., io.BytesIO)
+        for saving the MsgPack binary output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
         When paired with generate_id=False, strictly validates the existing ID.
@@ -566,8 +572,9 @@ def load_bopp_msgpack(
 
     Parameters
     ----------
-    source : str, pathlib.Path, bytes, bytearray, or open binary file handle
-        Path to the binary MsgPack file, raw msgpack bytes, or an open binary stream.
+    source : str, pathlib.Path, bytes, bytearray, or typing.BinaryIO
+        Path to the binary MsgPack file (as str or Path), raw msgpack bytes or bytearray,
+        or an open binary stream (e.g., io.BytesIO).
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
@@ -593,8 +600,10 @@ def load_bopp_csv(
 
     Parameters
     ----------
-    source : str, pathlib.Path, or open text file handle / stream
-        Path to the BOPP CSV file, or an open text stream (e.g. io.StringIO).
+    source : str, pathlib.Path, or typing.TextIO
+        Path to the BOPP CSV file (as str or Path), or an open text stream (e.g. io.StringIO).
+        Note: string inputs (str) are treated strictly as filesystem paths; wrap
+        in-memory CSV strings in `io.StringIO`.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
