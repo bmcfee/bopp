@@ -10,6 +10,8 @@
     { "$ref": "extent/pixel_box.json" },
     { "$ref": "extent/score_quarter.json" },
     { "$ref": "extent/score_interval.json" },
+    { "$ref": "extent/score_quarter_float.json" },
+    { "$ref": "extent/score_interval_float.json" },
     { "$ref": "extent/midi_tick.json" },
     { "$ref": "extent/midi_interval.json" }
   ],

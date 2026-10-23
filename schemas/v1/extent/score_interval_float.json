@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extents/score_interval_float.json",
+  "title": "Score Interval (float)",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "score_interval_float"
+    },
+    "quarter": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval start times in quarter notes, as floating-point numbers.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "duration": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval durations in quarter notes, as floating-point numbers.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    }
+  },
+  "required": ["extent_type", "quarter", "duration"]
+}
