@@ -53,6 +53,27 @@ def _is_path_like(obj: Any) -> bool:
     return isinstance(obj, (str, Path)) and not hasattr(obj, "read") and not hasattr(obj, "write")
 
 
+@typing.overload
+def _open_or_yield_write(
+    target: str | Path | BinaryIO,
+    binary: Literal[True],
+) -> Iterator[BinaryIO]: ...
+
+
+@typing.overload
+def _open_or_yield_write(
+    target: str | Path | TextIO,
+    binary: Literal[False],
+) -> Iterator[TextIO]: ...
+
+
+@typing.overload
+def _open_or_yield_write(
+    target: str | Path | TextIO | BinaryIO,
+    binary: bool,
+) -> Iterator[TextIO | BinaryIO]: ...
+
+
 @contextlib.contextmanager
 def _open_or_yield_write(
     target: str | Path | TextIO | BinaryIO,
@@ -67,10 +88,10 @@ def _open_or_yield_write(
     if _is_path_like(target):
         mode = "wb" if binary else "w"
         kwargs = {} if binary else {"encoding": "utf-8"}
-        with open(target, mode, **kwargs) as f:  # type: ignore[call-overload]
+        with open(target, mode, **kwargs) as f:  # type: ignore[arg-type,call-overload]
             yield f
     else:
-        yield target  # type: ignore[misc]
+        yield target
 
 
 def _read_bytes_from_source(source: str | Path | bytes | bytearray | BinaryIO | TextIO) -> bytes:
@@ -436,15 +457,12 @@ def _save_msgspec_encoded(
     _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
     encoded_data = codec.encode(annotation)
 
-    if _is_path_like(target):
-        with open(target, "wb") as f:  # type: ignore[call-overload]
-            f.write(encoded_data)
-    else:
-        # Check if stream accepts bytes or strings
+    with _open_or_yield_write(target, binary=True) as f:
         try:
-            target.write(encoded_data)  # type: ignore[arg-type]
+            f.write(encoded_data)
         except TypeError:
-            target.write(encoded_data.decode("utf-8"))  # type: ignore[arg-type]
+            # target is a TextIO stream expecting str
+            f.write(encoded_data.decode("utf-8"))  # type: ignore[arg-type]
 
 
 def _load_msgspec_encoded(
@@ -578,7 +596,7 @@ def load_bopp_msgpack(
         Path to the binary MsgPack file, raw msgpack bytes, or an open binary stream.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-    resolve_ext : bool, default True
+        resolve_ext : bool, default True
         If True, resolves and validates extension payload values via registered extensions.
 
     Returns
@@ -605,7 +623,7 @@ def load_bopp_csv(
         Path to the BOPP CSV file, raw CSV string, or open text stream.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        resolve_ext : bool, default True
+    resolve_ext : bool, default True
         If True, resolves and validates extension payload values via registered extensions.
         Emits a warning if missing.
     backend : {"polars", "pandas"}, default "polars"
