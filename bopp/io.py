@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import csv
+import io
 import tomllib
 import typing
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, BinaryIO, Literal, TextIO
 
 import msgspec
 
@@ -46,6 +48,86 @@ class _VersionHeader(msgspec.Struct):
     bopp_version: str = get_current_schema_version()
 
 
+def _is_path_like(obj: Any) -> bool:
+    """Check if an object represents a filesystem path."""
+    return isinstance(obj, (str, Path)) and not hasattr(obj, "read") and not hasattr(obj, "write")
+
+
+@typing.overload
+def _open_or_yield_write(
+    target: str | Path | BinaryIO,
+    binary: Literal[True],
+) -> Iterator[BinaryIO]: ...
+
+
+@typing.overload
+def _open_or_yield_write(
+    target: str | Path | TextIO,
+    binary: Literal[False],
+) -> Iterator[TextIO]: ...
+
+
+@typing.overload
+def _open_or_yield_write(
+    target: str | Path | TextIO | BinaryIO,
+    binary: bool,
+) -> Iterator[TextIO | BinaryIO]: ...
+
+
+@contextlib.contextmanager  # type: ignore[misc]
+def _open_or_yield_write(
+    target: str | Path | TextIO | BinaryIO,
+    binary: bool,
+) -> Iterator[TextIO | BinaryIO]:
+    """
+    Context manager yielding a writable file-like object.
+
+    If target is a path (str or Path), opens it with mode 'wb' or 'w' and closes
+    it upon exit. If target is an open file handle, yields it directly without closing.
+    """
+    if _is_path_like(target):
+        mode = "wb" if binary else "w"
+        kwargs = {} if binary else {"encoding": "utf-8"}
+        with open(target, mode, **kwargs) as f:  # type: ignore[arg-type,call-overload]
+            yield f
+    else:
+        yield target  # type: ignore[misc]
+
+
+def _read_bytes_from_source(source: str | Path | bytes | bytearray | BinaryIO | TextIO) -> bytes:
+    """Read binary data from a path, raw bytes, or an open binary/text stream."""
+    if isinstance(source, (bytes, bytearray, memoryview)):
+        return bytes(source)
+
+    if hasattr(source, "read"):
+        content = source.read()
+        if isinstance(content, str):
+            return content.encode("utf-8")
+        return bytes(content)
+
+    if isinstance(source, (str, Path)):
+        return Path(source).read_bytes()
+
+    raise BoppIOError(f"Unsupported source type for binary read: {type(source)}")
+
+
+@contextlib.contextmanager
+def _open_or_yield_text_stream(source: str | Path | TextIO) -> Iterator[TextIO]:
+    """
+    Context manager yielding a text stream for CSV parsing.
+
+    If source is an open stream (has .read), yields it directly.
+    If source is a str or Path, opens it as a filesystem path in text mode.
+    """
+    if hasattr(source, "read"):
+        yield source  # type: ignore[misc]
+    elif isinstance(source, (str, Path)):
+        with open(source, "r", encoding="utf-8") as f:
+            yield f
+    else:
+        raise BoppIOError(f"Unsupported source type for text stream: {type(source)}")
+
+
 def _parse_complex_cell(val: str | None) -> Any:
     """
     Safely evaluate container literals from a CSV cell.
@@ -70,8 +152,6 @@ def _parse_complex_cell(val: str | None) -> Any:
         return msgspec.json.decode(val_stripped)
     except (msgspec.DecodeError, ValueError, SyntaxError):
         return val_stripped
-
-    return val
 
 
 def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Callable[[str], Any]]:
@@ -175,7 +255,7 @@ def _build_polars_csv_schema(
     Returns
     -------
     tuple of (dict[str, Any], list[str])
-        A tuple consisting of the full schema mapping every column name to a Polars data type,
+        A tuple practical consisting of the full schema mapping every column name to a Polars data type,
         and a list of column names designated as complex fields requiring post-read decoding.
     """
     import polars as pl
@@ -277,21 +357,22 @@ def _prepare_annotation_for_save(
 
 def save_bopp_csv(
     ann: BoppBase,
-    filepath: str | Path,
+    target: str | Path | TextIO,
     *,
     validate_id: bool = True,
     generate_id: bool = True,
     backend: Literal["pandas", "pandas-pyarrow", "polars"] = "polars",
 ) -> None:
     """
-    Write metadata as TOML frontmatter followed by tabular data to a CSV file.
+    Write metadata as TOML frontmatter followed by tabular data to a CSV file or stream.
 
     Parameters
     ----------
     ann : BoppBase
         The Annotation struct instance to export.
-    filepath : str or pathlib.Path
-        Target file path for the output CSV file.
+    target : str, pathlib.Path, or typing.TextIO
+        Target file path (as str or Path) or open text stream (e.g. io.StringIO)
+        for saving the CSV output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
         When paired with generate_id=False, strictly validates the existing ID.
@@ -325,7 +406,7 @@ def save_bopp_csv(
         frontmatter.append(f"# {line}\n")
     frontmatter.append("# ---\n")
 
-    with open(filepath, "w", encoding="utf-8") as f:
+    with _open_or_yield_write(target, binary=False) as f:  # type: ignore[attr-defined]
         # 3. Write the header
         f.writelines(frontmatter)
 
@@ -342,7 +423,7 @@ def save_bopp_csv(
 
 def _save_msgspec_encoded(
     annotation: BoppBase,
-    filepath: str | Path,
+    target: str | Path | BinaryIO | TextIO,
     codec: Any,
     *,
     validate_id: bool,
@@ -350,19 +431,23 @@ def _save_msgspec_encoded(
 ) -> None:
     _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
     encoded_data = codec.encode(annotation)
-    with open(filepath, "wb") as f:
-        f.write(encoded_data)
+
+    with _open_or_yield_write(target, binary=True) as f:  # type: ignore[attr-defined]
+        try:
+            f.write(encoded_data)
+        except TypeError:
+            # target is a TextIO stream expecting str
+            f.write(encoded_data.decode("utf-8"))  # type: ignore[arg-type]
 
 
 def _load_msgspec_encoded(
-    filepath: str | Path,
+    source: str | Path | bytes | bytearray | BinaryIO | TextIO,
     codec: Any,
     *,
     validate_id: bool,
     resolve_ext: bool,
 ) -> BoppBase:
-    with open(filepath, "rb") as f:
-        data = f.read()
+    data = _read_bytes_from_source(source)
 
     header = codec.decode(data, type=_VersionHeader)
     annotation_cls = get_registry(header.bopp_version)["Annotation"]
@@ -377,14 +462,22 @@ def _load_msgspec_encoded(
     return ann
 
 
-def load_bopp_json(filepath: str | Path, *, validate_id: bool = True, resolve_ext: bool = True) -> BoppBase:
+def load_bopp_json(
+    source: str | Path | bytes | bytearray | BinaryIO | TextIO,
+    *,
+    validate_id: bool = True,
+    resolve_ext: bool = True,
+) -> BoppBase:
     """
-    Read a BOPP JSON file directly into an Annotation model instance.
+    Read a BOPP JSON resource directly into an Annotation model instance.
 
     Parameters
     ----------
-    filepath : str or pathlib.Path
-        Path to the BOPP JSON file to read.
+    source : str, pathlib.Path, bytes, bytearray, typing.BinaryIO, or typing.TextIO
+        Path to the BOPP JSON file (as str or Path), an open binary or text stream
+        (e.g., io.StringIO, io.BytesIO), or raw JSON bytes / bytearray.
+        Note: string inputs (str) are treated strictly as filesystem paths; wrap
+        in-memory JSON strings in `io.StringIO` or encode to `bytes`.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
@@ -395,26 +488,26 @@ def load_bopp_json(filepath: str | Path, *, validate_id: bool = True, resolve_ex
     BoppBase
         Decoded and validated Annotation instance.
     """
-
-    return _load_msgspec_encoded(filepath, msgspec.json, validate_id=validate_id, resolve_ext=resolve_ext)
+    return _load_msgspec_encoded(source, msgspec.json, validate_id=validate_id, resolve_ext=resolve_ext)
 
 
 def save_bopp_json(
     annotation: BoppBase,
-    filepath: str | Path,
+    target: str | Path | BinaryIO | TextIO,
     *,
     validate_id: bool = True,
     generate_id: bool = True,
 ) -> None:
     """
-    Serialize an Annotation instance directly into a JSON file.
+    Serialize an Annotation instance directly into a JSON file or stream.
 
     Parameters
     ----------
     annotation : BoppBase
         The Annotation instance to serialize.
-    filepath : str or pathlib.Path
-        Target file path for saving the JSON output.
+    target : str, pathlib.Path, typing.BinaryIO, or typing.TextIO
+        Target file path (as str or Path) or open binary/text stream
+        (e.g., io.StringIO, io.BytesIO) for saving the JSON output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
         When paired with generate_id=False, strictly validates the existing ID.
@@ -426,7 +519,7 @@ def save_bopp_json(
     """
     _save_msgspec_encoded(
         annotation,
-        filepath,
+        target,
         msgspec.json,
         validate_id=validate_id,
         generate_id=generate_id,
@@ -435,20 +528,21 @@ def save_bopp_json(
 
 def save_bopp_msgpack(
     annotation: BoppBase,
-    filepath: str | Path,
+    target: str | Path | BinaryIO,
     *,
     validate_id: bool = True,
     generate_id: bool = True,
 ) -> None:
     """
-    Serialize an Annotation instance directly into a binary MsgPack file.
+    Serialize an Annotation instance directly into a binary MsgPack file or stream.
 
     Parameters
     ----------
     annotation : BoppBase
         The Annotation instance to serialize.
-    filepath : str or pathlib.Path
-        Target file path for saving the MsgPack binary output.
+    target : str, pathlib.Path, or typing.BinaryIO
+        Target file path (as str or Path) or open binary stream (e.g., io.BytesIO)
+        for saving the MsgPack binary output.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID before saving.
         When paired with generate_id=False, strictly validates the existing ID.
@@ -460,7 +554,7 @@ def save_bopp_msgpack(
     """
     _save_msgspec_encoded(
         annotation,
-        filepath,
+        target,
         msgspec.msgpack,
         validate_id=validate_id,
         generate_id=generate_id,
@@ -468,18 +562,19 @@ def save_bopp_msgpack(
 
 
 def load_bopp_msgpack(
-    filepath: str | Path,
+    source: str | Path | bytes | bytearray | BinaryIO,
     *,
     validate_id: bool = True,
     resolve_ext: bool = True,
 ) -> BoppBase:
     """
-    Read a binary MsgPack file and decode it into an Annotation struct.
+    Read a binary MsgPack resource and decode it into an Annotation struct.
 
     Parameters
     ----------
-    filepath : str or pathlib.Path
-        Path to the binary MsgPack file.
+    source : str, pathlib.Path, bytes, bytearray, or typing.BinaryIO
+        Path to the binary MsgPack file (as str or Path), raw msgpack bytes or bytearray,
+        or an open binary stream (e.g., io.BytesIO).
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
@@ -490,23 +585,25 @@ def load_bopp_msgpack(
     BoppBase
         Decoded and validated Annotation instance.
     """
-    return _load_msgspec_encoded(filepath, msgspec.msgpack, validate_id=validate_id, resolve_ext=resolve_ext)
+    return _load_msgspec_encoded(source, msgspec.msgpack, validate_id=validate_id, resolve_ext=resolve_ext)
 
 
 def load_bopp_csv(
-    filepath: str | Path,
+    source: str | Path | TextIO,
     *,
     validate_id: bool = True,
     resolve_ext: bool = True,
     backend: Literal["polars", "pandas"] = "polars",
 ) -> BoppBase:
     """
-    Read a BOPP CSV file directly into a validated Annotation struct.
+    Read a BOPP CSV file or open text stream directly into a validated Annotation struct.
 
     Parameters
     ----------
-    filepath : str or pathlib.Path
-        Path to the BOPP CSV file.
+    source : str, pathlib.Path, or typing.TextIO
+        Path to the BOPP CSV file (as str or Path), or an open text stream (e.g. io.StringIO).
+        Note: string inputs (str) are treated strictly as filesystem paths; wrap
+        in-memory CSV strings in `io.StringIO`.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
@@ -527,7 +624,7 @@ def load_bopp_csv(
     """
     toml_lines = []
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with _open_or_yield_text_stream(source) as f:
         # 1. Parse TOML Frontmatter
         first_line = f.readline().strip()
 
@@ -541,14 +638,21 @@ def load_bopp_csv(
 
             metadata = tomllib.loads("".join(toml_lines))
         else:
-            # No frontmatter found, reset the file pointer
-            f.seek(0)
+            # No frontmatter found, reset the file pointer if seekable
+            if hasattr(f, "seek"):
+                f.seek(0)
             metadata = {}
 
         bopp_version = metadata.get("bopp_version", get_current_schema_version())
-        header_pos = f.tell()
+        header_pos = f.tell() if hasattr(f, "seek") else None
         header_line = f.readline()
-        f.seek(header_pos)
+        # Reset position back to header row so dataframe reader reads column names
+        if hasattr(f, "seek") and header_pos is not None:
+            f.seek(header_pos)
+        else:
+            # For non-seekable streams, recombine header with remaining lines
+            remaining = header_line + f.read()
+            f = io.StringIO(remaining)
 
         # 2. Hand the open file pointer to Polars or Pandas
         if backend == "polars":
