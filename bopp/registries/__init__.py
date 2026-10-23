@@ -28,6 +28,7 @@ def get_registry(version: str) -> dict[str, Any]:
         - "COMPLEX_FIELDS_REGISTRY": dict mapping facet types to fields containing complex structures.
         - "STRING_FIELDS_REGISTRY": dict mapping facet types to fields containing string values.
         - "Annotation": the root Annotation Struct class for the version.
+        - "Grouping": the Grouping Struct class for the version.
 
     Raises
     ------
@@ -53,6 +54,7 @@ def get_registry(version: str) -> dict[str, Any]:
             "COMPLEX_FIELDS_REGISTRY": getattr(v1, "COMPLEX_FIELDS_REGISTRY", {}),
             "STRING_FIELDS_REGISTRY": getattr(v1, "STRING_FIELDS_REGISTRY", {}),
             "Annotation": v1.ANNOTATION_CLASS,
+            "Grouping": getattr(v1, "GROUPING_CLASS", None),
         }
 
     raise ValueError(f"Unknown registry version '{registry_key}' for schema '{version}'.")

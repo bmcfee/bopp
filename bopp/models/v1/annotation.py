@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from msgspec import UNSET, Meta, UnsetType
 
 from ...base import BoppBase
-from . import confidences, extents, payloads
+from . import confidences, extents, grouping, payloads
 from . import metadata as metadata_1
 
 
@@ -72,6 +72,15 @@ class Annotation(BoppBase):
             dict[str, Any],
             Meta(
                 description="Unstructured storage area for arbitrary user-defined data"
+            ),
+        ]
+        | UnsetType
+    ) = UNSET
+    groupings: (
+        Annotated[
+            list[grouping.Grouping],
+            Meta(
+                description="Optional array of groupings defined over indices or element IDs"
             ),
         ]
         | UnsetType

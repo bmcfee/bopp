@@ -117,6 +117,7 @@ def _rebuild_annotation(
     metadata: msgspec.Struct | Any = msgspec.UNSET,
     extent: msgspec.Struct | None | Any = msgspec.UNSET,
     confidence: msgspec.Struct | None | Any = msgspec.UNSET,
+    groupings: list[Any] | Any = msgspec.UNSET,
 ) -> BoppBase:
     """Rebuild an Annotation with updated facets and recompute its deterministic ID."""
     kwargs: dict[str, Any] = {
@@ -131,6 +132,8 @@ def _rebuild_annotation(
         kwargs["extent"] = extent
     if confidence is not msgspec.UNSET:
         kwargs["confidence"] = confidence
+    if groupings is not msgspec.UNSET:
+        kwargs["groupings"] = groupings
 
     new_ann = msgspec.structs.replace(annotation, **kwargs)
     validate_and_set_annotation_id(new_ann)
@@ -161,6 +164,21 @@ def _subset_struct_lists(
     return msgspec.structs.replace(struct, **updates)
 
 
+def _subset_groupings(
+    groupings: list[Any] | Literal[msgspec.UnsetType.UNSET] | None,
+    indices: list[int],
+) -> list[Any] | Literal[msgspec.UnsetType.UNSET] | None:
+    """Subset ids array of grouping objects using indices."""
+    if groupings is None or groupings is msgspec.UNSET:
+        return groupings
+
+    new_groupings = []
+    for g in groupings:
+        new_ids = [g.ids[idx] for idx in indices]
+        new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
+    return new_groupings
+
+
 def _resample_struct(
     struct: msgspec.Struct | None,
     cols: dict[str, list[Any]],
@@ -179,6 +197,27 @@ def _resample_struct(
         ]
 
     return msgspec.structs.replace(struct, **updates)
+
+
+def _resample_groupings(
+    groupings: list[Any] | Literal[msgspec.UnsetType.UNSET] | None,
+    matched_indices: list[int | None],
+    fill_map: dict[str, int],
+) -> list[Any] | Literal[msgspec.UnsetType.UNSET] | None:
+    """Resample groupings based on matched indices and a fill mapping."""
+    if groupings is None or groupings is msgspec.UNSET:
+        return groupings
+
+    new_groupings = []
+    for g in groupings:
+        ids = getattr(g, "ids", None)
+        if isinstance(ids, list):
+            fill_val = fill_map.get(getattr(g, "name", ""), -1)
+            new_ids = [fill_val if idx is None else ids[idx] for idx in matched_indices]
+            new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
+        else:
+            new_groupings.append(copy.deepcopy(g))
+    return new_groupings
 
 
 def _coerce_trim_bound(value: _TrimBound) -> float | Fraction | None:
@@ -245,7 +284,7 @@ def trim(
     Returns
     -------
     BoppBase
-        A new Annotation instance with trimmed extents, payloads, and confidences.
+        A new Annotation instance with trimmed extents, payloads, confidences, and groupings.
 
     Raises
     ------
@@ -327,6 +366,7 @@ def trim(
 
     payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
     confidence = getattr(annotation, "confidence", msgspec.UNSET)
+    groupings = getattr(annotation, "groupings", msgspec.UNSET)
 
     if axis_config is None:
         return _rebuild_annotation(
@@ -337,6 +377,7 @@ def trim(
             payload=payload,
             extent=extent,
             confidence=confidence,
+            groupings=groupings,
         )
 
     kind, field_a, field_b = axis_config
@@ -437,6 +478,7 @@ def trim(
     new_extent = _subset_struct_lists(extent, kept_indices, n_obs, overrides=extent_updates)
     new_payload = _subset_struct_lists(payload, kept_indices, n_obs)
     new_confidence = _subset_struct_lists(confidence, kept_indices, n_obs)
+    new_groupings = _subset_groupings(groupings, kept_indices)
 
     return _rebuild_annotation(
         annotation,
@@ -446,6 +488,7 @@ def trim(
         extent=new_extent,
         payload=new_payload,  # type: ignore[arg-type]
         confidence=new_confidence,
+        groupings=new_groupings,
     )
 
 
@@ -454,14 +497,14 @@ def filter_by(
     predicate: Callable[..., bool],
     *,
     target: str | None = None,
-    facet: Literal["payload", "extent", "confidence", "all"] = "payload",
+    facet: Literal["payload", "extent", "confidence", "groupings", "all"] = "payload",
 ) -> BoppBase:
     """
     Filter observations in an Annotation by applying a predicate function.
 
-    Observations across extent, payload, and confidence facets are filtered in parallel
-    according to their shared array indices, keeping only elements where `predicate`
-    evaluates to True.
+    Observations across extent, payload, confidence, and groupings facets are filtered
+    in parallel according to their shared array indices, keeping only elements where
+    `predicate` evaluates to True.
 
     Parameters
     ----------
@@ -470,15 +513,15 @@ def filter_by(
     predicate : Callable[..., bool]
         A callable taking observation elements or records and returning a truthy/falsy value.
     target : str or None, optional
-        A specific field name to pass into `predicate` (e.g., 'value', 'time', 'valence').
+        A specific field or grouping name to pass into `predicate` (e.g., 'value', 'time', 'pattern').
         If specified, `predicate` is invoked as `predicate(value)`.
         If None and `facet` is not "all", if the facet contains a single parallel column
         or a field named 'value', that column value is passed directly to `predicate`.
         Otherwise, a record (accessible via attribute and dict key) is passed to `predicate`.
-    facet : {"payload", "extent", "confidence", "all"}, default "payload"
+    facet : {"payload", "extent", "confidence", "groupings", "all"}, default "payload"
         The facet to target when evaluating `predicate`.
         When set to "all", `predicate` is passed a row record containing fields from
-        extent, payload, and confidence facets.
+        extent, payload, confidence, and groupings facets.
 
     Returns
     -------
@@ -526,7 +569,7 @@ def filter_by(
     >>> happy.payload.valence
     [0.5]
 
-    Cross-facet filtering across extent, payload, and confidence:
+    Cross-facet filtering across extent, payload, confidence, and groupings:
 
     >>> ann_multi = bopp.create(
     ...     media_id="track_1",
@@ -545,9 +588,9 @@ def filter_by(
     >>> res.payload.value
     ['chorus']
     """
-    if facet not in ("payload", "extent", "confidence", "all"):
+    if facet not in ("payload", "extent", "confidence", "groupings", "all"):
         raise BoppArgumentError(
-            f"Invalid facet '{facet}'. Must be one of 'payload', 'extent', 'confidence', or 'all'."
+            f"Invalid facet '{facet}'. Must be one of 'payload', 'extent', 'confidence', 'groupings', or 'all'."
         )
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Filtering")
@@ -559,14 +602,21 @@ def filter_by(
     payload: msgspec.Struct = getattr(annotation, "payload", None)  # type: ignore[assignment]
     extent = getattr(annotation, "extent", None)
     confidence = getattr(annotation, "confidence", None)
+    groupings = getattr(annotation, "groupings", None)
 
     payload_cols = _get_facet_list_fields(payload)
     extent_cols = _get_facet_list_fields(extent)
     confidence_cols = _get_facet_list_fields(confidence)
 
+    groupings_cols: dict[str, list[int]] = {}
+    if groupings is not None and groupings is not msgspec.UNSET:
+        for g in groupings:
+            if g.name is not None:
+                groupings_cols[g.name] = g.ids
+
     # Determine number of observations from any available facet column
     n_obs = 0
-    all_facets_cols = [payload_cols, extent_cols, confidence_cols]
+    all_facets_cols = [payload_cols, extent_cols, confidence_cols, groupings_cols]
     for cols in all_facets_cols:
         if cols:
             first_col = next(iter(cols.values()))
@@ -582,6 +632,7 @@ def filter_by(
             payload=payload,
             extent=extent,
             confidence=confidence,
+            groupings=groupings,
         )
 
     # Prepare input stream for predicate
@@ -591,7 +642,7 @@ def filter_by(
         if target is not None:
             # Look for target across all facets
             found_col = None
-            for cols in (payload_cols, extent_cols, confidence_cols):
+            for cols in (payload_cols, extent_cols, confidence_cols, groupings_cols):
                 if target in cols:
                     found_col = cols[target]
                     break
@@ -609,9 +660,36 @@ def filter_by(
                     record_dict[k] = v[i]
                 for k, v in confidence_cols.items():
                     record_dict[k] = v[i]
+                for k, v in groupings_cols.items():
+                    record_dict[k] = v[i]
                 record = FilterRecord(record_dict)
                 if predicate(record):
                     kept_indices.append(i)
+
+    elif facet == "groupings":
+        if not groupings_cols:
+            raise BoppArgumentError("Facet 'groupings' is not present on annotation or contains no layers.")
+
+        if target is not None:
+            if target not in groupings_cols:
+                raise BoppArgumentError(
+                    f"Target grouping '{target}' not found in facet 'groupings'. Available: {list(groupings_cols.keys())}"
+                )
+            target_list = groupings_cols[target]
+            for i, val in enumerate(target_list):
+                if predicate(val):
+                    kept_indices.append(i)
+        else:
+            if len(groupings_cols) == 1:
+                target_list = next(iter(groupings_cols.values()))
+                for i, val in enumerate(target_list):
+                    if predicate(val):
+                        kept_indices.append(i)
+            else:
+                for i in range(n_obs):
+                    record = FilterRecord({k: v[i] for k, v in groupings_cols.items()})
+                    if predicate(record):
+                        kept_indices.append(i)
 
     else:
         facet_struct_map = {
@@ -655,6 +733,7 @@ def filter_by(
     new_payload = _subset_struct_lists(payload, kept_indices, n_obs)
     new_extent = _subset_struct_lists(extent, kept_indices, n_obs)
     new_confidence = _subset_struct_lists(confidence, kept_indices, n_obs)
+    new_groupings = _subset_groupings(groupings, kept_indices)
 
     return _rebuild_annotation(
         annotation,
@@ -664,6 +743,7 @@ def filter_by(
         extent=new_extent,
         payload=new_payload,  # type: ignore[arg-type]
         confidence=new_confidence,
+        groupings=new_groupings,
     )
 
 
@@ -702,7 +782,7 @@ def to_times(
     Evaluates observations at the requested timestamps. For interval extents, observations
     covering each timestamp are selected. For point extents, nearest or previous neighbor
     lookup is performed without assuming any algebra on the payload values. If confidence
-    values are present, they are resampled in parallel.
+    or grouping values are present, they are resampled in parallel.
 
     Parameters
     ----------
@@ -728,7 +808,8 @@ def to_times(
         Value to fill when a sample timestamp falls in a gap (no covering observation).
         For single-column payloads, a scalar value may be supplied. For multi-column
         payloads, a dictionary mapping field names to fill values must be provided.
-        Fill values are validated against the payload schema. Default is None.
+        Grouping layers may be populated via grouping names in fill_value dict, defaulting
+        to -1 when unspecified. Fill values are validated against schema types. Default is None.
 
     Returns
     -------
@@ -740,7 +821,7 @@ def to_times(
     BoppArgumentError
         If arguments are invalid or the source extent is incompatible with time conversion.
     BoppValidationError
-        If `fill_value` does not conform to the payload or confidence schema types.
+        If `fill_value` does not conform to the payload, confidence, or grouping schema types.
 
     Examples
     --------
@@ -824,6 +905,7 @@ def to_times(
     extent = getattr(annotation, "extent", None)
     payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
     confidence = getattr(annotation, "confidence", None)
+    groupings = getattr(annotation, "groupings", None)
 
     payload_cols = _get_facet_list_fields(payload)
     confidence_cols = _get_facet_list_fields(confidence)
@@ -846,10 +928,17 @@ def to_times(
     elif payload_cols:
         first_payload_col = next(iter(payload_cols.values()))
         n_source_obs = len(first_payload_col)
+    elif groupings is not None and groupings is not msgspec.UNSET:
+        for g in groupings:
+            g_ids = getattr(g, "ids", None)
+            if isinstance(g_ids, list):
+                n_source_obs = len(g_ids)
+                break
 
     # Setup fill_value map
     payload_fill_map: dict[str, Any] = {}
     confidence_fill_map: dict[str, Any] = {}
+    grouping_fill_map: dict[str, int] = {}
 
     if isinstance(fill_value, dict):
         for col_name in payload_cols:
@@ -866,6 +955,18 @@ def to_times(
                 confidence_fill_map[col_name] = fill_value[col_name]
             else:
                 confidence_fill_map[col_name] = 0.0
+        if groupings is not None and groupings is not msgspec.UNSET:
+            for g in groupings:
+                g_name = getattr(g, "name", "")
+                if g_name in fill_value:
+                    val = fill_value[g_name]
+                    if not isinstance(val, int) or isinstance(val, bool):
+                        raise BoppValidationError(
+                            f"Fill value for grouping '{g_name}' must be an integer, got {type(val).__name__}."
+                        )
+                    grouping_fill_map[g_name] = val
+                else:
+                    grouping_fill_map[g_name] = -1
     else:
         if len(payload_cols) == 1:
             col_name = next(iter(payload_cols.keys()))
@@ -881,6 +982,10 @@ def to_times(
 
         for col_name in confidence_cols:
             confidence_fill_map[col_name] = 0.0
+
+        if groupings is not None and groupings is not msgspec.UNSET:
+            for g in groupings:
+                grouping_fill_map[getattr(g, "name", "")] = -1
 
     # Build sampling grid
     target_times: list[float]
@@ -917,6 +1022,7 @@ def to_times(
         new_extent = Times(time=[])
         new_payload = _subset_struct_lists(payload, [], n_source_obs)
         new_confidence = _subset_struct_lists(confidence, [], n_source_obs)
+        new_groupings = _subset_groupings(groupings, [])
 
         return _rebuild_annotation(
             annotation,
@@ -926,6 +1032,7 @@ def to_times(
             extent=new_extent,
             payload=new_payload,  # type: ignore[arg-type]
             confidence=new_confidence,
+            groupings=new_groupings,
         )
 
     # If source annotation has no observations
@@ -939,6 +1046,7 @@ def to_times(
         empty_indices: list[int | None] = [None] * len(out_times)
         new_payload = _resample_struct(payload, payload_cols, empty_indices, payload_fill_map)
         new_confidence = _resample_struct(confidence, confidence_cols, empty_indices, confidence_fill_map)
+        new_groupings = _resample_groupings(groupings, empty_indices, grouping_fill_map)
         new_extent = Times(time=out_times)
 
         return _rebuild_annotation(
@@ -949,6 +1057,7 @@ def to_times(
             extent=new_extent,
             payload=new_payload,  # type: ignore[arg-type]
             confidence=new_confidence,
+            groupings=new_groupings,
         )
 
     out_times = []
@@ -1013,6 +1122,7 @@ def to_times(
 
     new_payload = _resample_struct(payload, payload_cols, matched_indices, payload_fill_map)
     new_confidence = _resample_struct(confidence, confidence_cols, matched_indices, confidence_fill_map)
+    new_groupings = _resample_groupings(groupings, matched_indices, grouping_fill_map)
     new_extent = Times(time=out_times)
 
     return _rebuild_annotation(
@@ -1023,4 +1133,5 @@ def to_times(
         extent=new_extent,
         payload=new_payload,  # type: ignore[arg-type]
         confidence=new_confidence,
+        groupings=new_groupings,
     )

@@ -1,9 +1,12 @@
 import base64
 import uuid
+import warnings
+from typing import Any
 
 import msgspec
 import pytest
 
+from bopp.base import BoppBase, GroupingBase
 from bopp.core import (
     BOPP_NAMESPACE,
     BoppArgumentError,
@@ -19,6 +22,8 @@ from bopp.core import (
     validate_annotation_id,
 )
 from bopp.models.v1.annotation import Annotation
+from bopp.models.v1.grouping import Grouping
+from bopp.models.v1.payload.onset import OnsetPayload
 
 
 class DummyStruct(msgspec.Struct):
@@ -246,3 +251,84 @@ def test_repr_mimebundle():
     # Check that invocation with include and exclude succeeds
     bundle_filtered = ann._repr_mimebundle_(include=["text/plain"], exclude=[mime_type])
     assert mime_type in bundle_filtered
+
+
+def test_grouping_without_labels():
+    grouping = Grouping(name="sections", ids=[0, 1, 0, 1, 2])
+    assert grouping.name == "sections"
+    assert grouping.ids == [0, 1, 0, 1, 2]
+    assert grouping.labels is msgspec.UNSET
+
+
+def test_grouping_valid_bijective_labels():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        grouping = Grouping(
+            name="sections",
+            ids=[0, 1, 0, 2],
+            labels={"verse": 0, "chorus": 1, "bridge": 2},
+        )
+    assert grouping.labels == {"verse": 0, "chorus": 1, "bridge": 2}
+
+
+def test_grouping_negative_ids_allowed_unmapped():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        grouping = Grouping(
+            name="sections",
+            ids=[-1, 0, -1, 1],
+            labels={"verse": 0, "chorus": 1},
+        )
+    assert grouping.ids == [-1, 0, -1, 1]
+
+
+def test_grouping_warns_unmapped_non_negative_ids():
+    with pytest.warns(UserWarning, match="contains non-negative group IDs not included in label mapping: \\[2\\]"):
+        Grouping(
+            name="sections",
+            ids=[0, 1, 2],
+            labels={"verse": 0, "chorus": 1},
+        )
+
+
+def test_grouping_duplicate_id_values_raises():
+    with pytest.raises(
+        BoppValidationError,
+        match="Grouping assigns two or more labels to the same group identifier",
+    ):
+        Grouping(
+            name="sections",
+            ids=[0, 0],
+            labels={"verse": 0, "chorus": 0},
+        )
+
+
+def test_grouping_non_list_ids_ignored_in_root_lengths():
+    class CustomGrouping(msgspec.Struct):
+        name: str
+        ids: Any = None
+
+    class CustomAnnotation(BoppBase):
+        media_id: str
+        payload: OnsetPayload
+        groupings: list[Any]
+
+    ann = CustomAnnotation(
+        media_id="audio:1",
+        payload=OnsetPayload(value=[1, 2]),
+        groupings=[CustomGrouping(name="test", ids=None)],
+    )
+    assert ann.media_id == "audio:1"
+
+
+def test_grouping_with_labels_and_none_or_unset_ids():
+    class GroupingWithoutIds(GroupingBase):
+        name: str
+        labels: dict[str, int]
+        ids: Any = None
+
+    g_none = GroupingWithoutIds(name="test", labels={"a": 0}, ids=None)
+    assert g_none.labels == {"a": 0}
+
+    g_unset = GroupingWithoutIds(name="test", labels={"a": 0}, ids=msgspec.UNSET)
+    assert g_unset.labels == {"a": 0}

@@ -76,8 +76,8 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
     """
     Extract all singleton/scalar fields from an Annotation for TOML serialization.
 
-    Parallel array blocks within facets (`extent`, `payload`, `confidence`) are omitted,
-    while scalar attributes on those facets are preserved under their facet key.
+    Parallel array blocks within facets (`extent`, `payload`, `confidence`) and `groupings`
+    are omitted, while scalar attributes on those facets are preserved under their facet key.
 
     Parameters
     ----------
@@ -109,7 +109,17 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
         if value is None or value is msgspec.UNSET:
             continue
 
-        if field.name in FACET_REGISTRY_KEYS:
+        if field.name == "groupings":
+            if isinstance(value, list) and value:
+                groupings_header = []
+                for g in value:
+                    g_dict: dict[str, Any] = {"name": g.name}
+                    labels = getattr(g, "labels", msgspec.UNSET)
+                    if labels is not msgspec.UNSET and labels is not None:
+                        g_dict["labels"] = msgspec.to_builtins(labels)
+                    groupings_header.append(g_dict)
+                header_data["groupings"] = groupings_header
+        elif field.name in FACET_REGISTRY_KEYS:
             if isinstance(value, msgspec.Struct):
                 facet_attrs: dict[str, Any] = {}
                 _extract_facet_data(value, field.name, {}, facet_attrs)
@@ -126,13 +136,13 @@ def extract_header(annotation: BoppBase) -> dict[str, Any]:
 
 def _validate_dataframe_columns(
     columns: list[str], registry_or_version: dict[str, Any] | str
-) -> dict[str, list[tuple[str, str, str]]]:
+) -> tuple[dict[str, list[tuple[str, str, str]]], list[tuple[int, str]]]:
     """
     Validate DataFrame column headers against the schema and group them by facet.
 
     Enforces the following validation rules:
-    1. Every column must follow the format ``"facet:type:field"`` with exactly
-       three colon-separated components.
+    1. Every facet column must follow the format ``"facet:type:field"`` with exactly
+       three colon-separated components, or ``"group.N.ids"`` for groupings.
     2. All columns belonging to the same facet must share a single type discriminator tag.
     3. The facet name and type tag must exist in the schema registry.
     4. The field name must exist on the type's msgspec Struct definition.
@@ -146,14 +156,15 @@ def _validate_dataframe_columns(
 
     Returns
     -------
-    dict of str to list of tuple of (str, str, str)
+    tuple of (dict[str, list[tuple[str, str, str]]], list[tuple[int, str]])
         Mapping from facet name (`"extent"`, `"payload"`, `"confidence"`) to
-        lists of ``(type_tag, field_name, full_col_name)`` tuples.
+        lists of ``(type_tag, field_name, full_col_name)`` tuples, and a list of
+        ``(group_index, full_col_name)`` tuples for grouping columns.
 
     Raises
     ------
     BoppValidationError
-        If any of the four structural or schema validation rules are violated.
+        If any of the structural or schema validation rules are violated.
     """
     if isinstance(registry_or_version, str):
         registry = get_registry(registry_or_version)
@@ -162,13 +173,24 @@ def _validate_dataframe_columns(
 
     facet_types: dict[str, str] = {}
     grouped_cols: dict[str, list[tuple[str, str, str]]] = {k: [] for k in FACET_REGISTRY_KEYS}
+    grouping_cols: list[tuple[int, str]] = []
 
     for col in columns:
+        # Check for grouping column: group.N.ids
+        if col.startswith("group."):
+            dot_parts = col.split(".")
+            if len(dot_parts) == 3 and dot_parts[0] == "group" and dot_parts[1].isdigit() and dot_parts[2] == "ids":
+                grouping_cols.append((int(dot_parts[1]), col))
+                continue
+            raise BoppValidationError(
+                f"Invalid grouping column format '{col}'. Expected 'group.N.ids' with an integer index N."
+            )
+
         parts = col.split(":")
         # Rule 1: Must have exactly 3 fields (facet:type:field)
         if len(parts) != 3:
             raise BoppValidationError(
-                f"Invalid column format '{col}'. Expected exactly 3 colon-separated fields 'facet:type:field'."
+                f"Invalid column format '{col}'. Expected exactly 3 colon-separated fields 'facet:type:field' or 'group.N.ids'."
             )
 
         facet, type_tag, field_name = parts[0], parts[1], parts[2]
@@ -203,7 +225,8 @@ def _validate_dataframe_columns(
 
         grouped_cols[facet].append((type_tag, field_name, col))
 
-    return grouped_cols
+    grouping_cols.sort(key=lambda item: item[0])
+    return grouped_cols, grouping_cols
 
 
 _NULL_TYPES = (type(None), msgspec.UnsetType)
@@ -507,8 +530,26 @@ def to_dataframe(
             column_types=column_types,
         )
 
+    # Process groupings
+    groupings_val = getattr(annotation, "groupings", msgspec.UNSET)
+    if groupings_val not in (msgspec.UNSET, None) and isinstance(groupings_val, list):
+        groupings_header = []
+        for idx, g in enumerate(groupings_val):
+            col_key = f"group.{idx}.ids"
+            data[col_key] = getattr(g, "ids", [])
+            column_types[col_key] = (list[int], False)
+
+            g_dict: dict[str, Any] = {"name": g.name}
+            labels = getattr(g, "labels", msgspec.UNSET)
+            if labels not in (msgspec.UNSET, None):
+                g_dict["labels"] = msgspec.to_builtins(labels)
+            groupings_header.append(g_dict)
+
+        if groupings_header:
+            header["groupings"] = groupings_header
+
     for field in msgspec.structs.fields(annotation):
-        if field.name in FACET_REGISTRY_KEYS or field.name in ("bopp_version", "media_id"):
+        if field.name in FACET_REGISTRY_KEYS or field.name in ("bopp_version", "media_id", "groupings"):
             continue
         val = getattr(annotation, field.name, msgspec.UNSET)
         if val not in (msgspec.UNSET, None):
@@ -626,7 +667,7 @@ def from_dataframe(
     registry = get_registry(bopp_version)
     annotation_cls = registry["Annotation"]
 
-    grouped_cols = _validate_dataframe_columns(columns, registry)
+    grouped_cols, grouping_cols = _validate_dataframe_columns(columns, registry)
 
     media_id = header.get("media_id")
     if not media_id or not isinstance(media_id, str):
@@ -662,5 +703,19 @@ def from_dataframe(
             facet_dict[field_name] = _get_column_list(full_col_name)
 
         bopp_data[facet] = facet_dict
+
+    if grouping_cols:
+        groupings_header_list = header.get("groupings", [])
+        grouping_items = []
+        for g_idx, col_name in grouping_cols:
+            g_meta = groupings_header_list[g_idx] if g_idx < len(groupings_header_list) else {}
+            g_dict = {
+                "name": g_meta.get("name", f"group_{g_idx}"),
+                "ids": _get_column_list(col_name),
+            }
+            if "labels" in g_meta:
+                g_dict["labels"] = g_meta["labels"]
+            grouping_items.append(g_dict)
+        bopp_data["groupings"] = grouping_items
 
     return msgspec.convert(bopp_data, type=annotation_cls)
