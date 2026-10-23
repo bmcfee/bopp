@@ -659,10 +659,11 @@ def load_bopp_csv(
             metadata = {}
 
         bopp_version = metadata.get("bopp_version", get_current_schema_version())
+        header_pos = f.tell() if hasattr(f, "seek") else None
         header_line = f.readline()
         # Reset position back to header row so dataframe reader reads column names
-        if hasattr(f, "seek"):
-            f.seek(f.tell() - len(header_line))
+        if hasattr(f, "seek") and header_pos is not None:
+            f.seek(header_pos)
         else:
             # For non-seekable streams, recombine header with remaining lines
             remaining = header_line + f.read()

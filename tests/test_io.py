@@ -620,6 +620,26 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
     assert loaded.media_id == "track:extra_col"
 
 
+def test_load_bopp_csv_crlf_newlines(tmp_path):
+    """Verify CSV files with CRLF (\\r\\n) line endings load correctly across platforms."""
+    csv_content = (
+        b"# ---\r\n"
+        b'# bopp_version = "1.0"\r\n'
+        b'# media_id = "track:crlf_test"\r\n'
+        b"# ---\r\n"
+        b"payload:onset:value,extent:time:time\r\n"
+        b"1,0.1\r\n"
+        b"2,0.5\r\n"
+    )
+    file_path = tmp_path / "crlf.csv"
+    file_path.write_bytes(csv_content)
+
+    loaded = load_bopp_csv(file_path, validate_id=False)
+    assert loaded.media_id == "track:crlf_test"
+    assert loaded.payload.value == [1, 2]
+    assert loaded.extent.time == [0.1, 0.5]
+
+
 def test_parse_complex_and_str_cell():
     # Empty or whitespace strings evaluate safely to None for complex fields
     assert _parse_complex_cell(None) is None  # type: ignore[arg-type]
