@@ -74,7 +74,7 @@ def _open_or_yield_write(
 ) -> Iterator[TextIO | BinaryIO]: ...
 
 
-@contextlib.contextmanager
+@contextlib.contextmanager  # type: ignore[misc]
 def _open_or_yield_write(
     target: str | Path | TextIO | BinaryIO,
     binary: bool,
@@ -91,7 +91,7 @@ def _open_or_yield_write(
         with open(target, mode, **kwargs) as f:  # type: ignore[arg-type,call-overload]
             yield f
     else:
-        yield target
+        yield target  # type: ignore[misc]
 
 
 def _read_bytes_from_source(source: str | Path | bytes | bytearray | BinaryIO | TextIO) -> bytes:
@@ -431,7 +431,7 @@ def save_bopp_csv(
         frontmatter.append(f"# {line}\n")
     frontmatter.append("# ---\n")
 
-    with _open_or_yield_write(target, binary=False) as f:
+    with _open_or_yield_write(target, binary=False) as f:  # type: ignore[attr-defined]
         # 3. Write the header
         f.writelines(frontmatter)
 
@@ -457,7 +457,7 @@ def _save_msgspec_encoded(
     _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
     encoded_data = codec.encode(annotation)
 
-    with _open_or_yield_write(target, binary=True) as f:
+    with _open_or_yield_write(target, binary=True) as f:  # type: ignore[attr-defined]
         try:
             f.write(encoded_data)
         except TypeError:
@@ -596,7 +596,7 @@ def load_bopp_msgpack(
         Path to the binary MsgPack file, raw msgpack bytes, or an open binary stream.
     validate_id : bool, default True
         If True, validates the deterministic UUIDv5 ID after loading.
-        resolve_ext : bool, default True
+    resolve_ext : bool, default True
         If True, resolves and validates extension payload values via registered extensions.
 
     Returns
