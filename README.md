@@ -57,6 +57,14 @@ BOPP annotations include automatic identification and provenance tracking:
 a9be57d4-7f27-5d84-9e9b-b365112921af
 ```
 
+### Groupings
+
+A BOPP annotation may optionally contain *groupings*.  A grouping is an integer-valued array of identifiers, equal in length to the observed data (e.g. payload values).
+Groupings support a variety of use cases, such as identifying annotation data with audio channels (group ids correspond to left/right), encoding hierarchical annotations (ids
+correspond to hierarchical depth), collecting logically related annotation data (e.g. individual pitch contours in an f0 estimation), etc.
+Each grouping may optionally include a label mapping to provide string-valued descriptors for each numerical identifier.
+
+
 ### Python implementation
 
 The `bopp` python package provides a reference implementation of the schema and an API for working with annotations.

@@ -271,6 +271,12 @@ def _build_polars_csv_schema(
     struct_type_hints: dict[type[msgspec.Struct], dict[str, Any]] = {}
 
     for col in columns:
+        if col.startswith("group."):
+            dot_parts = col.split(".")
+            if len(dot_parts) == 3 and dot_parts[0] == "group" and dot_parts[1].isdigit() and dot_parts[2] == "ids":
+                schema[col] = pl.Int64
+                continue
+
         parts = col.split(":")
         if len(parts) == 3:
             facet, tag, field = parts[0], parts[1], parts[2]

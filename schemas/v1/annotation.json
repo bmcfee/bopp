@@ -46,6 +46,13 @@
     "sandbox": {
       "description": "Unstructured storage area for arbitrary user-defined data",
       "type": "object"
+    },
+    "groupings": {
+      "description": "Optional array of groupings defined over indices or element IDs",
+      "type": "array",
+      "items": {
+        "$ref": "grouping.json"
+      }
     }
   },
   "required": ["media_id", "payload", "bopp_version"]

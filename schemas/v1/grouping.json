@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "v1/grouping.json",
+  "title": "Grouping",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the grouping layer"
+    },
+    "ids": {
+      "description": "Parallel array of signed integer group IDs corresponding to annotation elements",
+      "$ref": "core.json#/$defs/Array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "labels": {
+      "description": "Inverted mapping from unique string labels to integer group IDs",
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    }
+  },
+  "required": ["name", "ids"],
+  "additionalProperties": false
+}

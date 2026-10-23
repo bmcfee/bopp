@@ -153,6 +153,7 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
     string_fields = defaultdict(dict)
     imports_by_module = defaultdict(set)
     annotation_class_info = None
+    grouping_class_info = None
 
     input_dir = input_dir.resolve()
 
@@ -220,6 +221,9 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                 elif node.name == "Annotation":
                     annotation_class_info = node.name
                     imports_by_module[rel_submodule].add(node.name)
+                elif node.name == "Grouping":
+                    grouping_class_info = node.name
+                    imports_by_module[rel_submodule].add(node.name)
 
     with output_file.open("w", encoding="utf-8") as f:
         f.write("# AUTO-GENERATED: Do not edit manually.\n\n")
@@ -234,6 +238,10 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
         if annotation_class_info:
             f.write(f"ANNOTATION_CLASS = {annotation_class_info}\n\n")
             all_exports.append("ANNOTATION_CLASS")
+
+        if grouping_class_info:
+            f.write(f"GROUPING_CLASS = {grouping_class_info}\n\n")
+            all_exports.append("GROUPING_CLASS")
 
         for tag_field in sorted(registries.keys()):
             tags = registries[tag_field]

@@ -25,6 +25,10 @@ from bopp.io import (
     save_bopp_json,
     save_bopp_msgpack,
 )
+from bopp.models.v1.annotation import Annotation
+from bopp.models.v1.extent.times import Times
+from bopp.models.v1.grouping import Grouping
+from bopp.models.v1.payload.onset import OnsetPayload
 from bopp.util import _get_tag, from_dataframe
 
 
@@ -224,6 +228,52 @@ def test_csv_roundtrip(tmp_path):
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == _get_tag(ann.payload)
     assert getattr(loaded, "sandbox", None) == {"user_note": "csv_test", "count": 10}
+
+
+def test_csv_roundtrip_with_groupings(tmp_path):
+    ann = Annotation(
+        media_id="track:csv_groupings",
+        bopp_version="1.0",
+        extent=Times(time=[0.1, 0.4]),
+        payload=OnsetPayload(value=[1, 2]),
+        groupings=[
+            Grouping(name="voices", ids=[0, 1], labels={"v1": 0, "v2": 1}),
+            Grouping(name="phrases", ids=[10, 10]),
+        ],
+    )
+    file_path = tmp_path / "test_groupings.csv"
+
+    save_bopp_csv(ann, file_path, backend="polars")
+
+    loaded = load_bopp_csv(file_path, backend="polars")
+    assert loaded.media_id == ann.media_id
+    assert len(loaded.groupings) == 2
+    assert loaded.groupings[0].name == "voices"
+    assert loaded.groupings[0].ids == [0, 1]
+    assert loaded.groupings[0].labels == {"v1": 0, "v2": 1}
+    assert loaded.groupings[1].name == "phrases"
+    assert loaded.groupings[1].ids == [10, 10]
+
+
+def test_csv_roundtrip_with_groupings_pandas(tmp_path):
+    ann = Annotation(
+        media_id="track:csv_groupings_pd",
+        bopp_version="1.0",
+        extent=Times(time=[0.1, 0.4]),
+        payload=OnsetPayload(value=[1, 2]),
+        groupings=[
+            Grouping(name="voices", ids=[0, 1]),
+        ],
+    )
+    file_path = tmp_path / "test_groupings_pd.csv"
+
+    save_bopp_csv(ann, file_path, backend="pandas")
+
+    loaded = load_bopp_csv(file_path, backend="pandas")
+    assert loaded.media_id == ann.media_id
+    assert len(loaded.groupings) == 1
+    assert loaded.groupings[0].name == "voices"
+    assert loaded.groupings[0].ids == [0, 1]
 
 
 def test_csv_roundtrip_object_payload(tmp_path):
@@ -451,7 +501,7 @@ def test_load_bopp_csv_invalid_schema(tmp_path):
 def test_csv_column_validation_rules():
     header = {"media_id": "track:col_rules", "bopp_version": "1.0"}
 
-    # Rule 1: Column format does not have 3 colon-separated parts
+    # Rule 1: Column format does not have 3 colon-separated parts or group.N.ids
     df_invalid_format = pd.DataFrame({"payload:onset": [1, 2]})
     with pytest.raises(BoppValidationError, match="Invalid column format"):
         from_dataframe(df_invalid_format, header)
