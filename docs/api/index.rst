@@ -72,7 +72,6 @@ Utilities
 
     to_dataframe
     from_dataframe
-    extract_header
 
 Exceptions
 ----------

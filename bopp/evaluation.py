@@ -18,9 +18,7 @@ def _extract_events(ann: BoppBase) -> Any:
         raise BoppArgumentError("Annotation requires an extent to extract event timestamps.")
 
     tag = _get_tag(extent)
-    if tag == "time":
-        return np.asarray(extent.time, dtype=np.float64)
-    if tag == "time_interval":
+    if tag in ("time", "time_interval"):
         return np.asarray(extent.time, dtype=np.float64)
 
     raise BoppArgumentError(
@@ -277,10 +275,7 @@ def evaluate(
         If task cannot be determined or annotations are incompatible.
     """
     ref_payload = getattr(ref, "payload", None)
-    est_payload = getattr(est, "payload", None)
-
     ref_tag = _get_tag(ref_payload) if ref_payload not in (None, msgspec.UNSET) else None
-    _get_tag(est_payload) if est_payload not in (None, msgspec.UNSET) else None
 
     resolved_task = task
     if resolved_task is None:

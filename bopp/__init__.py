@@ -19,37 +19,40 @@ from ._version import (
     get_registry_version as get_registry_version,
 )
 from .core import (
-    BoppArgumentError as BoppArgumentError,
-)
-from .core import (
-    BoppArrayError as BoppArrayError,
-)
-from .core import (
-    BoppError as BoppError,
-)
-from .core import (
-    BoppIOError as BoppIOError,
-)
-from .core import (
-    BoppRegistryError as BoppRegistryError,
-)
-from .core import (
-    BoppValidationError as BoppValidationError,
-)
-from .core import (
     compute_annotation_id as compute_annotation_id,
 )
 from .core import (
     create as create,
 )
 from .core import (
+    ensure_annotation_id as ensure_annotation_id,
+)
+from .core import (
     validate as validate,
 )
 from .core import (
-    validate_and_set_annotation_id as validate_and_set_annotation_id,
+    validate_annotation_id as validate_annotation_id,
 )
 from .evaluation import (
     evaluate as evaluate,
+)
+from .exceptions import (
+    BoppArgumentError as BoppArgumentError,
+)
+from .exceptions import (
+    BoppArrayError as BoppArrayError,
+)
+from .exceptions import (
+    BoppError as BoppError,
+)
+from .exceptions import (
+    BoppIOError as BoppIOError,
+)
+from .exceptions import (
+    BoppRegistryError as BoppRegistryError,
+)
+from .exceptions import (
+    BoppValidationError as BoppValidationError,
 )
 from .extensions import (
     resolve_extensions as resolve_extensions,

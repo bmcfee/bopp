@@ -5,17 +5,14 @@ import msgspec
 import pytest
 
 from bopp.core import (
-    BOPP_NAMESPACE,
     BoppArgumentError,
     BoppArrayError,
     BoppRegistryError,
     BoppValidationError,
     _extract_kwargs,
-    compute_annotation_id,
     create,
     ensure_annotation_id,
     validate,
-    validate_and_set_annotation_id,
     validate_annotation_id,
 )
 from bopp.models.v1.annotation import Annotation

@@ -5,6 +5,7 @@ import typing
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args, get_origin
 
 import msgspec
+import polars as pl
 
 from ._version import get_current_schema_version
 from .base import BoppBase
@@ -18,7 +19,6 @@ from .registries import FACET_REGISTRY_KEYS, get_registry
 
 if TYPE_CHECKING:
     import pandas as pd
-    import polars as pl
 
 # ==========================================
 # 1. Struct <-> DataFrame Translators
@@ -70,58 +70,6 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
     if config is not None:
         return getattr(config, "tag", None)
     return None
-
-
-def extract_header(annotation: BoppBase) -> dict[str, Any]:
-    """
-    Extract all singleton/scalar fields from an Annotation for TOML serialization.
-
-    Parallel array blocks within facets (`extent`, `payload`, `confidence`) are omitted,
-    while scalar attributes on those facets are preserved under their facet key.
-
-    Parameters
-    ----------
-    annotation : BoppBase
-        The Annotation struct to extract metadata fields from.
-
-    Returns
-    -------
-    dict of str to Any
-        Dictionary of serialized header/singleton fields.
-
-    See Also
-    --------
-    to_dataframe : Extracts parallel arrays and header into an AnnotationDataFrame.
-
-    Examples
-    --------
-    >>> import bopp
-    >>> ann = bopp.create(media_id="audio:123", payload_kind="onset", value=[0.1])
-    >>> header = extract_header(ann)
-    >>> header["media_id"]
-    'audio:123'
-    """
-    header_data: dict[str, Any] = {}
-
-    for field in msgspec.structs.fields(annotation):
-        value = getattr(annotation, field.name)
-
-        if value is None or value is msgspec.UNSET:
-            continue
-
-        if field.name in FACET_REGISTRY_KEYS:
-            if isinstance(value, msgspec.Struct):
-                facet_attrs: dict[str, Any] = {}
-                _extract_facet_data(value, field.name, {}, facet_attrs)
-                if field.name in facet_attrs:
-                    tag = _get_tag(value)
-                    facet_dict = {f"{field.name}_type": tag} if tag else {}
-                    facet_dict.update(facet_attrs[field.name])
-                    header_data[field.name] = facet_dict
-        else:
-            header_data[field.name] = msgspec.to_builtins(value)
-
-    return header_data
 
 
 def _validate_dataframe_columns(
@@ -421,7 +369,6 @@ def to_dataframe(
     See Also
     --------
     from_dataframe : Reconstitute an Annotation struct from a DataFrame and header.
-    extract_header : Extract singleton header fields from an Annotation.
 
     Examples
     --------
@@ -473,37 +420,15 @@ def to_dataframe(
 
     column_types: dict[str, tuple[Any, bool]] = {}
 
-    payload_struct = getattr(annotation, "payload", None)
-    _extract_facet_data(
-        payload_struct,
-        "payload",
-        data,
-        header,
-        encode_complex=encode_complex,
-        complex_fields=_get_complex_fields_for_facet(payload_struct, "payload"),
-        column_types=column_types,
-    )
-
-    if hasattr(annotation, "extent"):
-        extent_struct = getattr(annotation, "extent", None)
+    for facet_name in ("payload", "extent", "confidence"):
+        facet_struct = getattr(annotation, facet_name, None)
         _extract_facet_data(
-            extent_struct,
-            "extent",
+            facet_struct,
+            facet_name,
             data,
             header,
             encode_complex=encode_complex,
-            complex_fields=_get_complex_fields_for_facet(extent_struct, "extent"),
-            column_types=column_types,
-        )
-    if hasattr(annotation, "confidence"):
-        confidence_struct = getattr(annotation, "confidence", None)
-        _extract_facet_data(
-            confidence_struct,
-            "confidence",
-            data,
-            header,
-            encode_complex=encode_complex,
-            complex_fields=_get_complex_fields_for_facet(confidence_struct, "confidence"),
+            complex_fields=_get_complex_fields_for_facet(facet_struct, facet_name),
             column_types=column_types,
         )
 
@@ -533,8 +458,6 @@ def to_dataframe(
         return AnnotationDataFrame(df=df_pd, header=header)
 
     elif backend == "polars":
-        import polars as pl
-
         schema: dict[str, Any] = {}
         for col_name, (field_type, is_complex) in column_types.items():
             # JSON-encoded complex cells are strings
@@ -602,11 +525,7 @@ def from_dataframe(
         df = df_or_tuple
 
     # Confirm pandas/polars type dynamically
-    try:
-        import polars as pl
-        valid = isinstance(df, pl.DataFrame)
-    except ImportError:
-        valid = False
+    valid = isinstance(df, pl.DataFrame)
 
     if not valid:
         try:
@@ -639,7 +558,7 @@ def from_dataframe(
         "media_id": media_id,
     }
 
-    for key in ("metadata", "sandbox", "annotated_domain", "id", "parents"):
+    for key in ("metadata", "sandbox", "id", "parents"):
         if key in header:
             bopp_data[key] = header[key]
 

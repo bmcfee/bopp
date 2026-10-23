@@ -140,8 +140,8 @@ def test_evaluate_tempo():
         extent=msgspec.UNSET,
         payload=TempoPayload(value=est_tempi),
     )
-    bopp.validate_and_set_annotation_id(ref)
-    bopp.validate_and_set_annotation_id(est)
+    bopp.ensure_annotation_id(ref)
+    bopp.ensure_annotation_id(est)
 
     actual = evaluate(ref, est)
     assert actual == expected
@@ -358,8 +358,8 @@ def test_evaluate_melody():
             ]
         ),
     )
-    bopp.validate_and_set_annotation_id(ref)
-    bopp.validate_and_set_annotation_id(est)
+    bopp.ensure_annotation_id(ref)
+    bopp.ensure_annotation_id(est)
 
     actual = evaluate(ref, est)
     assert actual == expected
@@ -401,8 +401,8 @@ def test_evaluate_hierarchy():
         extent=TimeIntervalExtent(time=[0.0, 5.0, 0.0], duration=[5.0, 5.0, 10.0]),
         payload=MultiSegmentPayload(label=["A", "B", "full"], level=[0, 0, 1]),
     )
-    bopp.validate_and_set_annotation_id(ref)
-    bopp.validate_and_set_annotation_id(est)
+    bopp.ensure_annotation_id(ref)
+    bopp.ensure_annotation_id(est)
 
     with pytest.warns(UserWarning, match="Segment hierarchy is inconsistent"):
         actual = evaluate(ref, est)
@@ -453,7 +453,7 @@ def test_evaluate_unknown_task_and_no_inferred_task():
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["test"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     with pytest.raises(BoppArgumentError, match="Unsupported evaluation task 'unknown'"):
         evaluate(ann, ann, task="unknown")

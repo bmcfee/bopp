@@ -32,7 +32,6 @@ __all__ = [
     "ensure_annotation_id",
     "resolve_extensions",
     "validate",
-    "validate_and_set_annotation_id",
     "validate_annotation_id",
 ]
 
@@ -70,7 +69,7 @@ def validate_annotation_id(annotation: Any) -> bool:
     Parameters
     ----------
     annotation : Any
-        An Annotation struct instance or dictionary representation of an annotation.
+        An Annotation struct instance to validate.
 
     Returns
     -------
@@ -82,11 +81,7 @@ def validate_annotation_id(annotation: Any) -> bool:
     BoppValidationError
         If an existing 'id' on the annotation does not match the computed ID.
     """
-    existing_id = (
-        getattr(annotation, "id", None)
-        if isinstance(annotation, msgspec.Struct)
-        else annotation.get("id")
-    )
+    existing_id = getattr(annotation, "id", None)
 
     if existing_id is None or existing_id is msgspec.UNSET:
         return False
@@ -108,7 +103,7 @@ def ensure_annotation_id(annotation: Any) -> str:
     Parameters
     ----------
     annotation : Any
-        An Annotation struct instance or dictionary representation.
+        An Annotation struct instance.
 
     Returns
     -------
@@ -120,42 +115,9 @@ def ensure_annotation_id(annotation: Any) -> str:
     BoppValidationError
         If an existing 'id' does not match the computed ID.
     """
-    computed_id = compute_annotation_id(annotation)
-
-    existing_id = (
-        getattr(annotation, "id", None)
-        if isinstance(annotation, msgspec.Struct)
-        else annotation.get("id")
-    )
-
-    if existing_id is None or existing_id is msgspec.UNSET:
-        if isinstance(annotation, msgspec.Struct):
-            annotation.id = computed_id  # type: ignore[attr-defined]
-        else:
-            annotation["id"] = computed_id
-    elif existing_id != computed_id:
-        raise BoppValidationError(
-            f"Annotation ID mismatch: object has '{existing_id}', computed '{computed_id}'"
-        )
-
-    return computed_id
-
-
-def validate_and_set_annotation_id(annotation: Any) -> str:
-    """
-    Deprecated alias for ensure_annotation_id.
-
-    Parameters
-    ----------
-    annotation : Any
-        An Annotation struct instance or dictionary representation.
-
-    Returns
-    -------
-    str
-        The assigned or validated UUIDv5 identifier.
-    """
-    return ensure_annotation_id(annotation)
+    if not validate_annotation_id(annotation):
+        annotation.id = compute_annotation_id(annotation)
+    return str(annotation.id)
 
 
 def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -291,8 +253,6 @@ def create(
 
     if generate_id:
         ensure_annotation_id(ann)
-    else:
-        validate_annotation_id(ann)
 
     return ann
 
