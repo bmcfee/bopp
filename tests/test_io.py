@@ -1,3 +1,4 @@
+import io
 from unittest.mock import patch
 
 import msgspec
@@ -5,12 +6,18 @@ import pandas as pd
 import pytest
 
 from bopp.core import compute_annotation_id, create
-from bopp.exceptions import BoppArgumentError, BoppRegistryError, BoppValidationError
+from bopp.exceptions import (
+    BoppArgumentError,
+    BoppIOError,
+    BoppRegistryError,
+    BoppValidationError,
+)
 from bopp.io import (
     AnnotationDataFrame,
     _build_csv_converters,
     _parse_complex_cell,
     _prepare_annotation_for_save,
+    _read_bytes_from_source,
     load_bopp_csv,
     load_bopp_json,
     load_bopp_msgpack,
@@ -39,6 +46,101 @@ def test_json_roundtrip(tmp_path):
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == _get_tag(ann.payload)
     assert getattr(loaded, "sandbox", None) == {"user_note": "json_test", "flag": True}
+
+
+def test_json_stream_and_string_io():
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:json_stream_test",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=[1, 1],
+    )
+
+    # 1. Text stream (StringIO)
+    buf_text = io.StringIO()
+    save_bopp_json(ann, buf_text)
+    buf_text.seek(0)
+    assert not buf_text.closed
+    loaded_from_text = load_bopp_json(buf_text)
+    assert loaded_from_text.id == ann.id
+    assert not buf_text.closed
+
+    # 2. Raw JSON string
+    raw_json_str = buf_text.getvalue()
+    loaded_from_str = load_bopp_json(raw_json_str)
+    assert loaded_from_str.id == ann.id
+
+    # 3. Binary stream (BytesIO)
+    buf_bin = io.BytesIO()
+    save_bopp_json(ann, buf_bin)
+    buf_bin.seek(0)
+    assert not buf_bin.closed
+    loaded_from_bin = load_bopp_json(buf_bin)
+    assert loaded_from_bin.id == ann.id
+    assert not buf_bin.closed
+
+    # 4. Raw bytes
+    loaded_from_bytes = load_bopp_json(buf_bin.getvalue())
+    assert loaded_from_bytes.id == ann.id
+
+
+def test_msgpack_stream_and_bytes_io():
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:msgpack_stream_test",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.2, 0.6],
+        value=[1, 1],
+    )
+
+    # Binary stream (BytesIO)
+    buf = io.BytesIO()
+    save_bopp_msgpack(ann, buf)
+    assert not buf.closed
+    buf.seek(0)
+
+    loaded_from_stream = load_bopp_msgpack(buf)
+    assert loaded_from_stream.id == ann.id
+    assert not buf.closed
+
+    # Raw bytes
+    loaded_from_bytes = load_bopp_msgpack(buf.getvalue())
+    assert loaded_from_bytes.id == ann.id
+
+
+def test_csv_stream_and_string_io():
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:csv_stream_test",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.1, 0.4],
+        value=[1, 1],
+        sandbox={"user_note": "csv_stream"},
+    )
+
+    # 1. Text stream (StringIO)
+    buf = io.StringIO()
+    save_bopp_csv(ann, buf)
+    assert not buf.closed
+    buf.seek(0)
+
+    loaded_stream = load_bopp_csv(buf)
+    assert loaded_stream.id == ann.id
+    assert not buf.closed
+
+    # 2. Raw CSV string
+    raw_csv = buf.getvalue()
+    loaded_str = load_bopp_csv(raw_csv)
+    assert loaded_str.id == ann.id
+    assert getattr(loaded_str, "sandbox", None) == {"user_note": "csv_stream"}
+
+    # 3. Raw CSV string with Pandas backend
+    loaded_pandas = load_bopp_csv(raw_csv, backend="pandas")
+    assert loaded_pandas.id == ann.id
 
 
 def test_load_bopp_json_missing_id(tmp_path):
@@ -587,3 +689,8 @@ def test_prepare_annotation_for_save_id_variations():
     # Strictly validate existing ID when generate_id=False and validate_id=True
     _prepare_annotation_for_save(ann, validate_id=True, generate_id=False)
     assert ann.id == expected_id
+
+
+def test_read_bytes_from_source_invalid():
+    with pytest.raises(BoppIOError, match="Unsupported source type"):
+        _read_bytes_from_source(12345)  # type: ignore[arg-type]
