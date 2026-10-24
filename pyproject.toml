@@ -90,7 +90,8 @@ force-include = { "bopp/py.typed" = "bopp/py.typed" }
 [tool.hatch.envs.codegen]
 # Isolate the generator dependencies from your main app
 dependencies = [
-  "datamodel-code-generator>=0.66.0" 
+  "datamodel-code-generator>=0.66.0",
+  "ruff",
 ]
 
 [tool.hatch.envs.codegen.scripts]
@@ -116,7 +117,7 @@ datamodel-codegen \\
 
 # Registry construction
 register = """
-scripts/generate_registry.py \\
+python scripts/generate_registry.py \\
     --input-dir bopp/models/v1/ \\
     --output bopp/registries/v1.py \\
     --base-module ..models.v1

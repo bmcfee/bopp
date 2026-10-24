@@ -10,6 +10,9 @@ jobs:
   lint_python:
     name: "Lint and code analysis"
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
     strategy:
       fail-fast: true
       matrix:
@@ -44,27 +47,21 @@ jobs:
         use-only-tar-bz2: false 
 
     - name: Conda info
-      shell: bash -l {0}
       run: |
         conda info -a
         conda list
 
     - name: Spell check
-      shell: bash -l {0}
       run: codespell
 
     - name: Linting check
-      shell: bash -l {0}
       run: ruff check --output-format=github bopp
 
     - name: Linting check on docs
-      shell: bash -l {0}
       run: ruff check --output-format=github docs
 
     - name: Docstring formatting check  
-      shell: bash -l {0}
       run: numpydoc lint bopp/*.py bopp/*/*.py bopp/*/*/*.py bopp/*/*/*/*.py
     
     - name: Type check package
-      shell: bash -l {0}
       run: python -m mypy --pretty bopp
