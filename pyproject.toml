@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Bounded Observation Payload Protocol"
 dependencies = [
     "msgspec>=0.19.0",
-    "mir_eval>=0.7",
+    "mir_eval>=0.8.0",
     "numpy>=2.2.0",
     "polars>=2.0.0",
 ]
@@ -16,8 +16,8 @@ python_requires = "3.13"
 
 [project.optional-dependencies]
 dataframe = [
-    "pandas>=2.0.0",
-    "pyarrow>=12.0.0",
+    "pandas>=2.2.3",
+    "pyarrow>=18.0.0",
 ]
 docs = [
     "sphinx",
@@ -30,8 +30,8 @@ test = [
     "check-jsonschema",
     "pytest",
     "pytest-cov",
-    "pandas>=2.0.0",
-    "pyarrow>=12.0.0",
+    "pandas>=2.2.3",
+    "pyarrow>=18.0.0",
 ]
 benchmark = [
     "pytest-benchmark"
@@ -90,7 +90,8 @@ force-include = { "bopp/py.typed" = "bopp/py.typed" }
 [tool.hatch.envs.codegen]
 # Isolate the generator dependencies from your main app
 dependencies = [
-  "datamodel-code-generator>=0.66.0" 
+  "datamodel-code-generator>=0.66.0",
+  "ruff",
 ]
 
 [tool.hatch.envs.codegen.scripts]
@@ -116,7 +117,7 @@ datamodel-codegen \\
 
 # Registry construction
 register = """
-scripts/generate_registry.py \\
+python scripts/generate_registry.py \\
     --input-dir bopp/models/v1/ \\
     --output bopp/registries/v1.py \\
     --base-module ..models.v1

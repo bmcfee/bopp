@@ -10,6 +10,9 @@ jobs:
   lint_python:
     name: "Lint and code analysis"
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
     strategy:
       fail-fast: true
       matrix:
@@ -29,7 +32,7 @@ jobs:
       with:
         path: ~/conda_pkgs_dir
         key: ${{ runner.os }}-${{ matrix.python-version }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles( matrix.envfile ) }}
-    - name: Install conda environmnent
+    - name: Install conda environment
       uses: conda-incubator/setup-miniconda@v4
       with: 
         auto-update-conda: false
@@ -44,27 +47,21 @@ jobs:
         use-only-tar-bz2: false 
 
     - name: Conda info
-      shell: bash -l {0}
       run: |
         conda info -a
         conda list
 
     - name: Spell check
-      shell: bash -l {0}
       run: codespell
 
     - name: Linting check
-      shell: bash -l {0}
-      run: ruff check --output-format=github bopp
+      run: ruff check --output-format=github bopp tests
 
     - name: Linting check on docs
-      shell: bash -l {0}
       run: ruff check --output-format=github docs
 
     - name: Docstring formatting check  
-      shell: bash -l {0}
       run: numpydoc lint bopp/*.py bopp/*/*.py bopp/*/*/*.py bopp/*/*/*/*.py
     
     - name: Type check package
-      shell: bash -l {0}
       run: python -m mypy --pretty bopp

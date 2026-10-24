@@ -25,6 +25,7 @@ def get_registry(version: str) -> dict[str, Any]:
         - "PAYLOAD_TYPE_REGISTRY": dict mapping payload tags to payload Struct types.
         - "EXTENT_TYPE_REGISTRY": dict mapping extent tags to extent Struct types.
         - "CONFIDENCE_TYPE_REGISTRY": dict mapping confidence tags to confidence Struct types.
+        - "METADATA_TYPE_REGISTRY": dict mapping metadata tags to metadata Struct types.
         - "COMPLEX_FIELDS_REGISTRY": dict mapping facet types to fields containing complex structures.
         - "STRING_FIELDS_REGISTRY": dict mapping facet types to fields containing string values.
         - "Annotation": the root Annotation Struct class for the version.
@@ -51,6 +52,7 @@ def get_registry(version: str) -> dict[str, Any]:
             "PAYLOAD_TYPE_REGISTRY": v1.PAYLOAD_TYPE_REGISTRY,
             "EXTENT_TYPE_REGISTRY": v1.EXTENT_TYPE_REGISTRY,
             "CONFIDENCE_TYPE_REGISTRY": v1.CONFIDENCE_TYPE_REGISTRY,
+            "METADATA_TYPE_REGISTRY": getattr(v1, "METADATA_TYPE_REGISTRY", {}),
             "COMPLEX_FIELDS_REGISTRY": getattr(v1, "COMPLEX_FIELDS_REGISTRY", {}),
             "STRING_FIELDS_REGISTRY": getattr(v1, "STRING_FIELDS_REGISTRY", {}),
             "Annotation": v1.ANNOTATION_CLASS,

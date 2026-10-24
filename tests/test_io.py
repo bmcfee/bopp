@@ -10,11 +10,9 @@ from bopp.core import compute_annotation_id, create
 from bopp.exceptions import (
     BoppArgumentError,
     BoppIOError,
-    BoppRegistryError,
     BoppValidationError,
 )
 from bopp.io import (
-    AnnotationDataFrame,
     _build_csv_converters,
     _open_or_yield_text_stream,
     _parse_complex_cell,
@@ -292,32 +290,10 @@ def test_csv_roundtrip_object_payload(tmp_path):
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == "object"
-    assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
-
-
-def test_csv_roundtrip_object_payload_polars(tmp_path):
-    pytest.importorskip("polars")
-
-    ann = create(
-        bopp_version="1.0",
-        media_id="track:csv_obj_polars",
-        payload_kind="object",
-        value=[{"color": "brown"}, {"color": "white"}],
-    )
-    file_path = tmp_path / "test_obj_polars.csv"
-
-    # Must succeed with Polars without raising write_csv nested type errors
-    save_bopp_csv(ann, file_path, backend="polars")
-
-    loaded = load_bopp_csv(file_path)
-    assert loaded.media_id == ann.media_id
-    assert _get_tag(loaded.payload) == "object"
-    assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
+    assert loaded.payload.value == [{"color": "brown"}, {"color": "white"}]
 
 
 def test_csv_roundtrip_nested_extent_polars(tmp_path):
-    pytest.importorskip("polars")
-
     ann = create(
         bopp_version="1.0",
         media_id="track:csv_extent_polars",
@@ -334,9 +310,9 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert getattr(loaded.payload, "value") == ["C:maj", "G:maj"]
-    assert getattr(loaded.extent, "quarter") == [(0, 1), (1, 2)]
-    assert getattr(loaded.extent, "duration") == [(1, 2), (1, 4)]
+    assert loaded.payload.value == ["C:maj", "G:maj"]
+    assert loaded.extent.quarter == [(0, 1), (1, 2)]
+    assert loaded.extent.duration == [(1, 2), (1, 4)]
 
 
 @pytest.mark.parametrize(
@@ -376,8 +352,6 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
     ],
 )
 def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
-    pytest.importorskip("polars")
-
     ann = ann_factory()
     payload_tag = _get_tag(ann.payload)
     file_path = tmp_path / f"test_complex_{payload_tag}_polars.csv"
@@ -584,47 +558,19 @@ def test_save_and_load_with_validate_id_false(tmp_path):
     assert loaded_csv.media_id == ann.media_id
 
 
-def test_save_bopp_csv_unknown_dataframe_type(tmp_path):
+def test_save_bopp_csv_pandas(tmp_path):
     ann = create(
         bopp_version="1.0",
-        media_id="track:unknown_df",
+        media_id="track:pandas_test",
         payload_kind="onset",
         extent_kind="time",
         time=[0.1],
         value=[1],
     )
-    file_path = tmp_path / "unknown_df.csv"
-
-    class MockUnsupportedDataFrame:
-        pass
-
-    mock_ann_df = AnnotationDataFrame(df=MockUnsupportedDataFrame(), header={"media_id": "test"})
-    with patch("bopp.io.to_dataframe", return_value=mock_ann_df):
-        with pytest.raises(BoppArgumentError, match="Unknown dataframe type"):
-            save_bopp_csv(ann, file_path)
-
-
-def test_save_bopp_csv_polars(tmp_path):
-    polars = pytest.importorskip("polars")
-
-    ann = create(
-        bopp_version="1.0",
-        media_id="track:polars_test",
-        payload_kind="onset",
-        extent_kind="time",
-        time=[0.1],
-        value=[1],
-    )
-    file_path = tmp_path / "polars_test.csv"
-
-    mock_ann_df = AnnotationDataFrame(
-        df=polars.DataFrame({"payload:onset:value": [1]}),
-        header={"media_id": "track:polars_test"},
-    )
-    with patch("bopp.io.to_dataframe", return_value=mock_ann_df):
-        save_bopp_csv(ann, file_path)
-
-    assert file_path.exists()
+    file_path = tmp_path / "pandas_test.csv"
+    save_bopp_csv(ann, file_path, backend="pandas")
+    loaded = load_bopp_csv(file_path, backend="pandas")
+    assert loaded.id == ann.id
 
 
 def test_load_bopp_csv_without_frontmatter(tmp_path):
@@ -751,7 +697,7 @@ def test_prepare_annotation_for_save_id_variations():
     _prepare_annotation_for_save(ann, validate_id=True, generate_id=True)
     assert ann.id == expected_id
 
-    # Unconditionally set ID when generate_id=True and validate_id=False
+    # Unconditionally set/overwrite ID when generate_id=True and validate_id=False
     ann_no_id = create(
         bopp_version="1.0",
         media_id="track:save_id_test2",
@@ -761,6 +707,10 @@ def test_prepare_annotation_for_save_id_variations():
         value=[2],
         generate_id=False,
     )
+    _prepare_annotation_for_save(ann_no_id, validate_id=False, generate_id=True)
+    assert ann_no_id.id == compute_annotation_id(ann_no_id)
+
+    ann_no_id.payload.value = [3]
     _prepare_annotation_for_save(ann_no_id, validate_id=False, generate_id=True)
     assert ann_no_id.id == compute_annotation_id(ann_no_id)
 
@@ -800,9 +750,11 @@ def test_load_bopp_csv_invalid_source_type():
     with pytest.raises(BoppIOError, match="Unsupported source type for text stream"):
         load_bopp_csv(12345)  # type: ignore[arg-type]
 
-    with pytest.raises(BoppIOError, match="Unsupported source type for text stream"):
-        with _open_or_yield_text_stream(b"binary data"):  # type: ignore[arg-type]
-            pass
+    with (
+        pytest.raises(BoppIOError, match="Unsupported source type for text stream"),
+        _open_or_yield_text_stream(b"binary data"),  # type: ignore[arg-type]
+    ):
+        pass
 
 
 class _NonSeekableTextStream:
@@ -873,6 +825,8 @@ def test_load_bopp_csv_pandas_missing():
             raise ImportError("No module named 'pandas'")
         return real_import(name, *args, **kwargs)
 
-    with patch("builtins.__import__", side_effect=mock_import):
-        with pytest.raises(BoppIOError, match="pandas is required for backend='pandas'"):
-            load_bopp_csv(io.StringIO(csv_content), backend="pandas")
+    with (
+        patch("builtins.__import__", side_effect=mock_import),
+        pytest.raises(BoppIOError, match="pandas is required for backend='pandas'"),
+    ):
+        load_bopp_csv(io.StringIO(csv_content), backend="pandas")

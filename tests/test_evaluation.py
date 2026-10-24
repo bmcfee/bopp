@@ -17,8 +17,6 @@ from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time_interval import TimeIntervalExtent
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
-from bopp.models.v1.payload.note_hz import NoteHzPayload
-from bopp.models.v1.payload.note_midi import NoteMidiPayload
 from bopp.models.v1.payload.pitch_contour_hz import PitchContourPayload
 from bopp.models.v1.payload.segment_multi import MultiSegmentPayload
 from bopp.models.v1.payload.tag_open import TagOpenPayload
@@ -140,8 +138,8 @@ def test_evaluate_tempo():
         extent=msgspec.UNSET,
         payload=TempoPayload(value=est_tempi),
     )
-    bopp.validate_and_set_annotation_id(ref)
-    bopp.validate_and_set_annotation_id(est)
+    bopp.ensure_annotation_id(ref)
+    bopp.ensure_annotation_id(est)
 
     actual = evaluate(ref, est)
     assert actual == expected
@@ -358,8 +356,8 @@ def test_evaluate_melody():
             ]
         ),
     )
-    bopp.validate_and_set_annotation_id(ref)
-    bopp.validate_and_set_annotation_id(est)
+    bopp.ensure_annotation_id(ref)
+    bopp.ensure_annotation_id(est)
 
     actual = evaluate(ref, est)
     assert actual == expected
@@ -401,8 +399,8 @@ def test_evaluate_hierarchy():
         extent=TimeIntervalExtent(time=[0.0, 5.0, 0.0], duration=[5.0, 5.0, 10.0]),
         payload=MultiSegmentPayload(label=["A", "B", "full"], level=[0, 0, 1]),
     )
-    bopp.validate_and_set_annotation_id(ref)
-    bopp.validate_and_set_annotation_id(est)
+    bopp.ensure_annotation_id(ref)
+    bopp.ensure_annotation_id(est)
 
     with pytest.warns(UserWarning, match="Segment hierarchy is inconsistent"):
         actual = evaluate(ref, est)
@@ -453,7 +451,7 @@ def test_evaluate_unknown_task_and_no_inferred_task():
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["test"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     with pytest.raises(BoppArgumentError, match="Unsupported evaluation task 'unknown'"):
         evaluate(ann, ann, task="unknown")

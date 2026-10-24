@@ -12,7 +12,6 @@ from msgspec import Meta
 import bopp
 from bopp.io import load_bopp_csv, save_bopp_csv
 from bopp.models.v1.extent.score_interval import ScoreInterval
-from bopp.models.v1.payload.tag_open import TagOpenPayload
 from bopp.registries.v1 import COMPLEX_FIELDS_REGISTRY, STRING_FIELDS_REGISTRY
 
 _spec = importlib.util.spec_from_file_location(

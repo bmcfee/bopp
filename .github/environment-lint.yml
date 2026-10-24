@@ -13,6 +13,6 @@ dependencies:
   - polars
   - pyarrow-stubs
   - msgspec
-  - mir_eval>=0.7
+  - mir_eval>=0.8.0
   - numpy>=2.2.0
   - pytest

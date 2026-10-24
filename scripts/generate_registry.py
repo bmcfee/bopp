@@ -51,9 +51,7 @@ def _is_complex_type(tp: Any) -> bool:
         return any(_is_complex_type(arg) for arg in args)
 
     if isinstance(tp, type):
-        if issubclass(tp, (int, float, str, bool, bytes)):
-            return False
-        return True
+        return not issubclass(tp, (int, float, str, bool, bytes))
 
     tp_str = str(tp)
     return any(k in tp_str for k in ("Fraction", "list", "dict", "tuple", "Any"))
@@ -199,7 +197,7 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
                                 complex_cols.append(field_name)
                             elif _is_string_field(hint):
                                 string_cols.append(field_name)
-                    except Exception as err:
+                    except Exception as err:  # noqa: BLE001
                         sys.stderr.write(
                             f"Warning: Failed to inspect annotations for {node.name} in {abs_submodule}: {err}\n"
                         )
@@ -249,24 +247,24 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
             all_exports.append(dict_name)
             f.write(f"{dict_name} = {{\n")
             for tag in sorted(tags.keys()):
-                f.write(f"    {repr(tag)}: {tags[tag]},\n")
+                f.write(f"    {tag!r}: {tags[tag]},\n")
             f.write("}\n\n")
 
         all_exports.append("COMPLEX_FIELDS_REGISTRY")
         f.write("COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {\n")
         for tag_field in sorted(complex_fields.keys()):
-            f.write(f"    {repr(tag_field)}: {{\n")
+            f.write(f"    {tag_field!r}: {{\n")
             for tag, fields in sorted(complex_fields[tag_field].items()):
-                f.write(f"        {repr(tag)}: {fields!r},\n")
+                f.write(f"        {tag!r}: {fields!r},\n")
             f.write("    },\n")
         f.write("}\n\n")
 
         all_exports.append("STRING_FIELDS_REGISTRY")
         f.write("STRING_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {\n")
         for tag_field in sorted(string_fields.keys()):
-            f.write(f"    {repr(tag_field)}: {{\n")
+            f.write(f"    {tag_field!r}: {{\n")
             for tag, fields in sorted(string_fields[tag_field].items()):
-                f.write(f"        {repr(tag)}: {fields!r},\n")
+                f.write(f"        {tag!r}: {fields!r},\n")
             f.write("    },\n")
         f.write("}\n\n")
 

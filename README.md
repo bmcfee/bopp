@@ -45,7 +45,7 @@ BOPP annotations include automatic identification and provenance tracking:
 ...     value=[1, 1, 1],
 ... )
 
->>> bopp.core.validate_and_set_annotation_id(parent_ann)
+>>> bopp.ensure_annotation_id(parent_ann)
 'd9a1b46c-38d5-56bc-aacb-0e8641382d1a'
 
 >>> child_ann = bopp.transforms.trim(parent_ann, start=0.25)

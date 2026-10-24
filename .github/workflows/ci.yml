@@ -21,6 +21,9 @@ jobs:
       Python ${{ matrix.python-version }} on ${{ matrix.os }}
       ${{ matrix.variant && format(' - {0}', matrix.variant) || '' }}
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash -el {0}
 
     strategy:
       fail-fast: false
@@ -35,22 +38,22 @@ jobs:
           - os: ubuntu-24.04-arm
             python-version: "3.15"
             channel-priority: "strict"
-            envfile: ".github/environment-ci.yml"
+            envfile: ".github/environment-test.yml"
 
           - os: ubuntu-latest
             python-version: "3.15"
             channel-priority: "strict"
-            envfile: ".github/environment-ci.yml"
+            envfile: ".github/environment-test.yml"
 
           - os: macos-latest
             python-version: "3.15"
             channel-priority: "flexible"
-            envfile: ".github/environment-ci.yml"
+            envfile: ".github/environment-test.yml"
 
           - os: windows-latest
             python-version: "3.15"
             channel-priority: "flexible"
-            envfile: ".github/environment-ci.yml"
+            envfile: ".github/environment-test.yml"
 
 
     steps:
@@ -59,28 +62,25 @@ jobs:
       - name: Setup Micromamba
         uses: mamba-org/setup-micromamba@v3
         with:
-          environment-file: .github/environment-test.yml
+          environment-file: ${{ matrix.envfile }}
           environment-name: bopp-test
           cache-environment: true
 
       - name: Verify json schema
-        shell: bash -l {0}
         run: |
           check-jsonschema --check-metaschema schemas/*/*.json schemas/*/*/*.json
 
       - name: Check code generation
-        shell: bash -l {0}
+        if: runner.os != 'Windows'
         run: |
           hatch run codegen:build
           git diff --exit-code
 
       - name: Install package
-        shell: bash -l {0}
         run: |
           pip install --no-deps -e .
 
       - name: Run tests
-        shell: bash -l {0}
         run: |
           pytest
 

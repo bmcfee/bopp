@@ -7,7 +7,13 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from bopp.core import BoppArgumentError, BoppArrayError, BoppIOError, BoppValidationError, create
+from bopp.core import create
+from bopp.exceptions import (
+    BoppArgumentError,
+    BoppArrayError,
+    BoppIOError,
+    BoppValidationError,
+)
 from bopp.io import _type_to_polars_dtype
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
@@ -23,7 +29,6 @@ from bopp.util import (
     _get_tag,
     _polars_column_dtype,
     _validate_dataframe_columns,
-    extract_header,
     from_dataframe,
     to_dataframe,
 )
@@ -45,93 +50,6 @@ def test_get_tag():
     assert _get_tag(TaggedStruct(name="a")) == "tagged_sample"
     assert _get_tag(UntaggedStruct(name="b")) is None
     assert _get_tag(NonStruct()) is None
-
-
-def test_extract_header():
-    ann = create(
-        bopp_version="1.0",
-        media_id="track:1",
-        payload_kind="onset",
-        extent_kind="time",
-        time=[0.1, 0.2],
-        value=[1, 1],
-        sandbox={"experiment": "header_test"},
-    )
-    header = extract_header(ann)
-    assert header["media_id"] == "track:1"
-    assert header["bopp_version"] == "1.0"
-    assert header["sandbox"] == {"experiment": "header_test"}
-    assert "payload" not in header
-    assert "extent" not in header
-
-
-def test_extract_header_with_none_field():
-    ann = Annotation(
-        media_id="track:none_field",
-        bopp_version="1.0",
-        payload=OnsetPayload(value=[1]),
-        metadata=None,
-    )
-    header = extract_header(ann)
-    assert header["media_id"] == "track:none_field"
-    assert "metadata" not in header
-
-
-def test_extract_header_with_scalar_facet_attributes():
-    """Verify extract_header includes scalar fields on facets when present."""
-    class ScalarPayload(msgspec.Struct, tag_field="payload_type", tag="onset"):
-        value: list[int]
-        unit: str = "custom_unit"
-
-    class ScalarExtent(msgspec.Struct, tag_field="extent_type", tag="time"):
-        time: list[float]
-        time_unit: str = "seconds"
-
-    # Annotation with facet as a non-struct object to ensure non-struct facets are ignored
-    class NonStructExtentAnnotation(msgspec.Struct):
-        media_id: str
-        extent: Any = "not_a_struct"
-        payload: ScalarPayload | None = None
-
-    ann_non_struct = NonStructExtentAnnotation(
-        media_id="track:non_struct",
-        payload=ScalarPayload(value=[1, 2], unit="custom_unit"),
-    )
-    header_non_struct = extract_header(ann_non_struct)  # type: ignore[arg-type]
-    assert "extent" not in header_non_struct
-
-    ann = Annotation(
-        media_id="track:scalar_test",
-        bopp_version="1.0",
-        extent=ScalarExtent(time=[0.1, 0.2], time_unit="seconds"),  # type: ignore[arg-type]
-        payload=ScalarPayload(value=[1, 2], unit="custom_unit"),  # type: ignore[arg-type]
-    )
-
-    header = extract_header(ann)
-    assert "payload" in header
-    assert header["payload"]["payload_type"] == "onset"
-    assert header["payload"]["unit"] == "custom_unit"
-    assert "extent" in header
-    assert header["extent"]["extent_type"] == "time"
-    assert header["extent"]["time_unit"] == "seconds"
-
-
-def test_extract_header_with_groupings():
-    ann = Annotation(
-        media_id="track:group_header",
-        bopp_version="1.0",
-        payload=OnsetPayload(value=[1, 2]),
-        groupings=[
-            Grouping(name="voices", ids=[0, 1], labels={"soprano": 0, "alto": 1}),
-            Grouping(name="sections", ids=[10, 10]),
-        ],
-    )
-    header = extract_header(ann)
-    assert "groupings" in header
-    assert len(header["groupings"]) == 2
-    assert header["groupings"][0] == {"name": "voices", "labels": {"soprano": 0, "alto": 1}}
-    assert header["groupings"][1] == {"name": "sections"}
-    assert "ids" not in header["groupings"][0]
 
 
 def test_extract_facet_data_scalar_attributes():
@@ -303,7 +221,7 @@ def test_to_dataframe_covers_extent_and_confidence_branches():
         value=[1, 1],
         confidence=[0.85, 0.95],
     )
-    df, header = to_dataframe(ann, backend="pandas")
+    df, _header = to_dataframe(ann, backend="pandas")
     assert "extent:time:time" in df.columns
     assert "confidence:likelihood:confidence" in df.columns
 
@@ -501,9 +419,9 @@ def test_from_dataframe_with_scalar_facet_attributes():
         }
 
         reconstructed = from_dataframe(df, header)
-        assert getattr(reconstructed.extent, "origin") == "custom_origin"
-        assert getattr(reconstructed.payload, "source") == "custom_source"
-        assert getattr(reconstructed.confidence, "method") == "custom_method"
+        assert reconstructed.extent.origin == "custom_origin"
+        assert reconstructed.payload.source == "custom_source"
+        assert reconstructed.confidence.method == "custom_method"
 
 
 def test_from_dataframe_missing_required_payload_facet():
@@ -556,28 +474,29 @@ def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
         value=[1],
     )
 
-    with patch.dict("sys.modules", {"pandas": None}):
-        with pytest.raises(BoppIOError, match="pandas is required"):
-            to_dataframe(ann, backend="pandas")
+    with (
+        patch.dict("sys.modules", {"pandas": None}),
+        pytest.raises(BoppIOError, match="pandas is required"),
+    ):
+        to_dataframe(ann, backend="pandas")
 
-    with patch.dict("sys.modules", {"pyarrow": None}):
-        with pytest.raises(BoppIOError, match="pyarrow is required"):
-            to_dataframe(ann, backend="pandas-pyarrow")
+    with (
+        patch.dict("sys.modules", {"pyarrow": None}),
+        pytest.raises(BoppIOError, match="pyarrow is required"),
+    ):
+        to_dataframe(ann, backend="pandas-pyarrow")
 
 
 def test_from_dataframe_raises_argument_error_when_dataframe_libraries_missing():
     """Verify that `from_dataframe` raises a BoppArgumentError when required DataFrame
-    libraries (pandas/polars) cannot be imported to inspect the input object.
+    library (pandas) cannot be imported to inspect the input object.
     """
     df_pd = pd.DataFrame({"payload:onset:value": [1]})
-    with patch.dict("sys.modules", {"pandas": None}):
-        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
-            from_dataframe(df_pd, {"media_id": "track:1"})
-
-    df_pl = pl.DataFrame({"payload:onset:value": [1]})
-    with patch.dict("sys.modules", {"polars": None}):
-        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
-            from_dataframe(df_pl, {"media_id": "track:1"})
+    with (
+        patch.dict("sys.modules", {"pandas": None}),
+        pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"),
+    ):
+        from_dataframe(df_pd, {"media_id": "track:1"})
 
 
 def test_invalid_backend():
@@ -597,11 +516,6 @@ def test_from_dataframe_unsupported_type():
     # Verify rejection when passed a non-DataFrame object
     with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
         from_dataframe({"not": "a_dataframe"}, {"media_id": "1"})
-
-    # Verify fallback handling when polars is not installed and input is not a pandas DataFrame
-    with patch.dict("sys.modules", {"polars": None}):
-        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
-            from_dataframe({"not": "a_dataframe"}, {"media_id": "1"})
 
 
 def test_from_dataframe_no_header():
@@ -656,7 +570,6 @@ def test_polars_column_dtypes_match_csv_reader():
     """Every registered column is read from CSV with the dtype it is written with."""
     registry = get_registry("1.0")
     complex_registry = registry["COMPLEX_FIELDS_REGISTRY"]
-    string_registry = registry["STRING_FIELDS_REGISTRY"]
     checked = 0
     for facet, registry_key in FACET_REGISTRY_KEYS.items():
         tag_field = f"{facet}_type"
@@ -664,7 +577,7 @@ def test_polars_column_dtypes_match_csv_reader():
             for field in msgspec.structs.fields(struct_cls):
                 written = _polars_column_dtype(field.type, pl)
                 read, is_complex = _type_to_polars_dtype(
-                    field.type, field.name, tag, tag_field, complex_registry, string_registry, pl
+                    field.type, field.name, tag, tag_field, complex_registry, pl
                 )
                 if written is None or is_complex:
                     continue
@@ -692,3 +605,21 @@ def test_polars_column_dtype_constrained_numbers(column):
     struct_cls = get_registry("1.0")[FACET_REGISTRY_KEYS[facet]][tag]
     field = next(f for f in msgspec.structs.fields(struct_cls) if f.name == field_name)
     assert _polars_column_dtype(field.type, pl) == pl.Float64
+
+
+def test_validate_dataframe_columns_grouping_indices():
+    # Non-canonical integer index (leading zero)
+    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.00.ids'"):
+        _validate_dataframe_columns(["payload:onset:value", "group.00.ids"], "1.0")
+
+    # Negative index
+    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.-1.ids'"):
+        _validate_dataframe_columns(["payload:onset:value", "group.-1.ids"], "1.0")
+
+    # Non-contiguous indices (missing 1)
+    with pytest.raises(
+        BoppValidationError,
+        match=r"Grouping column indices must be contiguous starting from 0 \(expected \[0, 1\], got \[0, 2\]\)",
+    ):
+        _validate_dataframe_columns(["payload:onset:value", "group.0.ids", "group.2.ids"], "1.0")
+

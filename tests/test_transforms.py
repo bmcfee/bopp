@@ -1,6 +1,5 @@
 import copy
 import math
-import warnings
 from decimal import Decimal
 from fractions import Fraction
 
@@ -27,7 +26,6 @@ from bopp.transforms import (
     FilterRecord,
     _derive_parents_and_sandbox,
     _get_facet_list_fields,
-    _get_list_fields_with_length,
     _rebuild_annotation,
     _resample_groupings,
     _resample_struct,
@@ -37,15 +35,6 @@ from bopp.transforms import (
     to_times,
     trim,
 )
-
-
-def test_get_list_fields_with_length_empty():
-    class EmptyStruct(msgspec.Struct):
-        field_a: int = 1
-        field_b: str = "test"
-
-    s = EmptyStruct()
-    assert _get_list_fields_with_length(s, 2) == {}
 
 
 def test_get_facet_list_fields_empty():
@@ -112,14 +101,14 @@ def test_subset_struct_lists_helper():
         extra_scalar: int = 42
 
     sample = SampleStruct(tags=["a", "b", "c"], scores=[1.0, 2.0, 3.0])
-    subsetted = _subset_struct_lists(sample, [0, 2], expected_length=3)
+    subsetted = _subset_struct_lists(sample, [0, 2])
     assert subsetted.tags == ["a", "c"]
     assert subsetted.scores == [1.0, 3.0]
     assert subsetted.extra_scalar == 42
 
     # With overrides
     overridden = _subset_struct_lists(
-        sample, [1], expected_length=3, overrides={"tags": ["custom"]}
+        sample, [1], overrides={"tags": ["custom"]}
     )
     assert overridden.tags == ["custom"]
     assert overridden.scores == [2.0]
@@ -281,22 +270,22 @@ def test_trim_invalid_extent_tag():
         extent=UntaggedExtent(time=[1.0, 2.0]),
         payload=TagOpenPayload(value=["a", "b"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     with pytest.raises(BoppArgumentError, match="has no valid schema tag"):
         trim(ann, start=1.0, end=2.0)
 
 
 def test_trim_no_extent():
-    metadata = HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+    metadata = HumanAnnotationMetadata(annotator_id="user_1", tool="manual")
     ann = Annotation(
         media_id="test_media",
         bopp_version="1.0.0",
-        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        metadata=metadata,
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["pop"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     result = trim(ann, start=1.0, end=5.0)
     assert result.extent is msgspec.UNSET
@@ -341,7 +330,7 @@ def test_trim_with_groupings():
         confidence=LikelihoodConfidence(confidence=[0.1, 0.3, 0.5, 0.8]),
         groupings=[g1, g2],
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     trimmed = trim(ann, start=2.0, end=6.0, reset=True)
     assert trimmed.extent.time == [1.0, 3.0]
@@ -391,7 +380,7 @@ def test_trim_no_extent_infinite_bound():
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["pop"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     result = trim(ann, start=0, end=math.inf)
     assert result.extent is msgspec.UNSET
@@ -477,7 +466,7 @@ def test_trim_time_frequency_box():
         ),
         payload=TagOpenPayload(value=["low", "high"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     trimmed = trim(ann, start=1.0, end=5.0, strict=False, reset=True)
     assert trimmed.extent.time == [0.0, 3.0]
@@ -501,7 +490,7 @@ def test_trim_time_frequency_box_along_frequency():
         extent=extent,
         payload=TagOpenPayload(value=["low", "mid", "high", "ultra"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # Trim frequency axis non-strict [250..600]
     trimmed_freq = trim(ann, start=250.0, end=600.0, target_field="frequency", reset=True)
@@ -530,7 +519,7 @@ def test_trim_min_max_strict_and_non_strict():
         extent=extent,
         payload=TagOpenPayload(value=["low", "mid", "high", "ultra"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # Non-strict trim with start and end
     trimmed_non_strict = trim(ann, start=150.0, end=600.0, target_field="frequency", strict=False)
@@ -581,7 +570,7 @@ def test_trim_empty_and_out_of_bounds_extents():
         extent=extent_empty,
         payload=TagOpenPayload(value=[]),
     )
-    bopp.validate_and_set_annotation_id(ann_empty)
+    bopp.ensure_annotation_id(ann_empty)
 
     trimmed_empty = trim(ann_empty, start=100.0, end=200.0, target_field="frequency", strict=True)
     assert trimmed_empty.extent.freq_min == []
@@ -603,7 +592,7 @@ def test_trim_empty_and_out_of_bounds_extents():
         extent=extent_out_of_bounds,
         payload=TagOpenPayload(value=["low1", "low2"]),
     )
-    bopp.validate_and_set_annotation_id(ann_oob)
+    bopp.ensure_annotation_id(ann_oob)
 
     # Trim frequency axis [100.0, 200.0] - all observations should be filtered out
     trimmed_oob = trim(ann_oob, start=100.0, end=200.0, target_field="frequency", strict=False)
@@ -766,7 +755,7 @@ def test_filter_by_groupings_facet():
         payload=TagOpenPayload(value=["a", "b", "c", "d"]),
         groupings=[g1, g2],
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # Filter by specific grouping target
     res_verse = filter_by(ann, lambda gid: gid == 1, facet="groupings", target="pattern")
@@ -790,7 +779,7 @@ def test_filter_by_groupings_facet():
         payload=TagOpenPayload(value=["a", "b"]),
         groupings=[g_single],
     )
-    bopp.validate_and_set_annotation_id(ann_single_g)
+    bopp.ensure_annotation_id(ann_single_g)
     res_single = filter_by(ann_single_g, lambda gid: gid == 0, facet="groupings")
     assert res_single.payload.value == ["a"]
 
@@ -805,7 +794,7 @@ def test_filter_by_multi_column_payload():
         extent=msgspec.UNSET,
         payload=MoodThayerPayload(valence=[0.5, -0.2, 0.8], arousal=[0.1, 0.4, -0.3]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # Filter with record
     filtered = filter_by(ann, lambda r: r.valence > 0 and r.arousal > 0)
@@ -829,7 +818,7 @@ def test_filter_by_facet_all():
         confidence=LikelihoodConfidence(confidence=[0.9, 0.4, 0.95, 0.85]),
         groupings=[g],
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # Filter across facets using record (extent, payload, confidence, grouping)
     filtered = filter_by(
@@ -913,7 +902,7 @@ def test_filter_by_invalid_arguments():
         payload=TagOpenPayload(value=["a"]),
         groupings=[Grouping(name="valid_layer", ids=[0])],
     )
-    bopp.validate_and_set_annotation_id(ann_with_g)
+    bopp.ensure_annotation_id(ann_with_g)
     with pytest.raises(BoppArgumentError, match="Target grouping 'invalid_layer' not found"):
         filter_by(ann_with_g, lambda x: True, facet="groupings", target="invalid_layer")
 
@@ -1082,7 +1071,7 @@ def test_to_times_with_groupings():
         confidence=LikelihoodConfidence(confidence=[0.7, 0.9]),
         groupings=[g1, g2],
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # Resample with gap: t=0.0 before first event, so method='previous' has gap
     res = to_times(
@@ -1185,7 +1174,7 @@ def test_to_times_global_annotation():
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["rock"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # sample_rate without extent raises error
     with pytest.raises(BoppArgumentError, match="sample_rate requires an extent"):
@@ -1210,7 +1199,7 @@ def test_to_times_time_frequency_box():
         ),
         payload=TagOpenPayload(value=["low", "high"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     res = to_times(ann, times=[1.0, 3.0])
     assert res.extent.time == [1.0, 3.0]
@@ -1249,7 +1238,7 @@ def test_to_times_fill_value_dict_missing_required_key():
         extent=Times(time=[1.0]),
         payload=MoodThayerPayload(valence=[0.5], arousal=[0.2]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     with pytest.raises(BoppArgumentError, match="Missing fill value for payload field"):
         to_times(ann, times=[0.0, 1.0], fill_value={"valence": 0.0})
@@ -1269,7 +1258,7 @@ def test_to_times_multi_column_payload_dict_fill():
         ),
         payload=MoodThayerPayload(valence=[0.5], arousal=[0.8]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     # Scalar fill value for multi-column payload raises error
     with pytest.raises(BoppArgumentError, match="requires fill_value to be a dict"):
@@ -1300,7 +1289,7 @@ def test_to_times_multi_column_payload_none_fill_value():
         extent=Times(time=[1.0]),
         payload=OptionalFieldPayload(label=["test"], comment=["note"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     res = to_times(ann, times=[0.0, 1.0], method="previous", fill_value=None)
     assert res.extent.time == [0.0, 1.0]
@@ -1368,7 +1357,7 @@ def test_to_times_empty_annotation_with_confidence_and_fill():
         payload=TagOpenPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     res = to_times(ann, times=[0.0, 1.0], fill_value="silence")
     assert res.extent.time == [0.0, 1.0]
@@ -1387,7 +1376,7 @@ def test_to_times_empty_annotation_confidence_fill_validation_failure():
         payload=TagOpenPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
 
     with pytest.raises(BoppValidationError, match="Invalid fill value for confidence struct"):
         to_times(ann, times=[0.0, 1.0], fill_value={"value": "silence", "confidence": "not_a_float"})
@@ -1653,7 +1642,7 @@ def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
             extent=msgspec.UNSET,
             payload=TagOpenPayload(value=["a"]),
         )
-        bopp.validate_and_set_annotation_id(ann)
+        bopp.ensure_annotation_id(ann)
     else:
         coords = {"tick": [0]} if extent_kind == "midi_interval" else {"time": [0.0]}
         if extent_kind != "time":
@@ -1685,7 +1674,7 @@ def test_trim_no_extent_rejects_fraction_before_order():
         extent=msgspec.UNSET,
         payload=TagOpenPayload(value=["a"]),
     )
-    bopp.validate_and_set_annotation_id(ann)
+    bopp.ensure_annotation_id(ann)
     with pytest.raises(BoppArgumentError, match="Fraction or pair bounds require a fraction axis"):
         trim(ann, start=[9, 1], end=5)
 
@@ -1801,3 +1790,20 @@ def test_filter_by_fraction_extent():
     assert [list(q) for q in result.extent.quarter] == [[1, 1], [3, 2]]
     assert [list(d) for d in result.extent.duration] == [[2, 1], [1, 1]]
     assert result.payload.value == list("cd")
+
+
+def test_filter_by_all_name_collision():
+    ann = create(
+        media_id="track:1",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=[1, 1],
+        groupings=[Grouping(name="time", ids=[0, 1])],
+    )
+    with pytest.raises(BoppArgumentError, match="Ambiguous target field 'time' found in multiple facets when facet='all'"):
+        filter_by(ann, lambda x: x > 0, facet="all", target="time")
+
+    with pytest.raises(BoppArgumentError, match=r"Column name collision across facets for \['time'\] when facet='all'"):
+        filter_by(ann, lambda r: r.time > 0, facet="all")
+

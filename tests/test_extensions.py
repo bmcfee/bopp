@@ -109,7 +109,7 @@ def test_union_type_support():
     assert "example.union" in reg
 
     # Also test typing.Union
-    typing_union = Union[TaggedItemA, TaggedItemB]
+    typing_union = Union[TaggedItemA, TaggedItemB]  # noqa: UP007
     reg["example.typing_union"] = typing_union
     assert reg["example.typing_union"] == typing_union
 
