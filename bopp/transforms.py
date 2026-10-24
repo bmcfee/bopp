@@ -222,8 +222,9 @@ def _conversion_extent(
 
     fraction_target = source_tag.endswith("_float")
     parameters: dict[str, Any] = {}
+    limit = 1
     if fraction_target:
-        if type(max_denominator) is not int:
+        if not isinstance(max_denominator, int) or isinstance(max_denominator, bool):
             raise BoppArgumentError(
                 f"{transform}: max_denominator must be an int (not a bool), got {max_denominator!r}."
             )
@@ -231,19 +232,19 @@ def _conversion_extent(
             raise BoppArgumentError(
                 f"{transform}: max_denominator must be >= 1, got {max_denominator}."
             )
-        parameters["max_denominator"] = max_denominator
+        limit = max_denominator
+        parameters["max_denominator"] = limit
 
     columns: dict[str, list[Any]] = {}
     for name, values in _get_facet_list_fields(extent).items():
         if fraction_target:
-            assert max_denominator is not None
             columns[name] = []
             for index, value in enumerate(values):
                 if not math.isfinite(value):
                     raise BoppArgumentError(
                         f"{transform}: field {name!r} at index {index} must be finite."
                     )
-                columns[name].append(_fraction_pair(Fraction(value).limit_denominator(max_denominator)))
+                columns[name].append(_fraction_pair(Fraction(value).limit_denominator(limit)))
         else:
             columns[name] = [numerator / denominator for numerator, denominator in values]
     return _rebuild_converted_extent(annotation, target_tag, columns, transform, parameters)
