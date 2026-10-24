@@ -17,8 +17,6 @@ from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time_interval import TimeIntervalExtent
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
-from bopp.models.v1.payload.note_hz import NoteHzPayload
-from bopp.models.v1.payload.note_midi import NoteMidiPayload
 from bopp.models.v1.payload.pitch_contour_hz import PitchContourPayload
 from bopp.models.v1.payload.segment_multi import MultiSegmentPayload
 from bopp.models.v1.payload.tag_open import TagOpenPayload

@@ -290,7 +290,7 @@ def test_csv_roundtrip_object_payload(tmp_path):
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == "object"
-    assert getattr(loaded.payload, "value") == [{"color": "brown"}, {"color": "white"}]
+    assert loaded.payload.value == [{"color": "brown"}, {"color": "white"}]
 
 
 def test_csv_roundtrip_nested_extent_polars(tmp_path):
@@ -310,9 +310,9 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert getattr(loaded.payload, "value") == ["C:maj", "G:maj"]
-    assert getattr(loaded.extent, "quarter") == [(0, 1), (1, 2)]
-    assert getattr(loaded.extent, "duration") == [(1, 2), (1, 4)]
+    assert loaded.payload.value == ["C:maj", "G:maj"]
+    assert loaded.extent.quarter == [(0, 1), (1, 2)]
+    assert loaded.extent.duration == [(1, 2), (1, 4)]
 
 
 @pytest.mark.parametrize(
@@ -750,9 +750,11 @@ def test_load_bopp_csv_invalid_source_type():
     with pytest.raises(BoppIOError, match="Unsupported source type for text stream"):
         load_bopp_csv(12345)  # type: ignore[arg-type]
 
-    with pytest.raises(BoppIOError, match="Unsupported source type for text stream"):
-        with _open_or_yield_text_stream(b"binary data"):  # type: ignore[arg-type]
-            pass
+    with (
+        pytest.raises(BoppIOError, match="Unsupported source type for text stream"),
+        _open_or_yield_text_stream(b"binary data"),  # type: ignore[arg-type]
+    ):
+        pass
 
 
 class _NonSeekableTextStream:
@@ -823,6 +825,8 @@ def test_load_bopp_csv_pandas_missing():
             raise ImportError("No module named 'pandas'")
         return real_import(name, *args, **kwargs)
 
-    with patch("builtins.__import__", side_effect=mock_import):
-        with pytest.raises(BoppIOError, match="pandas is required for backend='pandas'"):
-            load_bopp_csv(io.StringIO(csv_content), backend="pandas")
+    with (
+        patch("builtins.__import__", side_effect=mock_import),
+        pytest.raises(BoppIOError, match="pandas is required for backend='pandas'"),
+    ):
+        load_bopp_csv(io.StringIO(csv_content), backend="pandas")

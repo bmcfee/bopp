@@ -246,7 +246,7 @@ def _build_polars_csv_schema(
     Returns
     -------
     tuple of (dict[str, Any], list[str])
-        A tuple practical consisting of the full schema mapping every column name to a Polars data type,
+        A tuple consisting of the full schema mapping every column name to a Polars data type,
         and a list of column names designated as complex fields requiring post-read decoding.
     """
     schema: dict[str, Any] = {}

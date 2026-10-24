@@ -8,9 +8,6 @@ import msgspec
 from ._version import get_current_schema_version
 from .exceptions import (
     BoppArgumentError,
-    BoppArrayError,
-    BoppError,
-    BoppIOError,
     BoppRegistryError,
     BoppValidationError,
 )
@@ -21,12 +18,6 @@ BOPP_NAMESPACE = uuid.UUID("a9b3e1c0-42f8-4e89-8d62-b9123456789a")
 
 __all__ = [
     "BOPP_NAMESPACE",
-    "BoppArgumentError",
-    "BoppArrayError",
-    "BoppError",
-    "BoppIOError",
-    "BoppRegistryError",
-    "BoppValidationError",
     "compute_annotation_id",
     "create",
     "ensure_annotation_id",

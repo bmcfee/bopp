@@ -44,6 +44,7 @@ coverage.xml
 .tox
 tmp/
 benchmark.json
+.benchmarks/
 
 # Miscellaneous
 pip-log.txt # Installer logs

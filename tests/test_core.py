@@ -8,15 +8,17 @@ import pytest
 
 from bopp.base import BoppBase, GroupingBase
 from bopp.core import (
-    BoppArgumentError,
-    BoppArrayError,
-    BoppRegistryError,
-    BoppValidationError,
     _extract_kwargs,
     create,
     ensure_annotation_id,
     validate,
     validate_annotation_id,
+)
+from bopp.exceptions import (
+    BoppArgumentError,
+    BoppArrayError,
+    BoppRegistryError,
+    BoppValidationError,
 )
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.grouping import Grouping

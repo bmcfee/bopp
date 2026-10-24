@@ -1,7 +1,8 @@
-import pytest
 import jams
 import pandas as pd
 import polars as pl
+import pytest
+
 import bopp.io
 
 PREFIXES = ["longbeats", "drive"]

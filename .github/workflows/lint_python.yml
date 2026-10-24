@@ -32,7 +32,7 @@ jobs:
       with:
         path: ~/conda_pkgs_dir
         key: ${{ runner.os }}-${{ matrix.python-version }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles( matrix.envfile ) }}
-    - name: Install conda environmnent
+    - name: Install conda environment
       uses: conda-incubator/setup-miniconda@v4
       with: 
         auto-update-conda: false
@@ -55,7 +55,7 @@ jobs:
       run: codespell
 
     - name: Linting check
-      run: ruff check --output-format=github bopp
+      run: ruff check --output-format=github bopp tests
 
     - name: Linting check on docs
       run: ruff check --output-format=github docs

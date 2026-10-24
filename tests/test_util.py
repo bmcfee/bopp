@@ -7,7 +7,13 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from bopp.core import BoppArgumentError, BoppArrayError, BoppIOError, BoppValidationError, create
+from bopp.core import create
+from bopp.exceptions import (
+    BoppArgumentError,
+    BoppArrayError,
+    BoppIOError,
+    BoppValidationError,
+)
 from bopp.io import _type_to_polars_dtype
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
@@ -215,7 +221,7 @@ def test_to_dataframe_covers_extent_and_confidence_branches():
         value=[1, 1],
         confidence=[0.85, 0.95],
     )
-    df, header = to_dataframe(ann, backend="pandas")
+    df, _header = to_dataframe(ann, backend="pandas")
     assert "extent:time:time" in df.columns
     assert "confidence:likelihood:confidence" in df.columns
 
@@ -413,9 +419,9 @@ def test_from_dataframe_with_scalar_facet_attributes():
         }
 
         reconstructed = from_dataframe(df, header)
-        assert getattr(reconstructed.extent, "origin") == "custom_origin"
-        assert getattr(reconstructed.payload, "source") == "custom_source"
-        assert getattr(reconstructed.confidence, "method") == "custom_method"
+        assert reconstructed.extent.origin == "custom_origin"
+        assert reconstructed.payload.source == "custom_source"
+        assert reconstructed.confidence.method == "custom_method"
 
 
 def test_from_dataframe_missing_required_payload_facet():
@@ -468,13 +474,17 @@ def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
         value=[1],
     )
 
-    with patch.dict("sys.modules", {"pandas": None}):
-        with pytest.raises(BoppIOError, match="pandas is required"):
-            to_dataframe(ann, backend="pandas")
+    with (
+        patch.dict("sys.modules", {"pandas": None}),
+        pytest.raises(BoppIOError, match="pandas is required"),
+    ):
+        to_dataframe(ann, backend="pandas")
 
-    with patch.dict("sys.modules", {"pyarrow": None}):
-        with pytest.raises(BoppIOError, match="pyarrow is required"):
-            to_dataframe(ann, backend="pandas-pyarrow")
+    with (
+        patch.dict("sys.modules", {"pyarrow": None}),
+        pytest.raises(BoppIOError, match="pyarrow is required"),
+    ):
+        to_dataframe(ann, backend="pandas-pyarrow")
 
 
 def test_from_dataframe_raises_argument_error_when_dataframe_libraries_missing():
@@ -482,9 +492,11 @@ def test_from_dataframe_raises_argument_error_when_dataframe_libraries_missing()
     library (pandas) cannot be imported to inspect the input object.
     """
     df_pd = pd.DataFrame({"payload:onset:value": [1]})
-    with patch.dict("sys.modules", {"pandas": None}):
-        with pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"):
-            from_dataframe(df_pd, {"media_id": "track:1"})
+    with (
+        patch.dict("sys.modules", {"pandas": None}),
+        pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"),
+    ):
+        from_dataframe(df_pd, {"media_id": "track:1"})
 
 
 def test_invalid_backend():
