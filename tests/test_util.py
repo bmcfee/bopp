@@ -593,3 +593,21 @@ def test_polars_column_dtype_constrained_numbers(column):
     struct_cls = get_registry("1.0")[FACET_REGISTRY_KEYS[facet]][tag]
     field = next(f for f in msgspec.structs.fields(struct_cls) if f.name == field_name)
     assert _polars_column_dtype(field.type, pl) == pl.Float64
+
+
+def test_validate_dataframe_columns_grouping_indices():
+    # Non-canonical integer index (leading zero)
+    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.00.ids'"):
+        _validate_dataframe_columns(["payload:onset:value", "group.00.ids"], "1.0")
+
+    # Negative index
+    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.-1.ids'"):
+        _validate_dataframe_columns(["payload:onset:value", "group.-1.ids"], "1.0")
+
+    # Non-contiguous indices (missing 1)
+    with pytest.raises(
+        BoppValidationError,
+        match=r"Grouping column indices must be contiguous starting from 0 \(expected \[0, 1\], got \[0, 2\]\)",
+    ):
+        _validate_dataframe_columns(["payload:onset:value", "group.0.ids", "group.2.ids"], "1.0")
+

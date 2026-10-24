@@ -35,7 +35,15 @@ class BoppBase(msgspec.Struct):
 
         groupings_field = getattr(self, "groupings", msgspec.UNSET)
         if groupings_field is not msgspec.UNSET and groupings_field is not None:
+            seen_names: set[str] = set()
             for g in groupings_field:
+                g_name = getattr(g, "name", None)
+                if isinstance(g_name, str):
+                    if g_name in seen_names:
+                        raise BoppValidationError(
+                            f"Annotation contains multiple groupings with the same name: '{g_name}'"
+                        )
+                    seen_names.add(g_name)
                 ids = getattr(g, "ids", None)
                 if isinstance(ids, list):
                     all_lengths.append(len(ids))

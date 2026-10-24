@@ -195,13 +195,9 @@ def _resample_groupings(
 
     new_groupings = []
     for g in groupings:
-        ids = getattr(g, "ids", None)
-        if isinstance(ids, list):
-            fill_val = fill_map.get(getattr(g, "name", ""), -1)
-            new_ids = [fill_val if idx is None else ids[idx] for idx in matched_indices]
-            new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
-        else:
-            new_groupings.append(copy.deepcopy(g))
+        fill_val = fill_map.get(g.name, -1)
+        new_ids = [fill_val if idx is None else g.ids[idx] for idx in matched_indices]
+        new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
     return new_groupings
 
 
@@ -621,15 +617,28 @@ def filter_by(
     if facet == "all":
         if target is not None:
             # Look for target across all facets
-            found_col = None
-            for cols in (payload_cols, extent_cols, confidence_cols, groupings_cols):
-                if target in cols:
-                    found_col = cols[target]
-                    break
-            if found_col is None:
+            matching_cols = [
+                cols[target]
+                for cols in (payload_cols, extent_cols, confidence_cols, groupings_cols)
+                if target in cols
+            ]
+            if not matching_cols:
                 raise BoppArgumentError(f"Target field '{target}' not found in any annotation facet.")
-            stream: list[Any] = found_col
+            if len(matching_cols) > 1:
+                raise BoppArgumentError(
+                    f"Ambiguous target field '{target}' found in multiple facets when facet='all'. "
+                    "Specify 'facet' explicitly."
+                )
+            stream: list[Any] = matching_cols[0]
         else:
+            seen_keys: set[str] = set()
+            for cols in (extent_cols, payload_cols, confidence_cols, groupings_cols):
+                overlap = seen_keys.intersection(cols.keys())
+                if overlap:
+                    raise BoppArgumentError(
+                        f"Column name collision across facets for {sorted(overlap)} when facet='all'."
+                    )
+                seen_keys.update(cols.keys())
             stream = [
                 FilterRecord(
                     {
@@ -916,8 +925,6 @@ def to_times(
                             f"Fill value for grouping '{g_name}' must be an integer, got {type(val).__name__}."
                         )
                     grouping_fill_map[g_name] = val
-                else:
-                    grouping_fill_map[g_name] = -1
     else:
         if len(payload_cols) > 1 and fill_value is not None:
             raise BoppArgumentError(
@@ -925,10 +932,6 @@ def to_times(
             )
         payload_fill_map = dict.fromkeys(payload_cols, fill_value)
         confidence_fill_map = dict.fromkeys(confidence_cols, 0.0)
-
-        if groupings is not None and groupings is not msgspec.UNSET:
-            for g in groupings:
-                grouping_fill_map[getattr(g, "name", "")] = -1
 
     # Build sampling grid
     target_times: list[float]

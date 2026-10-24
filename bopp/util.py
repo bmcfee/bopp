@@ -117,11 +117,17 @@ def _validate_dataframe_columns(
         # Check for grouping column: group.N.ids
         if col.startswith("group."):
             dot_parts = col.split(".")
-            if len(dot_parts) == 3 and dot_parts[0] == "group" and dot_parts[1].isdigit() and dot_parts[2] == "ids":
+            if (
+                len(dot_parts) == 3
+                and dot_parts[0] == "group"
+                and dot_parts[1].isdigit()
+                and dot_parts[1] == str(int(dot_parts[1]))
+                and dot_parts[2] == "ids"
+            ):
                 grouping_cols.append((int(dot_parts[1]), col))
                 continue
             raise BoppValidationError(
-                f"Invalid grouping column format '{col}'. Expected 'group.N.ids' with an integer index N."
+                f"Invalid grouping column format '{col}'. Expected 'group.N.ids' with a canonical non-negative integer index N."
             )
 
         parts = col.split(":")
@@ -164,6 +170,12 @@ def _validate_dataframe_columns(
         grouped_cols[facet].append((type_tag, field_name, col))
 
     grouping_cols.sort(key=lambda item: item[0])
+    expected_indices = list(range(len(grouping_cols)))
+    actual_indices = [idx for idx, _ in grouping_cols]
+    if actual_indices != expected_indices:
+        raise BoppValidationError(
+            f"Grouping column indices must be contiguous starting from 0 (expected {expected_indices}, got {actual_indices})."
+        )
     return grouped_cols, grouping_cols
 
 

@@ -1790,3 +1790,20 @@ def test_filter_by_fraction_extent():
     assert [list(q) for q in result.extent.quarter] == [[1, 1], [3, 2]]
     assert [list(d) for d in result.extent.duration] == [[2, 1], [1, 1]]
     assert result.payload.value == list("cd")
+
+
+def test_filter_by_all_name_collision():
+    ann = create(
+        media_id="track:1",
+        payload_kind="onset",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=[1, 1],
+        groupings=[Grouping(name="time", ids=[0, 1])],
+    )
+    with pytest.raises(BoppArgumentError, match="Ambiguous target field 'time' found in multiple facets when facet='all'"):
+        filter_by(ann, lambda x: x > 0, facet="all", target="time")
+
+    with pytest.raises(BoppArgumentError, match=r"Column name collision across facets for \['time'\] when facet='all'"):
+        filter_by(ann, lambda r: r.time > 0, facet="all")
+

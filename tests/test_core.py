@@ -20,6 +20,7 @@ from bopp.core import (
 )
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.grouping import Grouping
+from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.onset import OnsetPayload
 
 
@@ -329,3 +330,88 @@ def test_grouping_with_labels_and_none_or_unset_ids():
 
     g_unset = GroupingWithoutIds(name="test", labels={"a": 0}, ids=msgspec.UNSET)
     assert g_unset.labels == {"a": 0}
+
+
+def test_duplicate_grouping_names_raises():
+    with pytest.raises(
+        BoppValidationError,
+        match="Annotation contains multiple groupings with the same name: 'sections'",
+    ):
+        Annotation(
+            media_id="audio:1",
+            bopp_version="1.0.0",
+            metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+            payload=OnsetPayload(value=[1, 1]),
+            groupings=[
+                Grouping(name="sections", ids=[0, 1]),
+                Grouping(name="sections", ids=[1, 0]),
+            ],
+        )
+
+
+def test_create_with_metadata_and_groupings():
+    # 1. metadata_kind + kwargs
+    ann1 = create(
+        media_id="audio:1",
+        payload_kind="onset",
+        metadata_kind="human",
+        annotator_id="user_1",
+        tool="sonic-visualiser",
+        value=[1, 1],
+        groupings=[Grouping(name="beats", ids=[0, 1])],
+    )
+    assert isinstance(ann1.metadata, HumanAnnotationMetadata)
+    assert ann1.metadata.annotator_id == "user_1"
+    assert ann1.metadata.tool == "sonic-visualiser"
+    assert len(ann1.groupings) == 1
+    assert ann1.groupings[0].name == "beats"
+
+    # 2. metadata as dict + groupings as list of dicts
+    ann2 = create(
+        media_id="audio:1",
+        payload_kind="onset",
+        metadata={"metadata_type": "human", "annotator_id": "user_2", "tool": "audacity"},
+        groupings=[{"name": "sections", "ids": [0, 1], "labels": {"a": 0, "b": 1}}],
+        value=[1, 1],
+    )
+    assert isinstance(ann2.metadata, HumanAnnotationMetadata)
+    assert ann2.metadata.annotator_id == "user_2"
+    assert isinstance(ann2.groupings[0], Grouping)
+    assert ann2.groupings[0].name == "sections"
+
+    # 3. metadata as struct instance
+    ann3 = create(
+        media_id="audio:1",
+        payload_kind="onset",
+        metadata=HumanAnnotationMetadata(annotator_id="user_3", tool="manual"),
+        value=[1, 1],
+    )
+    assert ann3.metadata.annotator_id == "user_3"
+
+
+def test_create_metadata_errors():
+    with pytest.raises(BoppArgumentError, match="Cannot specify both 'metadata' and 'metadata_kind'"):
+        create(
+            media_id="audio:1",
+            payload_kind="onset",
+            metadata_kind="human",
+            metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+            value=[1],
+        )
+
+    with pytest.raises(BoppRegistryError, match="Unrecognized metadata kind: 'nonexistent'"):
+        create(
+            media_id="audio:1",
+            payload_kind="onset",
+            metadata_kind="nonexistent",
+            value=[1],
+        )
+
+    with pytest.raises(BoppRegistryError, match="Unrecognized metadata kind: 'bad_type'"):
+        create(
+            media_id="audio:1",
+            payload_kind="onset",
+            metadata={"metadata_type": "bad_type"},
+            value=[1],
+        )
+

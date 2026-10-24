@@ -147,6 +147,9 @@ def create(
     payload_kind: str,
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
+    metadata_kind: str | None = None,
+    metadata: Any = msgspec.UNSET,
+    groupings: list[Any] | Any = msgspec.UNSET,
     parents: list[str] | Any = msgspec.UNSET,
     bopp_version: str | None = None,
     sandbox: Any = msgspec.UNSET,
@@ -167,6 +170,14 @@ def create(
         Kind identifier registered for the extent struct, if applicable.
     confidence_kind : str or None, optional
         Kind identifier registered for the confidence struct, if applicable.
+    metadata_kind : str or None, optional
+        Kind identifier registered for the metadata struct, if applicable.
+        Mutually exclusive with `metadata`.
+    metadata : msgspec.Struct or dict, optional
+        Explicit metadata struct instance or dictionary representation.
+        Mutually exclusive with `metadata_kind`.
+    groupings : list of Grouping or list of dict, optional
+        List of Grouping struct instances or dictionary representations.
     parents : list of str, optional
         List of parent annotation UUIDs from which this annotation was derived.
     bopp_version : str or None, optional
@@ -179,8 +190,8 @@ def create(
     resolve_ext : bool, default True
         If True and payload_kind is 'ext', resolves and validates the extension payload values.
     **kwargs : Any
-        Keyword arguments matching fields for the payload, extent, or
-        confidence structures.
+        Keyword arguments matching fields for the payload, extent, confidence,
+        or metadata structures.
 
     Returns
     -------
@@ -190,20 +201,26 @@ def create(
     Raises
     ------
     BoppRegistryError
-        If an unrecognized `payload_kind`, `extent_kind`, or `confidence_kind`
-        is provided.
+        If an unrecognized `payload_kind`, `extent_kind`, `confidence_kind`, or
+        `metadata_kind` is provided.
     BoppArgumentError
-        If unused keyword arguments remain.
+        If unused keyword arguments remain or both `metadata` and `metadata_kind`
+        are specified.
     """
     if bopp_version is None:
         bopp_version = get_current_schema_version()
+
+    if metadata_kind is not None and metadata is not msgspec.UNSET:
+        raise BoppArgumentError("Cannot specify both 'metadata' and 'metadata_kind'.")
 
     registry = get_registry(bopp_version)
 
     PAYLOAD_TYPE_REGISTRY = registry["PAYLOAD_TYPE_REGISTRY"]
     EXTENT_TYPE_REGISTRY = registry["EXTENT_TYPE_REGISTRY"]
     CONFIDENCE_TYPE_REGISTRY = registry["CONFIDENCE_TYPE_REGISTRY"]
+    METADATA_TYPE_REGISTRY = registry.get("METADATA_TYPE_REGISTRY", {})
     Annotation = registry["Annotation"]
+    Grouping = registry.get("Grouping")
 
     try:
         payload_cls = PAYLOAD_TYPE_REGISTRY[payload_kind]
@@ -234,6 +251,28 @@ def create(
         confidence_args = _extract_kwargs(confidence_cls, kwargs)
         confidence_obj = confidence_cls(**confidence_args)
 
+    metadata_obj = metadata
+    if metadata_kind is not None:
+        try:
+            metadata_cls = METADATA_TYPE_REGISTRY[metadata_kind]
+        except KeyError as e:
+            raise BoppRegistryError(f"Unrecognized metadata kind: {e}") from e
+
+        metadata_args = _extract_kwargs(metadata_cls, kwargs)
+        metadata_obj = metadata_cls(**metadata_args)
+    elif isinstance(metadata, dict):
+        meta_type = metadata.get("metadata_type")
+        if meta_type not in METADATA_TYPE_REGISTRY:
+            raise BoppRegistryError(f"Unrecognized metadata kind: {meta_type!r}")
+        metadata_obj = msgspec.convert(metadata, METADATA_TYPE_REGISTRY[meta_type])
+
+    groupings_obj = groupings
+    if groupings is not msgspec.UNSET and groupings is not None and Grouping is not None:
+        groupings_obj = [
+            msgspec.convert(g, Grouping) if isinstance(g, dict) else g
+            for g in groupings
+        ]
+
     # Any remaining kwargs indicate a user typo or a schema mismatch
     if kwargs:
         raise BoppArgumentError(f"Unconsumed keyword arguments: {list(kwargs.keys())}")
@@ -242,10 +281,12 @@ def create(
         media_id=media_id,
         parents=parents,
         bopp_version=bopp_version,
+        metadata=metadata_obj,
         extent=extent_obj,
         payload=payload_obj,
         confidence=confidence_obj,
         sandbox=sandbox,
+        groupings=groupings_obj,
     )
 
     if resolve_ext and payload_kind == "ext":
