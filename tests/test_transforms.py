@@ -2027,3 +2027,17 @@ def test_score_conversion_empty_columns(name, source, target, kwargs):
     if "interval" in source:
         assert result.extent.duration == []
     assert bopp.validate(result)
+
+
+@pytest.mark.parametrize("name, source, target, kwargs", SCORE_CONVERSIONS)
+def test_score_conversion_preserves_groupings(name, source, target, kwargs):
+    g = Grouping(name="layer", ids=[0, 1, 0, 1, 2])
+    ann = _score_annotation(source, groupings=[g])
+    result = getattr(bopp, name)(ann, **kwargs)
+    assert result.groupings is not None
+    assert len(result.groupings) == 1
+    assert result.groupings[0].name == "layer"
+    assert result.groupings[0].ids == [0, 1, 0, 1, 2]
+    assert result.groupings is not ann.groupings
+    assert bopp.validate(result)
+

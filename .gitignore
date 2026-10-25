@@ -30,6 +30,7 @@ docs/api/generated/
 docs/api/generated_schema
 docs/_build/
 docs/_static/
+_site/
 
 # IDEs / editors
 *.swp

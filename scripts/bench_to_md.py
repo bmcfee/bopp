@@ -2,6 +2,7 @@
 # render_md.py
 
 import json
+
 import pandas as pd
 
 with open("benchmark.json") as f:

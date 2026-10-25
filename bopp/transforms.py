@@ -286,6 +286,7 @@ def _rebuild_converted_extent(
         sandbox=sandbox,
         payload=copy.deepcopy(annotation.payload),  # type: ignore[attr-defined]
         confidence=copy.deepcopy(getattr(annotation, "confidence", msgspec.UNSET)),
+        groupings=copy.deepcopy(getattr(annotation, "groupings", msgspec.UNSET)),
         extent=extent_cls(**columns),
         metadata=DerivedAnnotationMetadata(transform=transform, parameters=parameters),
     )

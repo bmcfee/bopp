@@ -107,7 +107,7 @@ def test_trim_score_float_matches_time(interval, strict, reset):
     ann = bopp.create(extent_kind=tag, quarter=positions, **common)
     timed = bopp.create(extent_kind="time_interval" if interval else "time", time=positions, **common)
     original = copy.deepcopy(ann)
-    bounds = dict(start=0.5, end=1.5, strict=strict, reset=reset)
+    bounds = {"start": 0.5, "end": 1.5, "strict": strict, "reset": reset}
     actual = bopp.trim(ann, **bounds)
     expected = bopp.trim(timed, **bounds)
     assert actual.extent.quarter == expected.extent.time
