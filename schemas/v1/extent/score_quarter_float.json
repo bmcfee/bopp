@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extents/score_quarter_float.json",
+  "$id": "extent/score_quarter_float.json",
   "title": "Score quarter notes (float)",
   "type": "object",
   "properties": {
