@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extents/time_interval.json",
+  "$id": "extent/time_interval.json",
   "title": "Time Interval Extent",
   "type": "object",
   "properties": {

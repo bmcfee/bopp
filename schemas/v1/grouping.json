@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "v1/grouping.json",
+  "$id": "grouping.json",
   "title": "Grouping",
   "type": "object",
   "properties": {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extents/pixel_box.json",
+  "$id": "extent/pixel_box.json",
   "title": "Pixel Box Extent",
   "type": "object",
   "properties": {

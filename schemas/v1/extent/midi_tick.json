@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extents/midi_tick.json",
+  "$id": "extent/midi_tick.json",
   "title": "MIDI Ticks",
   "type": "object",
   "properties": {
