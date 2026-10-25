@@ -13,11 +13,11 @@ from .payload import (
     ext,
     key_mode,
     lyrics,
+    marker,
     mood_thayer,
     note_hz,
     note_midi,
     object,
-    onset,
     pitch_contour_hz,
     relation,
     segment_multi,
@@ -36,7 +36,7 @@ type AnyPayload = Annotated[
     | note_midi.NoteMidiPayload
     | object.ObjectPayload
     | ext.ExtensionPayload
-    | onset.OnsetPayload
+    | marker.MarkerPayload
     | pitch_contour_hz.PitchContourPayload
     | relation.RelationPayload
     | segment_multi.MultiSegmentPayload

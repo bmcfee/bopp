@@ -13,7 +13,7 @@
     { "$ref": "payload/note_midi.json" },
     { "$ref": "payload/object.json" },
     { "$ref": "payload/ext.json" },
-    { "$ref": "payload/onset.json" },
+    { "$ref": "payload/marker.json" },
     { "$ref": "payload/pitch_contour_hz.json" },
     { "$ref": "payload/relation.json" },
     { "$ref": "payload/segment_multi.json" },
