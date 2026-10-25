@@ -1795,7 +1795,7 @@ def test_filter_by_fraction_extent():
 def test_filter_by_all_name_collision():
     ann = create(
         media_id="track:1",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.0, 1.0],
         value=[1, 1],
@@ -2040,4 +2040,25 @@ def test_score_conversion_preserves_groupings(name, source, target, kwargs):
     assert result.groupings[0].ids == [0, 1, 0, 1, 2]
     assert result.groupings is not ann.groupings
     assert bopp.validate(result)
+
+
+def test_marker_payload_transforms():
+    ann = create(
+        media_id="track:marker_test",
+        payload_kind="marker",
+        extent_kind="time",
+        time=[0.1, 0.5, 1.0, 2.0],
+        description="cues",
+    )
+    trimmed = trim(ann, start=0.4, end=1.5)
+    assert trimmed.extent.time == [0.5, 1.0]
+    assert trimmed.payload.description == "cues"
+
+    filtered = filter_by(ann, lambda t: t > 0.5, facet="extent", target="time")
+    assert filtered.extent.time == [1.0, 2.0]
+    assert filtered.payload.description == "cues"
+
+    resampled = to_times(ann, times=[0.0, 0.5, 1.5], method="nearest")
+    assert resampled.extent.time == [0.0, 0.5, 1.5]
+    assert resampled.payload.description == "cues"
 

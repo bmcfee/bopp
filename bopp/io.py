@@ -638,7 +638,18 @@ def load_bopp_csv(
             f = io.StringIO(remaining)
 
         # 2. Hand the open file pointer to Polars or Pandas
-        if backend == "polars":
+        if not header_line.strip():
+            if backend == "polars":
+                df = pl.DataFrame()
+            elif backend == "pandas":
+                try:
+                    import pandas as pd
+                except ImportError as err:
+                    raise BoppIOError("pandas is required for backend='pandas'") from err
+                df = pd.DataFrame()
+            else:
+                raise BoppArgumentError(f"Unsupported backend: {backend}")
+        elif backend == "polars":
             schema, complex_columns = _build_polars_csv_schema(
                 header_line, bopp_version
             )

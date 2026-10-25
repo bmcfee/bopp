@@ -23,7 +23,8 @@ from bopp.exceptions import (
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.grouping import Grouping
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
-from bopp.models.v1.payload.onset import OnsetPayload
+from bopp.models.v1.payload.beat import BeatPositionPayload
+from bopp.models.v1.payload.marker import MarkerPayload
 
 
 class DummyStruct(msgspec.Struct):
@@ -42,14 +43,15 @@ def test_create_minimal():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=[0.1, 0.5],
-        value=[1, 1],
+        description="onset",
     )
     assert isinstance(ann, Annotation)
     assert ann.media_id == "audio:123"
-    assert ann.payload.__struct_config__.tag == "onset"
+    assert ann.payload.__struct_config__.tag == "marker"
+    assert ann.payload.description == "onset"
     assert getattr(ann, "id", None) is not None
     val = uuid.UUID(ann.id)
     assert val.version == 5
@@ -59,10 +61,10 @@ def test_create_generate_id_false():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=[0.1, 0.5],
-        value=[1, 1],
+        description="onset",
         generate_id=False,
     )
     assert getattr(ann, "id", msgspec.UNSET) is msgspec.UNSET
@@ -72,11 +74,11 @@ def test_create_full():
     ann = create(
         bopp_version="1.0",
         media_id="audio:456",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         confidence_kind="likelihood",
         time=[0.1, 0.5],
-        value=[1, 1],
+        description="onset",
         confidence=[0.9, 0.95],
         sandbox={"custom_key": "custom_value", "notes": [1, 2, 3]},
     )
@@ -91,10 +93,10 @@ def test_uuid5_idempotence_and_mutation():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=[0.1, 0.5],
-        value=[1, 1],
+        description="onset",
     )
     initial_id = ann.id
 
@@ -103,7 +105,7 @@ def test_uuid5_idempotence_and_mutation():
     assert validate_annotation_id(ann) is True
 
     # Mutate payload and verify failure when validate_annotation_id checks the existing ID
-    ann.payload.value = [1, 2]
+    ann.payload.description = "modified_onset"
     with pytest.raises(BoppValidationError, match="Annotation ID mismatch"):
         validate_annotation_id(ann)
 
@@ -112,10 +114,10 @@ def test_validate_annotation_id_missing():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=[0.1, 0.5],
-        value=[1, 1],
+        description="onset",
         generate_id=False,
     )
     assert validate_annotation_id(ann) is False
@@ -126,10 +128,10 @@ def test_create_with_parents():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=[0.1],
-        value=[1],
+        description="onset",
         parents=[parent_id],
     )
     assert getattr(ann, "parents", None) == [parent_id]
@@ -145,10 +147,10 @@ def test_create_invalid_extent_kind():
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="onset",
+            payload_kind="marker",
             extent_kind="non_existent_extent",
             time=[0.1],
-            value=[1],
+            description="onset",
         )
 
 
@@ -157,10 +159,9 @@ def test_create_invalid_confidence_kind():
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="onset",
+            payload_kind="marker",
             confidence_kind="non_existent_conf",
-            time=[0.1],
-            value=[1],
+            description="onset",
         )
 
 
@@ -169,9 +170,8 @@ def test_create_unconsumed_kwargs():
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="onset",
-            time=[0.1],
-            value=[1],
+            payload_kind="marker",
+            description="onset",
             unused_param="invalid",
         )
 
@@ -181,7 +181,7 @@ def test_create_mismatched_array_lengths():
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="onset",
+            payload_kind="beat",
             extent_kind="time",
             time=[0.1, 0.5],
             value=[1],
@@ -192,10 +192,10 @@ def test_validate_struct():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=[0.1],
-        value=[1],
+        description="onset",
         sandbox={"experiment_id": "exp-42"},
     )
     assert validate(ann) is True
@@ -205,7 +205,7 @@ def test_validate_dict():
     data = {
         "bopp_version": "1.0",
         "media_id": "audio:123",
-        "payload": {"payload_type": "onset", "time": [0.1], "value": [1]},
+        "payload": {"payload_type": "marker", "description": "onset"},
         "sandbox": {"experiment_id": "exp-42"},
     }
     assert validate(data, target_type=Annotation) is True
@@ -220,7 +220,7 @@ def test_validate_invalid_data():
     invalid_data = {
         "bopp_version": "v1",
         "media_id": "audio:123",
-        "payload": {"payload_type": "onset", "time": "not_a_list", "value": [1]},
+        "payload": {"payload_type": "marker", "description": 123},
     }
     with pytest.raises(BoppValidationError, match="Validation failed"):
         validate(invalid_data, target_type=Annotation)
@@ -230,10 +230,10 @@ def test_repr_mimebundle():
     ann = create(
         bopp_version="1.0",
         media_id="audio:repr_test",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=[0.25, 0.75],
-        value=[1, 1],
+        description="onset",
     )
 
     bundle = ann._repr_mimebundle_()
@@ -310,12 +310,12 @@ def test_grouping_non_list_ids_ignored_in_root_lengths():
 
     class CustomAnnotation(BoppBase):
         media_id: str
-        payload: OnsetPayload
+        payload: BeatPositionPayload
         groupings: list[Any]
 
     ann = CustomAnnotation(
         media_id="audio:1",
-        payload=OnsetPayload(value=[1, 2]),
+        payload=BeatPositionPayload(value=[1, 2]),
         groupings=[CustomGrouping(name="test", ids=None)],
     )
     assert ann.media_id == "audio:1"
@@ -343,7 +343,7 @@ def test_duplicate_grouping_names_raises():
             media_id="audio:1",
             bopp_version="1.0.0",
             metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
-            payload=OnsetPayload(value=[1, 1]),
+            payload=MarkerPayload(description="test"),
             groupings=[
                 Grouping(name="sections", ids=[0, 1]),
                 Grouping(name="sections", ids=[1, 0]),
@@ -355,11 +355,11 @@ def test_create_with_metadata_and_groupings():
     # 1. metadata_kind + kwargs
     ann1 = create(
         media_id="audio:1",
-        payload_kind="onset",
+        payload_kind="marker",
         metadata_kind="human",
         annotator_id="user_1",
         tool="sonic-visualiser",
-        value=[1, 1],
+        description="beats",
         groupings=[Grouping(name="beats", ids=[0, 1])],
     )
     assert isinstance(ann1.metadata, HumanAnnotationMetadata)
@@ -371,10 +371,10 @@ def test_create_with_metadata_and_groupings():
     # 2. metadata as dict + groupings as list of dicts
     ann2 = create(
         media_id="audio:1",
-        payload_kind="onset",
+        payload_kind="marker",
         metadata={"metadata_type": "human", "annotator_id": "user_2", "tool": "audacity"},
         groupings=[{"name": "sections", "ids": [0, 1], "labels": {"a": 0, "b": 1}}],
-        value=[1, 1],
+        description="sections",
     )
     assert isinstance(ann2.metadata, HumanAnnotationMetadata)
     assert ann2.metadata.annotator_id == "user_2"
@@ -384,9 +384,9 @@ def test_create_with_metadata_and_groupings():
     # 3. metadata as struct instance
     ann3 = create(
         media_id="audio:1",
-        payload_kind="onset",
+        payload_kind="marker",
         metadata=HumanAnnotationMetadata(annotator_id="user_3", tool="manual"),
-        value=[1, 1],
+        description="manual",
     )
     assert ann3.metadata.annotator_id == "user_3"
 
@@ -395,25 +395,37 @@ def test_create_metadata_errors():
     with pytest.raises(BoppArgumentError, match="Cannot specify both 'metadata' and 'metadata_kind'"):
         create(
             media_id="audio:1",
-            payload_kind="onset",
+            payload_kind="marker",
             metadata_kind="human",
             metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
-            value=[1],
+            description="test",
         )
 
     with pytest.raises(BoppRegistryError, match="Unrecognized metadata kind: 'nonexistent'"):
         create(
             media_id="audio:1",
-            payload_kind="onset",
+            payload_kind="marker",
             metadata_kind="nonexistent",
-            value=[1],
+            description="test",
         )
 
     with pytest.raises(BoppRegistryError, match="Unrecognized metadata kind: 'bad_type'"):
         create(
             media_id="audio:1",
-            payload_kind="onset",
+            payload_kind="marker",
             metadata={"metadata_type": "bad_type"},
-            value=[1],
+            description="test",
         )
+
+
+def test_create_marker_payload_without_extent():
+    ann = create(
+        bopp_version="1.0",
+        media_id="audio:global_marker",
+        payload_kind="marker",
+        description="global_event",
+    )
+    assert ann.payload.description == "global_event"
+    assert ann.extent is msgspec.UNSET
+    assert validate(ann) is True
 

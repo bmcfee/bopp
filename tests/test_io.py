@@ -28,7 +28,7 @@ from bopp.io import (
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.times import Times
 from bopp.models.v1.grouping import Grouping
-from bopp.models.v1.payload.onset import OnsetPayload
+from bopp.models.v1.payload.beat import BeatPositionPayload
 from bopp.util import _get_tag, from_dataframe
 
 
@@ -36,7 +36,7 @@ def test_json_roundtrip(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:json_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1, 0.5, 1.2],
         value=[1, 1, 1],
@@ -56,7 +56,7 @@ def test_json_stream_and_string_io():
     ann = create(
         bopp_version="1.0",
         media_id="track:json_stream_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1, 0.5],
         value=[1, 1],
@@ -94,7 +94,7 @@ def test_msgpack_stream_and_bytes_io():
     ann = create(
         bopp_version="1.0",
         media_id="track:msgpack_stream_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.2, 0.6],
         value=[1, 1],
@@ -119,7 +119,7 @@ def test_csv_stream_and_string_io():
     ann = create(
         bopp_version="1.0",
         media_id="track:csv_stream_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1, 0.4],
         value=[1, 1],
@@ -149,7 +149,7 @@ def test_csv_stream_and_string_io():
 
 def test_load_bopp_json_missing_id(tmp_path):
     # Valid JSON without an 'id' field
-    json_data = '{"bopp_version": "1.0", "media_id": "track:123", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+    json_data = '{"bopp_version": "1.0", "media_id": "track:123", "payload": {"payload_type": "beat", "time": [0.1], "value": [1]}}'
     file_path = tmp_path / "missing_id.json"
     file_path.write_text(json_data, encoding="utf-8")
 
@@ -160,7 +160,7 @@ def test_load_bopp_json_missing_id(tmp_path):
 def test_load_bopp_json_mismatched_id_error(tmp_path):
     # Valid UUID string format to pass msgspec schema validation, but computed ID mismatch
     invalid_uuid = "00000000-0000-5000-8000-000000000000"
-    json_data = f'{{"bopp_version": "1.0", "media_id": "track:123", "id": "{invalid_uuid}", "payload": {{"payload_type": "onset", "time": [0.1], "value": [1]}}}}'
+    json_data = f'{{"bopp_version": "1.0", "media_id": "track:123", "id": "{invalid_uuid}", "payload": {{"payload_type": "beat", "time": [0.1], "value": [1]}}}}'
     file_path = tmp_path / "mismatched_id.json"
     file_path.write_text(json_data, encoding="utf-8")
 
@@ -170,7 +170,7 @@ def test_load_bopp_json_mismatched_id_error(tmp_path):
 
 def test_load_bopp_json_invalid_schema(tmp_path):
     # Valid JSON but invalid structure (missing required 'media_id')
-    invalid_json_data = '{"bopp_version": "1.0", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+    invalid_json_data = '{"bopp_version": "1.0", "payload": {"payload_type": "beat", "time": [0.1], "value": [1]}}'
     file_path = tmp_path / "invalid.json"
     file_path.write_text(invalid_json_data, encoding="utf-8")
 
@@ -182,7 +182,7 @@ def test_msgpack_roundtrip(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:msgpack_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.3, 0.7],
         value=[1, 1],
@@ -213,7 +213,7 @@ def test_csv_roundtrip(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:csv_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1, 0.4],
         value=[1, 1],
@@ -235,7 +235,7 @@ def test_csv_roundtrip_with_groupings(tmp_path):
         media_id="track:csv_groupings",
         bopp_version="1.0",
         extent=Times(time=[0.1, 0.4]),
-        payload=OnsetPayload(value=[1, 2]),
+        payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
             Grouping(name="voices", ids=[0, 1], labels={"v1": 0, "v2": 1}),
             Grouping(name="phrases", ids=[10, 10]),
@@ -260,7 +260,7 @@ def test_csv_roundtrip_with_groupings_pandas(tmp_path):
         media_id="track:csv_groupings_pd",
         bopp_version="1.0",
         extent=Times(time=[0.1, 0.4]),
-        payload=OnsetPayload(value=[1, 2]),
+        payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
             Grouping(name="voices", ids=[0, 1]),
         ],
@@ -375,7 +375,7 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"payload_kind": "onset", "extent_kind": "time", "time": [0, 1.5], "value": ["a", "b"]},
+        {"payload_kind": "marker", "extent_kind": "time", "time": [0, 1.5], "description": "marker_events"},
         {
             "payload_kind": "tag_open",
             "extent_kind": "time_interval",
@@ -488,7 +488,7 @@ def test_load_bopp_csv_invalid_schema(tmp_path):
         '# bopp_version = "1.0"\n'
         '# media_id = "track:csv_invalid"\n'
         "# ---\n"
-        "payload:onset:nonsense,extent:time:time\n"
+        "payload:beat:nonsense,extent:time:time\n"
         "1,0.1\n"
     )
     file_path = tmp_path / "invalid.csv"
@@ -502,7 +502,7 @@ def test_csv_column_validation_rules():
     header = {"media_id": "track:col_rules", "bopp_version": "1.0"}
 
     # Rule 1: Column format does not have 3 colon-separated parts or group.N.ids
-    df_invalid_format = pd.DataFrame({"payload:onset": [1, 2]})
+    df_invalid_format = pd.DataFrame({"payload:beat": [1, 2]})
     with pytest.raises(BoppValidationError, match="Invalid column format"):
         from_dataframe(df_invalid_format, header)
 
@@ -510,7 +510,7 @@ def test_csv_column_validation_rules():
     df_mixed_types = pd.DataFrame({
         "extent:time:time": [0.1, 0.2],
         "extent:time_interval:start": [0.1, 0.2],
-        "payload:onset:value": [1, 1],
+        "payload:beat:value": [1, 1],
     })
     with pytest.raises(BoppValidationError, match="Mixed types for facet 'extent'"):
         from_dataframe(df_mixed_types, header)
@@ -524,7 +524,7 @@ def test_csv_column_validation_rules():
 
     # Rule 4: Field does not exist on target type struct
     df_invalid_field = pd.DataFrame({
-        "payload:onset:invalid_field_name": [1, 2]
+        "payload:beat:invalid_field_name": [1, 2]
     })
     with pytest.raises(BoppValidationError, match="Field 'invalid_field_name' in column .* does not exist"):
         from_dataframe(df_invalid_field, header)
@@ -534,7 +534,7 @@ def test_save_and_load_with_validate_id_false(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:no_id_val",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1],
         value=[1],
@@ -562,7 +562,7 @@ def test_save_bopp_csv_pandas(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:pandas_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1],
         value=[1],
@@ -575,7 +575,7 @@ def test_save_bopp_csv_pandas(tmp_path):
 
 def test_load_bopp_csv_without_frontmatter(tmp_path):
     # Test handling of legacy or unfrontmattered CSV files
-    csv_content = "payload:onset:value,extent:time:time\n1,0.1\n"
+    csv_content = "payload:beat:value,extent:time:time\n1,0.1\n"
     file_path = tmp_path / "no_frontmatter.csv"
     file_path.write_text(csv_content, encoding="utf-8")
 
@@ -606,7 +606,7 @@ def test_load_bopp_csv_non_target_columns(tmp_path):
         '# bopp_version = "1.0"\n'
         '# media_id = "track:extra_col"\n'
         "# ---\n"
-        "payload:onset:value,extent:time:time\n"
+        "payload:beat:value,extent:time:time\n"
         "1,0.1\n"
     )
     file_path = tmp_path / "extra_col.csv"
@@ -623,7 +623,7 @@ def test_load_bopp_csv_crlf_newlines(tmp_path):
         b'# bopp_version = "1.0"\r\n'
         b'# media_id = "track:crlf_test"\r\n'
         b"# ---\r\n"
-        b"payload:onset:value,extent:time:time\r\n"
+        b"payload:beat:value,extent:time:time\r\n"
         b"1,0.1\r\n"
         b"2,0.5\r\n"
     )
@@ -660,14 +660,14 @@ def test_build_csv_converters_error_and_edge_cases():
     assert _build_csv_converters("", "1.0") == {}
 
     # Unknown schema version safely yields no converters
-    assert _build_csv_converters("payload:onset:value", "nonexistent_version") == {}
+    assert _build_csv_converters("payload:beat:value", "nonexistent_version") == {}
 
     # Columns that are malformed, outside recognized facets, or missing fields are ignored
     header = (
         "not_three_parts,"
         "unknown_facet:foo:bar,"
         "payload:nonexistent_tag:value,"
-        "payload:onset:missing_field"
+        "payload:beat:missing_field"
     )
     assert _build_csv_converters(header, "1.0") == {}
 
@@ -680,7 +680,7 @@ def test_prepare_annotation_for_save_id_variations():
     ann = create(
         bopp_version="1.0",
         media_id="track:save_id_test",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1],
         value=[1],
@@ -701,7 +701,7 @@ def test_prepare_annotation_for_save_id_variations():
     ann_no_id = create(
         bopp_version="1.0",
         media_id="track:save_id_test2",
-        payload_kind="onset",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.2],
         value=[2],
@@ -725,7 +725,7 @@ def test_read_bytes_from_source_invalid():
 
 
 def test_read_bytes_from_source_buffer_types():
-    data = b'{"bopp_version": "1.0", "media_id": "track:buf_test", "payload": {"payload_type": "onset", "time": [0.1], "value": [1]}}'
+    data = b'{"bopp_version": "1.0", "media_id": "track:buf_test", "payload": {"payload_type": "beat", "time": [0.1], "value": [1]}}'
 
     # bytearray
     loaded_bytearray = load_bopp_json(bytearray(data), validate_id=False)
@@ -783,7 +783,7 @@ def test_load_bopp_csv_non_seekable_stream():
         '# bopp_version = "1.0"\n'
         '# media_id = "track:non_seekable"\n'
         "# ---\n"
-        "payload:onset:value,extent:time:time\n"
+        "payload:beat:value,extent:time:time\n"
         "1,0.1\n"
         "2,0.5\n"
     )
@@ -802,7 +802,7 @@ def test_load_bopp_csv_unsupported_backend():
         '# bopp_version = "1.0"\n'
         '# media_id = "track:invalid_backend"\n'
         "# ---\n"
-        "payload:onset:value,extent:time:time\n"
+        "payload:beat:value,extent:time:time\n"
         "1,0.1\n"
     )
     with pytest.raises(BoppArgumentError, match="Unsupported backend: unknown"):
@@ -815,7 +815,7 @@ def test_load_bopp_csv_pandas_missing():
         '# bopp_version = "1.0"\n'
         '# media_id = "track:pandas_missing"\n'
         "# ---\n"
-        "payload:onset:value,extent:time:time\n"
+        "payload:beat:value,extent:time:time\n"
         "1,0.1\n"
     )
     real_import = builtins.__import__
@@ -830,3 +830,40 @@ def test_load_bopp_csv_pandas_missing():
         pytest.raises(BoppIOError, match="pandas is required for backend='pandas'"),
     ):
         load_bopp_csv(io.StringIO(csv_content), backend="pandas")
+
+
+def test_csv_roundtrip_marker_payload(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:marker_csv",
+        payload_kind="marker",
+        extent_kind="time",
+        time=[0.1, 0.5, 1.2],
+        description="cues",
+        sandbox={"note": "marker_roundtrip"},
+    )
+    for backend in ("polars", "pandas"):
+        file_path = tmp_path / f"marker_{backend}.csv"
+        save_bopp_csv(ann, file_path, backend=backend)
+        loaded = load_bopp_csv(file_path, backend=backend)
+        assert loaded.media_id == ann.media_id
+        assert loaded.payload.description == "cues"
+        assert loaded.extent.time == [0.1, 0.5, 1.2]
+        assert loaded.id == ann.id
+
+
+def test_csv_roundtrip_marker_payload_without_extent(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:marker_no_extent",
+        payload_kind="marker",
+        description="global_label",
+    )
+    for backend in ("polars", "pandas"):
+        file_path = tmp_path / f"marker_no_extent_{backend}.csv"
+        save_bopp_csv(ann, file_path, backend=backend)
+        loaded = load_bopp_csv(file_path, backend=backend)
+        assert loaded.media_id == ann.media_id
+        assert loaded.payload.description == "global_label"
+        assert loaded.extent is msgspec.UNSET
+        assert loaded.id == ann.id

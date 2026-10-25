@@ -39,19 +39,19 @@ BOPP annotations include automatic identification and provenance tracking:
 >>> # Create a parent annotation
 >>> parent_ann = bopp.create(
 ...     media_id="track:123",
-...     payload_kind="onset",
+...     payload_kind="marker",
 ...     extent_kind="time",
 ...     time=[0.1, 0.5, 0.9],
-...     value=[1, 1, 1],
+...     description="onset",
 ... )
 
 >>> bopp.ensure_annotation_id(parent_ann)
-'d9a1b46c-38d5-56bc-aacb-0e8641382d1a'
+'e088e4cb-06d8-591c-b3fb-d11fa81263b5'
 
 >>> child_ann = bopp.transforms.trim(parent_ann, start=0.25)
 
 >>> print(child_ann.parents)
-['d9a1b46c-38d5-56bc-aacb-0e8641382d1a']
+['e088e4cb-06d8-591c-b3fb-d11fa81263b5']
 
 >>> print(child_ann.id)
 a9be57d4-7f27-5d84-9e9b-b365112921af

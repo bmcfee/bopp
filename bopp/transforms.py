@@ -795,7 +795,7 @@ def filter_by(
 
     # Determine number of observations from any available facet column
     n_obs = 0
-    all_facets_cols = [payload_cols, extent_cols, confidence_cols, groupings_cols]
+    all_facets_cols = [extent_cols, payload_cols, confidence_cols, groupings_cols]
     for cols in all_facets_cols:
         if cols:
             first_col = next(iter(cols.values()))

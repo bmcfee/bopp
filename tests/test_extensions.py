@@ -303,8 +303,8 @@ def test_resolve_extensions_none_or_unset_payload():
 def test_resolve_extensions_non_extension_payload():
     ann = create(
         bopp_version="1.0",
-        media_id="track:onset_test",
-        payload_kind="onset",
+        media_id="track:beat_test",
+        payload_kind="beat",
         extent_kind="time",
         time=[0.1],
         value=[1],

@@ -323,6 +323,7 @@ def _extract_facet_data(
     type_field_name = f"{facet_name}_type"
 
     facet_attrs: dict[str, Any] = {}
+    has_list_fields = False
 
     for field in msgspec.structs.fields(type(struct)):
         if field.name == type_field_name:
@@ -332,6 +333,7 @@ def _extract_facet_data(
             continue
 
         if isinstance(val, list):
+            has_list_fields = True
             col_key = f"{facet_name}:{tag}:{field.name}"
             is_complex = False
             if encode_complex:
@@ -358,6 +360,9 @@ def _extract_facet_data(
                 column_types[col_key] = (field.type, is_complex)
         else:
             facet_attrs[field.name] = msgspec.to_builtins(val)
+
+    if not has_list_fields and tag is not None:
+        facet_attrs[type_field_name] = tag
 
     if facet_attrs:
         attrs_dict[facet_name] = facet_attrs
@@ -402,13 +407,13 @@ def to_dataframe(
     >>> from bopp.models.v1.annotation import Annotation
     >>> ann = Annotation(
     ...     media_id="audio:123",
-    ...     payload={"payload_type": "onset", "value": [1, 2]}
+    ...     payload={"payload_type": "beat", "value": [1.0, 2.0]}
     ... )
     >>> df, header = to_dataframe(ann, backend="pandas")
     >>> header["media_id"]
     'audio:123'
     >>> df.columns.tolist()
-    ['payload:onset:value']
+    ['payload:beat:value']
 
     Accessing attributes via named fields:
 
@@ -611,14 +616,23 @@ def from_dataframe(
         return extractor() if extractor is not None else list(col_series)
 
     for facet, cols in grouped_cols.items():
+        facet_header = header.get(facet)
         if not cols:
+            if isinstance(facet_header, dict):
+                f_type = facet_header.get(f"{facet}_type")
+                if f_type is None and facet == "payload" and "description" in facet_header:
+                    f_type = "marker"
+                if f_type is not None:
+                    f_dict = dict(facet_header)
+                    f_dict[f"{facet}_type"] = f_type
+                    bopp_data[facet] = f_dict
             continue
 
         facet_type = cols[0][0]
         facet_dict: dict[str, Any] = {f"{facet}_type": facet_type}
 
-        if isinstance(header.get(facet), dict):
-            facet_dict.update(header[facet])
+        if isinstance(facet_header, dict):
+            facet_dict.update(facet_header)
 
         for _, field_name, full_col_name in cols:
             facet_dict[field_name] = _get_column_list(full_col_name)

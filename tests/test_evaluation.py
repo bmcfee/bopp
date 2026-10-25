@@ -34,17 +34,17 @@ def test_evaluate_onset():
 
     ref = create(
         media_id="audio",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=ref_times,
-        value=[1, 1, 1],
+        description="onset",
     )
     est = create(
         media_id="audio",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=est_times,
-        value=[1, 1, 1],
+        description="onset",
     )
 
     actual = evaluate(ref, est)
@@ -64,18 +64,18 @@ def test_evaluate_onset_from_time_interval():
 
     ref = create(
         media_id="audio",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time_interval",
         time=ref_times,
         duration=ref_durs,
-        value=[1, 1],
+        description="onset",
     )
     est = create(
         media_id="onset",
-        payload_kind="onset",
+        payload_kind="marker",
         extent_kind="time",
         time=est_times,
-        value=[1, 1],
+        description="onset",
     )
     actual = evaluate(ref, est, task="onset")
     assert actual == expected

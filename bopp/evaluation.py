@@ -228,7 +228,7 @@ TASK_DISPATCH = {
 
 # Payload tag to task mapping
 PAYLOAD_TASK_MAP = {
-    "onset": "onset",
+    "marker": "onset",
     "beat": "beat",
     "tempo": "tempo",
     "chord": "chord",
