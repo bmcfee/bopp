@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extent/score_quarter_float.json",
+  "title": "Score quarter notes (float)",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "score_quarter_float"
+    },
+    "quarter": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "An array of quarter values as floating-point numbers.",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["extent_type", "quarter"]
+}

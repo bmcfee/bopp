@@ -32,7 +32,15 @@ from .exceptions import (
     BoppValidationError,
 )
 from .extensions import resolve_extensions
-from .transforms import filter_by, to_times, trim
+from .transforms import (
+    filter_by,
+    to_score_interval,
+    to_score_interval_float,
+    to_score_quarter,
+    to_score_quarter_float,
+    to_times,
+    trim,
+)
 
 __all__ = [
     "DEFAULT_SCHEMA_VERSION",
@@ -56,6 +64,10 @@ __all__ = [
     "models",
     "registries",
     "resolve_extensions",
+    "to_score_interval",
+    "to_score_interval_float",
+    "to_score_quarter",
+    "to_score_quarter_float",
     "to_times",
     "transforms",
     "trim",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extents/time_frequency_box.json",
+  "$id": "extent/time_frequency_box.json",
   "title": "Time-Frequency Box Extent",
   "type": "object",
   "properties": {

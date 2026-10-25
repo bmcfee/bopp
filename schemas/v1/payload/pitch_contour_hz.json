@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "payload/pitch_contour.json",
+  "$id": "payload/pitch_contour_hz.json",
   "title": "Pitch_Contour Payload",
   "type": "object",
   "properties": {

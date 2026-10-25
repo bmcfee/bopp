@@ -14,6 +14,7 @@ from .core import ensure_annotation_id
 from .exceptions import BoppArgumentError, BoppValidationError
 from .models.v1.extent.times import Times
 from .models.v1.metadata.derived import DerivedAnnotationMetadata
+from .registries import get_registry
 from .util import _get_tag
 
 # Mapping default target_field when target_field is None
@@ -25,6 +26,8 @@ DEFAULT_TARGET_FIELDS: dict[str, str] = {
     "midi_interval": "tick",
     "score_quarter": "quarter",
     "score_interval": "quarter",
+    "score_quarter_float": "quarter",
+    "score_interval_float": "quarter",
 }
 
 # Axis structure definition: (extent_tag, target_field) -> (kind, origin_or_min, span_or_max)
@@ -40,12 +43,22 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("midi_interval", "tick"): ("origin_span", "tick", "duration"),
     ("score_quarter", "quarter"): ("point", "quarter", None),
     ("score_interval", "quarter"): ("origin_span", "quarter", "duration"),
+    ("score_quarter_float", "quarter"): ("point", "quarter", None),
+    ("score_interval_float", "quarter"): ("origin_span", "quarter", "duration"),
 }
 
 FRACTION_AXES: frozenset[tuple[str, str]] = frozenset({
     ("score_quarter", "quarter"),
     ("score_interval", "quarter"),
 })
+
+
+_SCORE_EXTENT_CONVERSIONS: dict[str, tuple[str, str]] = {
+    "to_score_quarter": ("score_quarter_float", "score_quarter"),
+    "to_score_interval": ("score_interval_float", "score_interval"),
+    "to_score_quarter_float": ("score_quarter", "score_quarter_float"),
+    "to_score_interval_float": ("score_interval", "score_interval_float"),
+}
 
 
 _TrimBound = int | float | Fraction | list[int] | tuple[int, int] | None
@@ -213,6 +226,193 @@ def _coerce_trim_bound(value: _TrimBound) -> float | Fraction | None:
 def _fraction_pair(value: Fraction) -> list[int]:
     """Encode a reduced fraction as a JSON-compatible pair."""
     return [value.numerator, value.denominator]
+
+
+def _conversion_extent(
+    annotation: BoppBase, transform: str, max_denominator: int | None = None,
+) -> BoppBase:
+    """Dispatch a score conversion after validating its source and parameters."""
+    source_tag, target_tag = _SCORE_EXTENT_CONVERSIONS[transform]
+    extent = getattr(annotation, "extent", msgspec.UNSET)
+    if extent is msgspec.UNSET or extent is None:
+        raise BoppArgumentError(f"{transform}: annotation has no extent; requires '{source_tag}'.")
+    tag = _get_tag(extent)
+    if tag != source_tag:
+        raise BoppArgumentError(f"{transform}: extent {tag!r} is unsupported; requires '{source_tag}'.")
+
+    fraction_target = source_tag.endswith("_float")
+    parameters: dict[str, Any] = {}
+    limit = 1
+    if fraction_target:
+        if not isinstance(max_denominator, int) or isinstance(max_denominator, bool):
+            raise BoppArgumentError(
+                f"{transform}: max_denominator must be an int (not a bool), got {max_denominator!r}."
+            )
+        if max_denominator < 1:
+            raise BoppArgumentError(
+                f"{transform}: max_denominator must be >= 1, got {max_denominator}."
+            )
+        limit = max_denominator
+        parameters["max_denominator"] = limit
+
+    columns: dict[str, list[Any]] = {}
+    for name, values in _get_facet_list_fields(extent).items():
+        if fraction_target:
+            columns[name] = []
+            for index, value in enumerate(values):
+                if not math.isfinite(value):
+                    raise BoppArgumentError(
+                        f"{transform}: field {name!r} at index {index} must be finite."
+                    )
+                columns[name].append(_fraction_pair(Fraction(value).limit_denominator(limit)))
+        else:
+            columns[name] = [numerator / denominator for numerator, denominator in values]
+    return _rebuild_converted_extent(annotation, target_tag, columns, transform, parameters)
+
+
+def _rebuild_converted_extent(
+    annotation: BoppBase,
+    target_tag: str,
+    columns: dict[str, list[Any]],
+    transform: str,
+    parameters: dict[str, Any],
+) -> BoppBase:
+    """Build a registered twin extent and derive an annotation around it."""
+    extent_cls = get_registry(annotation.bopp_version)["EXTENT_TYPE_REGISTRY"][target_tag]  # type: ignore[attr-defined]
+    parents, sandbox = _derive_parents_and_sandbox(annotation, "Converting")
+    return _rebuild_annotation(
+        annotation,
+        parents=parents,
+        sandbox=sandbox,
+        payload=copy.deepcopy(annotation.payload),  # type: ignore[attr-defined]
+        confidence=copy.deepcopy(getattr(annotation, "confidence", msgspec.UNSET)),
+        extent=extent_cls(**columns),
+        metadata=DerivedAnnotationMetadata(transform=transform, parameters=parameters),
+    )
+
+
+def to_score_quarter(annotation: BoppBase, *, max_denominator: int) -> BoppBase:
+    """
+    Convert a score_quarter_float extent to score_quarter.
+
+    Each finite coordinate in `quarter` becomes the nearest fraction
+    whose denominator does not exceed the bound, using
+    Fraction(value).limit_denominator(max_denominator). Approximation uses the
+    float's exact binary value: 1.1 becomes [6, 5] with a bound of 5 because
+    it lies slightly above the midpoint of 1 and 6/5. Results are reduced
+    [numerator, denominator] lists with positive denominators.
+    The source is unchanged; the derived annotation copies payload, confidence,
+    and sandbox, records parent lineage and conversion metadata, and recomputes its ID.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        Annotation with a score_quarter_float extent.
+    max_denominator : int
+        Required keyword-only positive denominator bound. Booleans are not accepted.
+
+    Returns
+    -------
+    BoppBase
+        A derived annotation with a score_quarter extent and a new ID.
+
+    Raises
+    ------
+    BoppArgumentError
+        If the source extent is missing or is not score_quarter_float,
+        the denominator bound is not an int >= 1, or a coordinate is not finite.
+    """
+    return _conversion_extent(annotation, "to_score_quarter", max_denominator)
+
+
+def to_score_interval(annotation: BoppBase, *, max_denominator: int) -> BoppBase:
+    """
+    Convert a score_interval_float extent to score_interval.
+
+    Each finite coordinate in `quarter` and `duration` becomes the nearest fraction
+    whose denominator does not exceed the bound, using
+    Fraction(value).limit_denominator(max_denominator). Approximation uses the
+    float's exact binary value: 1.1 becomes [6, 5] with a bound of 5 because
+    it lies slightly above the midpoint of 1 and 6/5. Results are reduced
+    [numerator, denominator] lists with positive denominators.
+    The source is unchanged; the derived annotation copies payload, confidence,
+    and sandbox, records parent lineage and conversion metadata, and recomputes its ID.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        Annotation with a score_interval_float extent.
+    max_denominator : int
+        Required keyword-only positive denominator bound. Booleans are not accepted.
+
+    Returns
+    -------
+    BoppBase
+        A derived annotation with a score_interval extent and a new ID.
+
+    Raises
+    ------
+    BoppArgumentError
+        If the source extent is missing or is not score_interval_float,
+        the denominator bound is not an int >= 1, or a coordinate is not finite.
+    """
+    return _conversion_extent(annotation, "to_score_interval", max_denominator)
+
+
+def to_score_quarter_float(annotation: BoppBase) -> BoppBase:
+    """
+    Convert a score_quarter extent to score_quarter_float.
+
+    Each [numerator, denominator] list or tuple in `quarter` becomes
+    a float via true division. The result is exact when representable as a double
+    and otherwise correctly rounded to the nearest double.
+    The source is unchanged; the derived annotation copies payload, confidence,
+    and sandbox, records parent lineage and conversion metadata, and recomputes its ID.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        Annotation with a score_quarter extent.
+
+    Returns
+    -------
+    BoppBase
+        A derived annotation with a score_quarter_float extent and a new ID.
+
+    Raises
+    ------
+    BoppArgumentError
+        If the source extent is missing or is not score_quarter.
+    """
+    return _conversion_extent(annotation, "to_score_quarter_float")
+
+
+def to_score_interval_float(annotation: BoppBase) -> BoppBase:
+    """
+    Convert a score_interval extent to score_interval_float.
+
+    Each [numerator, denominator] list or tuple in `quarter` and `duration` becomes
+    a float via true division. The result is exact when representable as a double
+    and otherwise correctly rounded to the nearest double.
+    The source is unchanged; the derived annotation copies payload, confidence,
+    and sandbox, records parent lineage and conversion metadata, and recomputes its ID.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        Annotation with a score_interval extent.
+
+    Returns
+    -------
+    BoppBase
+        A derived annotation with a score_interval_float extent and a new ID.
+
+    Raises
+    ------
+    BoppArgumentError
+        If the source extent is missing or is not score_interval.
+    """
+    return _conversion_extent(annotation, "to_score_interval_float")
 
 
 def _trim_bound_parameter(

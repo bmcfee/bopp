@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "payload/relation",
+  "$id": "payload/relation.json",
   "title": "Relation Payload",
   "description": "Columnar payload defining relationships between works (covers, quotes, etc).",
   "type": "object",
