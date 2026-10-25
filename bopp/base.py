@@ -15,27 +15,29 @@ class BoppBase(msgspec.Struct):
     Dynamically validates parallel columnar arrays on the root Annotation node,
     safely ignoring sub-models.
     """
-    def __post_init__(self):
-        all_lengths = []
+    def __post_init__(self) -> None:
+        all_lengths: list[int] = []
 
-        extent_field = getattr(self, "extent", msgspec.UNSET)
-        if extent_field is not msgspec.UNSET and extent_field is not None:
-            extent_lengths = self._get_all_column_lengths(extent_field, "Extent")
-            all_lengths.extend(extent_lengths)
-
-        payload_field = getattr(self, "payload", msgspec.UNSET)
-        if payload_field is not msgspec.UNSET and payload_field is not None:
-            payload_lengths = self._get_all_column_lengths(payload_field, "Payload")
-            all_lengths.extend(payload_lengths)
-        
-        confidence_field = getattr(self, "confidence", msgspec.UNSET)
-        if confidence_field is not msgspec.UNSET and confidence_field is not None:
-            conf_lengths = self._get_all_column_lengths(confidence_field, "Confidence")
-            all_lengths.extend(conf_lengths)
+        for attr_name, label in (
+            ("extent", "Extent"),
+            ("payload", "Payload"),
+            ("confidence", "Confidence"),
+        ):
+            facet_field = getattr(self, attr_name, msgspec.UNSET)
+            if facet_field is not msgspec.UNSET and facet_field is not None:
+                all_lengths.extend(self._get_all_column_lengths(facet_field, label))
 
         groupings_field = getattr(self, "groupings", msgspec.UNSET)
         if groupings_field is not msgspec.UNSET and groupings_field is not None:
+            seen_names: set[str] = set()
             for g in groupings_field:
+                g_name = getattr(g, "name", None)
+                if isinstance(g_name, str):
+                    if g_name in seen_names:
+                        raise BoppValidationError(
+                            f"Annotation contains multiple groupings with the same name: '{g_name}'"
+                        )
+                    seen_names.add(g_name)
                 ids = getattr(g, "ids", None)
                 if isinstance(ids, list):
                     all_lengths.append(len(ids))
@@ -56,8 +58,8 @@ class BoppBase(msgspec.Struct):
         lengths = []
         for field in msgspec.structs.fields(type(facet_struct)):
             val = getattr(facet_struct, field.name)
-            
-            if isinstance(val, (list,)):
+
+            if isinstance(val, list):
                 lengths.append(len(val))
         
         if not lengths:
@@ -106,7 +108,7 @@ class GroupingBase(msgspec.Struct):
     if a label mapping is provided for group identifiers, and warn if non-negative
     group IDs are unmapped.
     """
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         labels = getattr(self, "labels", msgspec.UNSET)
         if labels is msgspec.UNSET or labels is None:
             return

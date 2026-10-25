@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import json
 import argparse
+import json
 from pathlib import Path
+
 
 def translate_jams_to_bopp(jams_path: str | Path, bopp_path: str | Path):
     """
@@ -12,7 +13,7 @@ def translate_jams_to_bopp(jams_path: str | Path, bopp_path: str | Path):
         jams_data = json.load(f)
         
     # 2. Extract the namespace key (e.g., 'chord') and its contents
-    namespace_key = list(jams_data.keys())[0]
+    namespace_key = next(iter(jams_data.keys()))
     jams_def = jams_data[namespace_key]
     
     # 3. Extract the value constraints and description

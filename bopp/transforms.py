@@ -10,7 +10,7 @@ from typing import Any, Literal
 import msgspec
 
 from .base import BoppBase
-from .core import validate_and_set_annotation_id
+from .core import ensure_annotation_id
 from .exceptions import BoppArgumentError, BoppValidationError
 from .models.v1.extent.times import Times
 from .models.v1.metadata.derived import DerivedAnnotationMetadata
@@ -79,16 +79,6 @@ class FilterRecord(dict):
         self[name] = value
 
 
-def _get_list_fields_with_length(struct: msgspec.Struct, expected_length: int) -> dict[str, list[Any]]:
-    """Return dictionary of field name -> list value for list fields matching expected_length."""
-    result = {}
-    for field in msgspec.structs.fields(type(struct)):
-        val = getattr(struct, field.name)
-        if isinstance(val, list) and len(val) == expected_length:
-            result[field.name] = val
-    return result
-
-
 def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]]:
     """Return dictionary of field name -> list value for all list fields in a struct."""
     if struct is None or struct is msgspec.UNSET:
@@ -149,14 +139,13 @@ def _rebuild_annotation(
         kwargs["groupings"] = groupings
 
     new_ann = msgspec.structs.replace(annotation, **kwargs)
-    validate_and_set_annotation_id(new_ann)
+    ensure_annotation_id(new_ann)
     return new_ann
 
 
 def _subset_struct_lists(
     struct: msgspec.Struct | Literal[msgspec.UnsetType.UNSET] | None,
     indices: list[int],
-    expected_length: int | None = None,
     overrides: dict[str, list[Any]] | None = None,
 ) -> msgspec.Struct | Literal[msgspec.UnsetType.UNSET] | None:
     """Subset list fields of a struct using indices, applying optional pre-computed overrides."""
@@ -164,11 +153,7 @@ def _subset_struct_lists(
         return struct
 
     updates: dict[str, list[Any]] = dict(overrides) if overrides else {}
-    list_fields = (
-        _get_list_fields_with_length(struct, expected_length)
-        if expected_length is not None
-        else _get_facet_list_fields(struct)
-    )
+    list_fields = _get_facet_list_fields(struct)
 
     for fname, fval in list_fields.items():
         if fname not in updates:
@@ -223,13 +208,9 @@ def _resample_groupings(
 
     new_groupings = []
     for g in groupings:
-        ids = getattr(g, "ids", None)
-        if isinstance(ids, list):
-            fill_val = fill_map.get(getattr(g, "name", ""), -1)
-            new_ids = [fill_val if idx is None else ids[idx] for idx in matched_indices]
-            new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
-        else:
-            new_groupings.append(copy.deepcopy(g))
+        fill_val = fill_map.get(g.name, -1)
+        new_ids = [fill_val if idx is None else g.ids[idx] for idx in matched_indices]
+        new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
     return new_groupings
 
 
@@ -305,6 +286,7 @@ def _rebuild_converted_extent(
         sandbox=sandbox,
         payload=copy.deepcopy(annotation.payload),  # type: ignore[attr-defined]
         confidence=copy.deepcopy(getattr(annotation, "confidence", msgspec.UNSET)),
+        groupings=copy.deepcopy(getattr(annotation, "groupings", msgspec.UNSET)),
         extent=extent_cls(**columns),
         metadata=DerivedAnnotationMetadata(transform=transform, parameters=parameters),
     )
@@ -591,7 +573,6 @@ def trim(
         pos_vals = getattr(extent, field_a)
         if fraction_axis:
             pos_vals = [Fraction(*value) for value in pos_vals]
-        n_obs = len(pos_vals)
         new_pos = []
 
         for i, pos in enumerate(pos_vals):
@@ -610,7 +591,6 @@ def trim(
         if fraction_axis:
             origin_vals = [Fraction(*value) for value in origin_vals]
             span_vals = [Fraction(*value) for value in span_vals]
-        n_obs = len(origin_vals)
 
         new_origin: list[float | Fraction] = []
         new_span: list[float | Fraction] = []
@@ -642,7 +622,6 @@ def trim(
     elif kind == "min_max":
         min_vals = getattr(extent, field_a)
         max_vals = getattr(extent, field_b)  # type: ignore[arg-type]
-        n_obs = len(min_vals)
 
         new_min: list[float] = []
         new_max: list[float] = []
@@ -675,9 +654,9 @@ def trim(
             for field, values in extent_updates.items()
         }
 
-    new_extent = _subset_struct_lists(extent, kept_indices, n_obs, overrides=extent_updates)
-    new_payload = _subset_struct_lists(payload, kept_indices, n_obs)
-    new_confidence = _subset_struct_lists(confidence, kept_indices, n_obs)
+    new_extent = _subset_struct_lists(extent, kept_indices, overrides=extent_updates)
+    new_payload = _subset_struct_lists(payload, kept_indices)
+    new_confidence = _subset_struct_lists(confidence, kept_indices)
     new_groupings = _subset_groupings(groupings, kept_indices)
 
     return _rebuild_annotation(
@@ -836,36 +815,42 @@ def filter_by(
         )
 
     # Prepare input stream for predicate
-    kept_indices: list[int] = []
-
     if facet == "all":
         if target is not None:
             # Look for target across all facets
-            found_col = None
-            for cols in (payload_cols, extent_cols, confidence_cols, groupings_cols):
-                if target in cols:
-                    found_col = cols[target]
-                    break
-            if found_col is None:
+            matching_cols = [
+                cols[target]
+                for cols in (payload_cols, extent_cols, confidence_cols, groupings_cols)
+                if target in cols
+            ]
+            if not matching_cols:
                 raise BoppArgumentError(f"Target field '{target}' not found in any annotation facet.")
-            for i, val in enumerate(found_col):
-                if predicate(val):
-                    kept_indices.append(i)
+            if len(matching_cols) > 1:
+                raise BoppArgumentError(
+                    f"Ambiguous target field '{target}' found in multiple facets when facet='all'. "
+                    "Specify 'facet' explicitly."
+                )
+            stream: list[Any] = matching_cols[0]
         else:
-            for i in range(n_obs):
-                record_dict: dict[str, Any] = {}
-                for k, v in extent_cols.items():
-                    record_dict[k] = v[i]
-                for k, v in payload_cols.items():
-                    record_dict[k] = v[i]
-                for k, v in confidence_cols.items():
-                    record_dict[k] = v[i]
-                for k, v in groupings_cols.items():
-                    record_dict[k] = v[i]
-                record = FilterRecord(record_dict)
-                if predicate(record):
-                    kept_indices.append(i)
-
+            seen_keys: set[str] = set()
+            for cols in (extent_cols, payload_cols, confidence_cols, groupings_cols):
+                overlap = seen_keys.intersection(cols.keys())
+                if overlap:
+                    raise BoppArgumentError(
+                        f"Column name collision across facets for {sorted(overlap)} when facet='all'."
+                    )
+                seen_keys.update(cols.keys())
+            stream = [
+                FilterRecord(
+                    {
+                        **{k: v[i] for k, v in extent_cols.items()},
+                        **{k: v[i] for k, v in payload_cols.items()},
+                        **{k: v[i] for k, v in confidence_cols.items()},
+                        **{k: v[i] for k, v in groupings_cols.items()},
+                    }
+                )
+                for i in range(n_obs)
+            ]
     elif facet == "groupings":
         if not groupings_cols:
             raise BoppArgumentError("Facet 'groupings' is not present on annotation or contains no layers.")
@@ -875,22 +860,11 @@ def filter_by(
                 raise BoppArgumentError(
                     f"Target grouping '{target}' not found in facet 'groupings'. Available: {list(groupings_cols.keys())}"
                 )
-            target_list = groupings_cols[target]
-            for i, val in enumerate(target_list):
-                if predicate(val):
-                    kept_indices.append(i)
+            stream = groupings_cols[target]
+        elif len(groupings_cols) == 1:
+            stream = next(iter(groupings_cols.values()))
         else:
-            if len(groupings_cols) == 1:
-                target_list = next(iter(groupings_cols.values()))
-                for i, val in enumerate(target_list):
-                    if predicate(val):
-                        kept_indices.append(i)
-            else:
-                for i in range(n_obs):
-                    record = FilterRecord({k: v[i] for k, v in groupings_cols.items()})
-                    if predicate(record):
-                        kept_indices.append(i)
-
+            stream = [FilterRecord({k: v[i] for k, v in groupings_cols.items()}) for i in range(n_obs)]
     else:
         facet_struct_map = {
             "payload": (payload, payload_cols),
@@ -906,33 +880,21 @@ def filter_by(
                 raise BoppArgumentError(
                     f"Target field '{target}' not found in facet '{facet}'. Available: {list(cols.keys())}"
                 )
-            target_list = cols[target]
-            for i, val in enumerate(target_list):
-                if predicate(val):
-                    kept_indices.append(i)
+            stream = cols[target]
+        elif "value" in cols:
+            stream = cols["value"]
+        elif len(cols) == 1:
+            stream = next(iter(cols.values()))
         else:
-            # If there's a 'value' column or only 1 column, pass values directly
-            if "value" in cols:
-                target_list = cols["value"]
-                for i, val in enumerate(target_list):
-                    if predicate(val):
-                        kept_indices.append(i)
-            elif len(cols) == 1:
-                target_list = next(iter(cols.values()))
-                for i, val in enumerate(target_list):
-                    if predicate(val):
-                        kept_indices.append(i)
-            else:
-                # Multiple columns and no 'value' column: pass record
-                for i in range(n_obs):
-                    record = FilterRecord({k: v[i] for k, v in cols.items()})
-                    if predicate(record):
-                        kept_indices.append(i)
+            # Multiple columns and no 'value' column: pass record
+            stream = [FilterRecord({k: v[i] for k, v in cols.items()}) for i in range(n_obs)]
+
+    kept_indices = [i for i, item in enumerate(stream) if predicate(item)]
 
     # Update facets with kept indices
-    new_payload = _subset_struct_lists(payload, kept_indices, n_obs)
-    new_extent = _subset_struct_lists(extent, kept_indices, n_obs)
-    new_confidence = _subset_struct_lists(confidence, kept_indices, n_obs)
+    new_payload = _subset_struct_lists(payload, kept_indices)
+    new_extent = _subset_struct_lists(extent, kept_indices)
+    new_confidence = _subset_struct_lists(confidence, kept_indices)
     new_groupings = _subset_groupings(groupings, kept_indices)
 
     return _rebuild_annotation(
@@ -948,17 +910,16 @@ def filter_by(
 
 
 def _validate_fill_values(
-    struct_type: type[msgspec.Struct],
+    struct: msgspec.Struct,
     fill_map: dict[str, Any],
     facet_name: str,
 ) -> None:
     """Validate that fill values conform to the struct's field types."""
-    dummy_kwargs: dict[str, Any] = {}
-    for f in msgspec.structs.fields(struct_type):
-        if f.name in fill_map:
-            dummy_kwargs[f.name] = [fill_map[f.name]]
-        else:
-            dummy_kwargs[f.name] = []
+    struct_type = type(struct)
+    dummy_kwargs: dict[str, Any] = {
+        f.name: [fill_map[f.name]] if f.name in fill_map else getattr(struct, f.name)
+        for f in msgspec.structs.fields(struct_type)
+    }
     try:
         msgspec.convert(dummy_kwargs, struct_type)
     except Exception as exc:
@@ -1165,27 +1126,13 @@ def to_times(
                             f"Fill value for grouping '{g_name}' must be an integer, got {type(val).__name__}."
                         )
                     grouping_fill_map[g_name] = val
-                else:
-                    grouping_fill_map[g_name] = -1
     else:
-        if len(payload_cols) == 1:
-            col_name = next(iter(payload_cols.keys()))
-            payload_fill_map[col_name] = fill_value
-        elif len(payload_cols) > 1 and fill_value is not None:
+        if len(payload_cols) > 1 and fill_value is not None:
             raise BoppArgumentError(
                 "Multi-column payload requires fill_value to be a dict mapping field names to values."
             )
-        elif len(payload_cols) > 1:
-            # fill_value is None
-            for col_name in payload_cols:
-                payload_fill_map[col_name] = None
-
-        for col_name in confidence_cols:
-            confidence_fill_map[col_name] = 0.0
-
-        if groupings is not None and groupings is not msgspec.UNSET:
-            for g in groupings:
-                grouping_fill_map[getattr(g, "name", "")] = -1
+        payload_fill_map = dict.fromkeys(payload_cols, fill_value)
+        confidence_fill_map = dict.fromkeys(confidence_cols, 0.0)
 
     # Build sampling grid
     target_times: list[float]
@@ -1202,26 +1149,22 @@ def to_times(
             time_arr = extent.time  # type: ignore[union-attr]
             t_min = min(time_arr)
             t_max = max(time_arr)
-        elif extent_tag in ("time_interval", "time_frequency_box"):
+        else:
             time_arr = extent.time  # type: ignore[union-attr]
             dur_arr = extent.duration  # type: ignore[union-attr]
             t_min = min(time_arr)
             t_max = max(t + d for t, d in zip(time_arr, dur_arr))
-        else:
-            raise BoppArgumentError(f"Cannot determine bounds for extent '{extent_tag}'.")
 
         step = 1.0 / sample_rate
         # Calculate number of steps with float tolerance
         n_steps = math.floor((t_max - t_min) / step + 1e-9) + 1
         target_times = [t_min + i * step for i in range(n_steps)]
-        if target_times and target_times[-1] > t_max + 1e-9:
-            target_times.pop()
 
     # If target_times is empty, return empty times extent
     if not target_times:
         new_extent = Times(time=[])
-        new_payload = _subset_struct_lists(payload, [], n_source_obs)
-        new_confidence = _subset_struct_lists(confidence, [], n_source_obs)
+        new_payload = _subset_struct_lists(payload, [])
+        new_confidence = _subset_struct_lists(confidence, [])
         new_groupings = _subset_groupings(groupings, [])
 
         return _rebuild_annotation(
@@ -1235,42 +1178,17 @@ def to_times(
             groupings=new_groupings,
         )
 
-    # If source annotation has no observations
-    if n_source_obs == 0:
-        # Validate fill values since every query position will be a gap
-        _validate_fill_values(type(payload), payload_fill_map, "payload")
-        if confidence is not None and confidence is not msgspec.UNSET:
-            _validate_fill_values(type(confidence), confidence_fill_map, "confidence")
-
-        out_times = list(target_times)
-        empty_indices: list[int | None] = [None] * len(out_times)
-        new_payload = _resample_struct(payload, payload_cols, empty_indices, payload_fill_map)
-        new_confidence = _resample_struct(confidence, confidence_cols, empty_indices, confidence_fill_map)
-        new_groupings = _resample_groupings(groupings, empty_indices, grouping_fill_map)
-        new_extent = Times(time=out_times)
-
-        return _rebuild_annotation(
-            annotation,
-            parents=new_parents,
-            sandbox=new_sandbox,
-            metadata=derived_metadata,
-            extent=new_extent,
-            payload=new_payload,  # type: ignore[arg-type]
-            confidence=new_confidence,
-            groupings=new_groupings,
-        )
-
-    out_times = []
+    out_times: list[float] = []
     # matched_indices: None means gap, int means source index
     matched_indices: list[int | None] = []
 
-    # Sampling per extent type
-    if extent_tag is None:
+    if n_source_obs == 0:
+        out_times = list(target_times)
+        matched_indices = [None] * len(out_times)
+    elif extent_tag is None:
         # Global annotation: broadcast the single observation across all query times
-        for t in target_times:
-            out_times.append(t)
-            matched_indices.append(0)
-
+        out_times = list(target_times)
+        matched_indices = [0] * len(out_times)
     elif extent_tag in ("time_interval", "time_frequency_box"):
         t_starts = extent.time  # type: ignore[union-attr]
         durations = extent.duration  # type: ignore[union-attr]
@@ -1316,9 +1234,9 @@ def to_times(
 
     # Validate fill_value if any gaps occurred
     if None in matched_indices:
-        _validate_fill_values(type(payload), payload_fill_map, "payload")
+        _validate_fill_values(payload, payload_fill_map, "payload")
         if confidence is not None and confidence is not msgspec.UNSET:
-            _validate_fill_values(type(confidence), confidence_fill_map, "confidence")
+            _validate_fill_values(confidence, confidence_fill_map, "confidence")
 
     new_payload = _resample_struct(payload, payload_cols, matched_indices, payload_fill_map)
     new_confidence = _resample_struct(confidence, confidence_cols, matched_indices, confidence_fill_map)

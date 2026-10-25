@@ -10,12 +10,13 @@ from pathlib import Path
 from typing import Any, BinaryIO, Literal, TextIO
 
 import msgspec
+import polars as pl
 
 from ._version import get_current_schema_version
 from .base import BoppBase
 from .core import (
+    compute_annotation_id,
     ensure_annotation_id,
-    validate_and_set_annotation_id,
     validate_annotation_id,
 )
 from .exceptions import BoppArgumentError, BoppIOError, BoppRegistryError
@@ -23,9 +24,7 @@ from .extensions import resolve_extensions
 from .registries import FACET_REGISTRY_KEYS, get_registry
 from .util import (
     AnnotationDataFrame,
-    _column_item_type,
     _polars_column_dtype,
-    _strip_type_wrappers,
     from_dataframe,
     to_dataframe,
 )
@@ -209,7 +208,6 @@ def _type_to_polars_dtype(
     tag: str,
     tag_field: str,
     complex_registry: dict[str, dict[str, list[str]]],
-    string_registry: dict[str, dict[str, list[str]]],
     pl: Any,
 ) -> tuple[Any, bool]:
     """
@@ -220,13 +218,6 @@ def _type_to_polars_dtype(
     was written with.
     """
     if field_name in complex_registry.get(tag_field, {}).get(tag, []):
-        return pl.String, True
-
-    if field_name in string_registry.get(tag_field, {}).get(tag, []):
-        return pl.String, False
-
-    item_type = _column_item_type(type_hint)
-    if item_type is not None and typing.get_origin(_strip_type_wrappers(item_type)) in (list, dict, tuple):
         return pl.String, True
 
     dtype = _polars_column_dtype(type_hint, pl)
@@ -255,11 +246,9 @@ def _build_polars_csv_schema(
     Returns
     -------
     tuple of (dict[str, Any], list[str])
-        A tuple practical consisting of the full schema mapping every column name to a Polars data type,
+        A tuple consisting of the full schema mapping every column name to a Polars data type,
         and a list of column names designated as complex fields requiring post-read decoding.
     """
-    import polars as pl
-
     schema: dict[str, Any] = {}
     complex_columns: list[str] = []
 
@@ -277,9 +266,8 @@ def _build_polars_csv_schema(
         return schema, complex_columns
 
     complex_registry: dict[str, dict[str, list[str]]] = registry.get("COMPLEX_FIELDS_REGISTRY", {})
-    string_registry: dict[str, dict[str, list[str]]] = registry.get("STRING_FIELDS_REGISTRY", {})
 
-    # Cache type hints per struct class
+    # Cache field types per struct class
     struct_type_hints: dict[type[msgspec.Struct], dict[str, Any]] = {}
 
     for col in columns:
@@ -300,17 +288,14 @@ def _build_polars_csv_schema(
 
                 if struct_cls is not None:
                     if struct_cls not in struct_type_hints:
-                        try:
-                            struct_type_hints[struct_cls] = typing.get_type_hints(
-                                struct_cls, include_extras=True
-                            )
-                        except (NameError, TypeError, AttributeError):
-                            struct_type_hints[struct_cls] = getattr(struct_cls, "__annotations__", {})
+                        struct_type_hints[struct_cls] = {
+                            f.name: f.type for f in msgspec.structs.fields(struct_cls)
+                        }
 
                     hints = struct_type_hints[struct_cls]
                     field_hint = hints.get(field)
                     dtype, is_complex = _type_to_polars_dtype(
-                        field_hint, field, tag, tag_field, complex_registry, string_registry, pl
+                        field_hint, field, tag, tag_field, complex_registry, pl
                     )
                     schema[col] = dtype
 
@@ -351,12 +336,9 @@ def _prepare_annotation_for_save(
         Whether to generate IDs when missing or unconditionally.
     """
     if generate_id and not validate_id:
-        validate_and_set_annotation_id(ann)
+        ann.id = compute_annotation_id(ann)  # type: ignore[attr-defined]
     elif generate_id and validate_id:
-        if getattr(ann, "id", msgspec.UNSET) in (msgspec.UNSET, None):
-            ensure_annotation_id(ann)
-        else:
-            validate_annotation_id(ann)
+        ensure_annotation_id(ann)
     elif not generate_id and validate_id:
         validate_annotation_id(ann)
 
@@ -417,14 +399,10 @@ def save_bopp_csv(
         f.writelines(frontmatter)
 
         # 4. Hand the open file pointer to Pandas/Polars
-        if hasattr(df, "to_csv"):
-            # is this a pandas dataframe?
-            df.to_csv(f, index=False)
-        elif hasattr(df, "write_csv"):
-            # Is this a polars dataframe?
+        if isinstance(df, pl.DataFrame):
             df.write_csv(f, quote_style="non_numeric")
         else:
-            raise BoppArgumentError(f"Unknown dataframe type: {type(df)}")
+            df.to_csv(f, index=False)
 
 
 def _save_msgspec_encoded(
@@ -614,7 +592,6 @@ def load_bopp_csv(
         If True, validates the deterministic UUIDv5 ID after loading.
     resolve_ext : bool, default True
         If True, resolves and validates extension payload values via registered extensions.
-        Emits a warning if missing.
     backend : {"polars", "pandas"}, default "polars"
         The DataFrame framework to use for parsing tabular CSV content.
 
@@ -662,8 +639,6 @@ def load_bopp_csv(
 
         # 2. Hand the open file pointer to Polars or Pandas
         if backend == "polars":
-            import polars as pl
-
             schema, complex_columns = _build_polars_csv_schema(
                 header_line, bopp_version
             )
