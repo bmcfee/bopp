@@ -1801,3 +1801,224 @@ def test_filter_by_fraction_extent():
     assert [list(q) for q in result.extent.quarter] == [[1, 1], [3, 2]]
     assert [list(d) for d in result.extent.duration] == [[2, 1], [1, 1]]
     assert result.payload.value == list("cd")
+
+
+SCORE_CONVERSIONS = [
+    ("to_score_quarter", "score_quarter_float", "score_quarter", {"max_denominator": 12}),
+    ("to_score_interval", "score_interval_float", "score_interval", {"max_denominator": 12}),
+    ("to_score_quarter_float", "score_quarter", "score_quarter_float", {}),
+    ("to_score_interval_float", "score_interval", "score_interval_float", {}),
+]
+
+
+def _score_annotation(tag, **kwargs):
+    """Create representative score columns, including zero and negative positions."""
+    columns = (
+        {"quarter": [-0.5, 0.0, 0.5, 1.0 / 3.0, 3.0]}
+        if tag.endswith("_float") else
+        {"quarter": [[-1, 2], [0, 1], [2, 4], [1, 3], [3, 1]]}
+    )
+    if "interval" in tag:
+        columns["duration"] = (
+            [0.0, 0.5, 1.0 / 3.0, 3.0, 0.125] if tag.endswith("_float") else
+            [[0, 1], [2, 4], [1, 3], [3, 1], [1, 8]]
+        )
+    return create(
+        media_id="track:score", payload_kind="tag_open", extent_kind=tag,
+        value=list("abcde"), **columns, **kwargs,
+    )
+
+
+@pytest.mark.parametrize("name, source, target, kwargs", SCORE_CONVERSIONS)
+@pytest.mark.parametrize("decoded", [False, True])
+def test_score_conversion_values_and_provenance(name, source, target, kwargs, decoded):
+    ann = _score_annotation(source)
+    if decoded:
+        ann = msgspec.json.decode(msgspec.json.encode(ann), type=type(ann))
+    original = copy.deepcopy(ann)
+    convert = getattr(bopp, name)
+    assert convert is getattr(bopp.transforms, name)
+    result = convert(ann, **kwargs)
+    target_cls = bopp.registries.get_registry(ann.bopp_version)["EXTENT_TYPE_REGISTRY"][target]
+    assert type(result.extent) is target_cls
+    if target.endswith("_float"):
+        assert result.extent.quarter == [-0.5, 0.0, 0.5, 1.0 / 3.0, 3.0]
+        if "interval" in target:
+            assert result.extent.duration == [0.0, 0.5, 1.0 / 3.0, 3.0, 0.125]
+        assert all(type(q) is float for q in result.extent.quarter)
+    else:
+        assert result.extent.quarter == [[-1, 2], [0, 1], [1, 2], [1, 3], [3, 1]]
+        if "interval" in target:
+            assert result.extent.duration == [[0, 1], [1, 2], [1, 3], [3, 1], [1, 8]]
+        for field in msgspec.structs.fields(result.extent):
+            for pair in getattr(result.extent, field.name):
+                assert type(pair) is list
+                assert pair[1] > 0
+                assert math.gcd(*pair) == 1
+    assert result.parents == [ann.id]
+    assert result.id != ann.id
+    assert result.id == bopp.compute_annotation_id(result)
+    assert result.media_id == ann.media_id
+    assert result.bopp_version == ann.bopp_version
+    assert result.payload == ann.payload
+    assert isinstance(result.metadata, DerivedAnnotationMetadata)
+    assert result.metadata.transform == name
+    assert result.metadata.parameters == kwargs
+    assert bopp.validate(result)
+    assert ann == original
+    loaded = msgspec.json.decode(msgspec.json.encode(result), type=type(result))
+    assert loaded.id == result.id
+    assert bopp.validate(loaded)
+    assert msgspec.json.encode(loaded.extent) == msgspec.json.encode(result.extent)
+
+
+@pytest.mark.parametrize("shape", ["quarter", "interval"])
+@pytest.mark.parametrize("value, bound, expected", [
+    (0.3333333333333333, 1, [0, 1]),
+    (0.3333333333333333, 2, [1, 2]),
+    (0.3333333333333333, 3, [1, 3]),
+    (2.2, 5, [11, 5]),
+    (1.1, 5, [6, 5]),
+    (-1.1, 5, [-6, 5]),
+])
+def test_score_conversion_denominator_bound(shape, value, bound, expected):
+    ann = create(
+        media_id="track:score", payload_kind="tag_open", extent_kind=f"score_{shape}_float",
+        quarter=[value], value=["a"],
+        **({"duration": [abs(value)]} if shape == "interval" else {}),
+    )
+    result = getattr(bopp, f"to_score_{shape}")(ann, max_denominator=bound)
+    assert result.extent.quarter == [expected]
+    if shape == "interval":
+        assert result.extent.duration == [[abs(expected[0]), expected[1]]]
+
+
+@pytest.mark.parametrize("shape", ["quarter", "interval"])
+def test_score_conversion_roundtrips(shape):
+    source = _score_annotation(f"score_{shape}")
+    # Use reduced fractions to check exact recovery, including nondyadic values.
+    source.extent.quarter = [[0, 1], [1, 3], [-3, 4], [11, 5], [1, 7]]
+    if shape == "interval":
+        source.extent.duration = [[0, 1], [1, 2], [1, 3], [3, 1], [1, 8]]
+    source.id = bopp.compute_annotation_id(source)
+    floating = getattr(bopp, f"to_score_{shape}_float")
+    rational = getattr(bopp, f"to_score_{shape}")
+    intermediate = floating(source)
+    result = rational(intermediate, max_denominator=8)
+    assert result.extent == source.extent
+    assert result.parents == [source.id, intermediate.id]
+
+    source = create(
+        media_id="track:score", payload_kind="tag_open", extent_kind=f"score_{shape}_float",
+        quarter=[0.0, 0.125, -0.75, 2.375], value=list("abcd"),
+        **({"duration": [0.0, 0.125, 0.75, 2.375]} if shape == "interval" else {}),
+    )
+    intermediate = rational(source, max_denominator=8)
+    result = floating(intermediate)
+    assert result.extent == source.extent
+    assert result.parents == [source.id, intermediate.id]
+
+
+@pytest.mark.parametrize("name, source, target, kwargs, tag", [
+    (*conversion, tag)
+    for conversion in SCORE_CONVERSIONS
+    for tag in [
+        "score_quarter", "score_interval", "score_quarter_float", "score_interval_float",
+        "time", "midi_tick", None,
+    ]
+    if tag != conversion[1]
+])
+def test_score_conversion_rejects_wrong_source(name, source, target, kwargs, tag):
+    if tag is not None and tag.startswith("score_"):
+        ann = _score_annotation(tag)
+    else:
+        columns = {"time": [0.0]} if tag == "time" else {"tick": [0]} if tag == "midi_tick" else {}
+        ann = create(
+            media_id="track:score", payload_kind="tag_open", extent_kind=tag,
+            value=["a"], **columns,
+        )
+    original = copy.deepcopy(ann)
+    with pytest.raises(BoppArgumentError, match=rf"{name}:.*{source}"):
+        getattr(bopp, name)(ann, **kwargs)
+    assert ann == original
+    if tag is None:
+        ann.extent = None
+        with pytest.raises(BoppArgumentError, match=rf"{name}:.*{source}"):
+            getattr(bopp, name)(ann, **kwargs)
+
+
+@pytest.mark.parametrize("shape", ["quarter", "interval"])
+@pytest.mark.parametrize("bound", [True, False, 2.0, 1.5, 0, -1, None, "8", np.int64(8)])
+def test_score_conversion_invalid_denominator(shape, bound):
+    ann = _score_annotation(f"score_{shape}_float")
+    with pytest.raises(BoppArgumentError, match="max_denominator"):
+        getattr(bopp, f"to_score_{shape}")(ann, max_denominator=bound)
+
+
+@pytest.mark.parametrize("shape", ["quarter", "interval"])
+def test_score_conversion_required_keyword(shape):
+    ann = _score_annotation(f"score_{shape}_float")
+    convert = getattr(bopp, f"to_score_{shape}")
+    with pytest.raises(TypeError, match="max_denominator"):
+        convert(ann)
+    with pytest.raises(TypeError):
+        convert(ann, 8)
+
+
+@pytest.mark.parametrize("shape, field", [
+    ("quarter", "quarter"), ("interval", "quarter"), ("interval", "duration"),
+])
+@pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan")])
+def test_score_conversion_nonfinite(shape, field, value):
+    ann = _score_annotation(f"score_{shape}_float")
+    getattr(ann.extent, field)[1] = value
+    with pytest.raises(BoppArgumentError, match=rf"{field}.*index 1"):
+        getattr(bopp, f"to_score_{shape}")(ann, max_denominator=8)
+
+
+@pytest.mark.parametrize("name, source, target, kwargs", SCORE_CONVERSIONS)
+def test_score_conversion_lineage_and_independent_facets(name, source, target, kwargs):
+    ann = _score_annotation(
+        source, confidence_kind="likelihood", confidence=[0.9, 0.8, 0.7, 0.6, 0.5],
+        sandbox={"custom": {"values": [1, 2]}},
+    )
+    trimmed = trim(ann, start=0)
+    original = copy.deepcopy(trimmed)
+    result = getattr(bopp, name)(trimmed, **kwargs)
+    assert result.parents == [ann.id, trimmed.id]
+    assert result.payload == trimmed.payload
+    assert result.confidence == trimmed.confidence
+    assert result.sandbox == trimmed.sandbox
+    assert result.payload is not trimmed.payload
+    assert result.confidence is not trimmed.confidence
+    assert result.sandbox is not trimmed.sandbox
+    result.payload.value.append("f")
+    result.confidence.confidence.append(0.4)
+    result.sandbox["custom"]["values"].append(3)
+    result.parents.append("another")
+    assert trimmed == original
+
+    no_id = Annotation(
+        media_id=ann.media_id, bopp_version=ann.bopp_version,
+        metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
+        extent=ann.extent, payload=ann.payload,
+    )
+    with pytest.warns(UserWarning, match="Converting an annotation with no ID"):
+        result = getattr(bopp, name)(no_id, **kwargs)
+    assert result.parents == []
+    assert result.sandbox is msgspec.UNSET
+    assert result.confidence is msgspec.UNSET
+    assert bopp.validate(result)
+
+
+@pytest.mark.parametrize("name, source, target, kwargs", SCORE_CONVERSIONS)
+def test_score_conversion_empty_columns(name, source, target, kwargs):
+    ann = create(
+        media_id="track:score", payload_kind="tag_open", extent_kind=source,
+        quarter=[], value=[], **({"duration": []} if "interval" in source else {}),
+    )
+    result = getattr(bopp, name)(ann, **kwargs)
+    assert result.extent.quarter == []
+    if "interval" in source:
+        assert result.extent.duration == []
+    assert bopp.validate(result)

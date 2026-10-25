@@ -12,7 +12,9 @@ from .extent import (
     midi_tick,
     pixel_box,
     score_interval,
+    score_interval_float,
     score_quarter,
+    score_quarter_float,
     time_frequency_box,
     time_interval,
     times,
@@ -25,6 +27,8 @@ type AnyExtent = Annotated[
     | pixel_box.PixelBoxExtent
     | score_quarter.ScoreQuarterNotes
     | score_interval.ScoreInterval
+    | score_quarter_float.ScoreQuarterNotesFloat
+    | score_interval_float.ScoreIntervalFloat
     | midi_tick.MidiTicks
     | midi_interval.MidiInterval,
     Meta(
