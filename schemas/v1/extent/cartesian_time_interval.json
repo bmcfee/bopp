@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extent/cartesian_time_interval.json",
+  "title": "Cartesian Time Interval Extent",
+  "description": "Spatiotemporal interval coordinates in Cartesian space with start times and durations.",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "cartesian_time_interval"
+    },
+    "time": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval start times in seconds.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "duration": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of interval durations in seconds.",
+      "items": {
+        "type": "number",
+        "minimum": 0.0
+      }
+    },
+    "x": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of x-coordinates in space.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "y": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of y-coordinates in space.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "z": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of z-coordinates in space.",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["extent_type", "time", "duration", "x", "y", "z"]
+}

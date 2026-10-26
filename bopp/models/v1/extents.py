@@ -8,15 +8,25 @@ from typing import Annotated
 from msgspec import Meta
 
 from .extent import (
+    cartesian,
+    cartesian_time,
+    cartesian_time_interval,
     midi_interval,
     midi_tick,
     pixel_box,
+    pixels,
     score_interval,
     score_interval_float,
     score_quarter,
     score_quarter_float,
+    spherical,
+    spherical_time,
+    spherical_time_interval,
+    text,
+    text_interval,
     time_frequency_box,
     time_interval,
+    time_uniform,
     times,
 )
 
@@ -24,7 +34,17 @@ type AnyExtent = Annotated[
     times.Times
     | time_interval.TimeIntervalExtent
     | time_frequency_box.TimeFrequencyBoxExtent
+    | time_uniform.UniformTimeExtent
+    | pixels.Pixels
     | pixel_box.PixelBoxExtent
+    | text.Text
+    | text_interval.TextInterval
+    | spherical.SphericalExtent
+    | spherical_time.SphericalTimeExtent
+    | spherical_time_interval.SphericalTimeIntervalExtent
+    | cartesian.CartesianExtent
+    | cartesian_time.CartesianTimeExtent
+    | cartesian_time_interval.CartesianTimeIntervalExtent
     | score_quarter.ScoreQuarterNotes
     | score_interval.ScoreInterval
     | score_quarter_float.ScoreQuarterNotesFloat

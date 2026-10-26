@@ -61,12 +61,30 @@ def _extract_events(ann: BoppBase) -> Any:
         )
 
     tag = _get_tag(extent)
-    if tag in ("time", "time_interval"):
+    if tag in (
+        "time",
+        "time_interval",
+        "spherical_time",
+        "spherical_time_interval",
+        "cartesian_time",
+        "cartesian_time_interval",
+    ):
         return np.asarray(extent.time, dtype=np.float64)
+    if tag == "time_uniform":
+        payload = getattr(ann, "payload", None)
+        n_obs = (
+            len(getattr(payload, "value", []))
+            if payload not in (None, msgspec.UNSET)
+            else 0
+        )
+        return (
+            extent.start_time
+            + np.arange(n_obs, dtype=np.float64) * extent.sampling_period
+        )
 
     raise BoppArgumentError(
         f"Cannot extract event timestamps from extent with tag '{tag}'. "
-        "Expected 'time' or 'time_interval'."
+        "Expected temporal extent ('time', 'time_interval', etc.)."
     )
 
 
@@ -77,21 +95,39 @@ def _extract_intervals(ann: BoppBase) -> Any:
         raise BoppArgumentError("Annotation requires an extent to extract intervals.")
 
     tag = _get_tag(extent)
-    if tag == "time_interval":
+    if tag in (
+        "time_interval",
+        "spherical_time_interval",
+        "cartesian_time_interval",
+    ):
         starts = np.asarray(extent.time, dtype=np.float64)
         durations = np.asarray(extent.duration, dtype=np.float64)
         if len(starts) == 0:
             return np.empty((0, 2), dtype=np.float64)
         return np.column_stack([starts, starts + durations])
-    if tag == "time":
+    if tag in ("time", "spherical_time", "cartesian_time"):
         times = np.asarray(extent.time, dtype=np.float64)
         if len(times) < 2:
             return np.empty((0, 2), dtype=np.float64)
         return np.column_stack([times[:-1], times[1:]])
+    if tag == "time_uniform":
+        payload = getattr(ann, "payload", None)
+        n_obs = (
+            len(getattr(payload, "value", []))
+            if payload not in (None, msgspec.UNSET)
+            else 0
+        )
+        if n_obs < 2:
+            return np.empty((0, 2), dtype=np.float64)
+        times = (
+            extent.start_time
+            + np.arange(n_obs, dtype=np.float64) * extent.sampling_period
+        )
+        return np.column_stack([times[:-1], times[1:]])
 
     raise BoppArgumentError(
         f"Cannot extract intervals from extent with tag '{tag}'. "
-        "Expected 'time_interval' or 'time'."
+        "Expected temporal extent ('time_interval', 'time', etc.)."
     )
 
 
@@ -108,7 +144,10 @@ def _extract_labels(ann: BoppBase, field_name: str = "value") -> list[Any]:
     if raw_labels is None:
         raise BoppArgumentError(f"Payload has no field '{field_name}'.")
 
-    if extent_tag == "time" and len(raw_labels) > 1:
+    if (
+        extent_tag in ("time", "spherical_time", "cartesian_time", "time_uniform")
+        and len(raw_labels) > 1
+    ):
         # Inferred consecutive intervals [t[i], t[i+1]] pair with raw_labels[:-1]
         return list(raw_labels[:-1])
 

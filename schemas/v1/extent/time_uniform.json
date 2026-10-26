@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extent/time_uniform.json",
+  "title": "Uniform Time Extent",
+  "description": "Uniformly sampled timesteps implicitly defined by scalar start_time and sampling_period without explicit columnar data.",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "time_uniform"
+    },
+    "start_time": {
+      "type": "number",
+      "description": "Start time of the first observation in seconds."
+    },
+    "sampling_period": {
+      "type": "number",
+      "exclusiveMinimum": 0.0,
+      "description": "Sampling period (time step) between consecutive observations in seconds."
+    }
+  },
+  "required": ["extent_type", "start_time", "sampling_period"]
+}

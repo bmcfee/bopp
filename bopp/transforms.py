@@ -22,12 +22,19 @@ DEFAULT_TARGET_FIELDS: dict[str, str] = {
     "time": "time",
     "time_interval": "time",
     "time_frequency_box": "time",
+    "time_uniform": "time",
     "midi_tick": "tick",
     "midi_interval": "tick",
     "score_quarter": "quarter",
     "score_interval": "quarter",
     "score_quarter_float": "quarter",
     "score_interval_float": "quarter",
+    "text": "offset",
+    "text_interval": "offset",
+    "spherical_time": "time",
+    "spherical_time_interval": "time",
+    "cartesian_time": "time",
+    "cartesian_time_interval": "time",
 }
 
 # Axis structure definition: (extent_tag, target_field) -> (kind, origin_or_min, span_or_max)
@@ -39,12 +46,38 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("time_frequency_box", "frequency"): ("min_max", "freq_min", "freq_max"),
     ("pixel_box", "x"): ("origin_span", "x", "width"),
     ("pixel_box", "y"): ("origin_span", "y", "height"),
+    ("pixels", "x"): ("point", "x", None),
+    ("pixels", "y"): ("point", "y", None),
     ("midi_tick", "tick"): ("point", "tick", None),
     ("midi_interval", "tick"): ("origin_span", "tick", "duration"),
     ("score_quarter", "quarter"): ("point", "quarter", None),
     ("score_interval", "quarter"): ("origin_span", "quarter", "duration"),
     ("score_quarter_float", "quarter"): ("point", "quarter", None),
     ("score_interval_float", "quarter"): ("origin_span", "quarter", "duration"),
+    ("text", "offset"): ("point", "offset", None),
+    ("text_interval", "offset"): ("origin_span", "offset", "length"),
+    ("spherical", "azimuth"): ("point", "azimuth", None),
+    ("spherical", "elevation"): ("point", "elevation", None),
+    ("spherical", "radius"): ("point", "radius", None),
+    ("spherical_time", "time"): ("point", "time", None),
+    ("spherical_time", "azimuth"): ("point", "azimuth", None),
+    ("spherical_time", "elevation"): ("point", "elevation", None),
+    ("spherical_time", "radius"): ("point", "radius", None),
+    ("spherical_time_interval", "time"): ("origin_span", "time", "duration"),
+    ("spherical_time_interval", "azimuth"): ("point", "azimuth", None),
+    ("spherical_time_interval", "elevation"): ("point", "elevation", None),
+    ("spherical_time_interval", "radius"): ("point", "radius", None),
+    ("cartesian", "x"): ("point", "x", None),
+    ("cartesian", "y"): ("point", "y", None),
+    ("cartesian", "z"): ("point", "z", None),
+    ("cartesian_time", "time"): ("point", "time", None),
+    ("cartesian_time", "x"): ("point", "x", None),
+    ("cartesian_time", "y"): ("point", "y", None),
+    ("cartesian_time", "z"): ("point", "z", None),
+    ("cartesian_time_interval", "time"): ("origin_span", "time", "duration"),
+    ("cartesian_time_interval", "x"): ("point", "x", None),
+    ("cartesian_time_interval", "y"): ("point", "y", None),
+    ("cartesian_time_interval", "z"): ("point", "z", None),
 }
 
 FRACTION_AXES: frozenset[tuple[str, str]] = frozenset(
@@ -510,6 +543,7 @@ def trim(
     extent = getattr(annotation, "extent", msgspec.UNSET)
     axis_config = None
     fraction_axis = False
+    extent_tag = None
     if extent is not msgspec.UNSET and extent is not None:
         extent_tag = _get_tag(extent)
         if extent_tag is None:
@@ -524,13 +558,18 @@ def trim(
                     f"Please specify 'target_field' explicitly (e.g. 'x' or 'y')."
                 )
 
-        axis_config = AXIS_CONFIGS.get((extent_tag, resolved_target_field))
-        if axis_config is None:
-            raise BoppArgumentError(
-                f"Unsupported target_field '{resolved_target_field}' for extent tag '{extent_tag}'."
-            )
+        if extent_tag != "time_uniform":
+            axis_config = AXIS_CONFIGS.get((extent_tag, resolved_target_field))
+            if axis_config is None:
+                raise BoppArgumentError(
+                    f"Unsupported target_field '{resolved_target_field}' for extent tag '{extent_tag}'."
+                )
 
-        fraction_axis = (extent_tag, resolved_target_field) in FRACTION_AXES
+            fraction_axis = (extent_tag, resolved_target_field) in FRACTION_AXES
+        elif resolved_target_field != "time":
+            raise BoppArgumentError(
+                f"Unsupported target_field '{resolved_target_field}' for extent tag 'time_uniform'."
+            )
 
     if fraction_axis:
         for bound in (new_start, new_end):
@@ -578,6 +617,62 @@ def trim(
     payload: msgspec.Struct = annotation.payload  # type: ignore[attr-defined]
     confidence = getattr(annotation, "confidence", msgspec.UNSET)
     groupings = getattr(annotation, "groupings", msgspec.UNSET)
+
+    if extent_tag == "time_uniform":
+        assert extent is not None and extent is not msgspec.UNSET
+        assert isinstance(extent, msgspec.Struct)
+        tu_start_time = float(extent.start_time)  # type: ignore[attr-defined]
+        tu_period = float(extent.sampling_period)  # type: ignore[attr-defined]
+
+        payload_cols = _get_facet_list_fields(payload)
+        confidence_cols = (
+            _get_facet_list_fields(confidence)
+            if confidence not in (None, msgspec.UNSET)
+            else {}
+        )
+        n_obs = 0
+        if payload_cols:
+            n_obs = len(next(iter(payload_cols.values())))
+        elif confidence_cols:
+            n_obs = len(next(iter(confidence_cols.values())))
+
+        tu_shift = float(new_start) if (reset and new_start is not None) else 0.0
+        tu_kept_indices: list[int] = []
+        for i in range(n_obs):
+            t_val = tu_start_time + i * tu_period
+            if new_start is not None and t_val < new_start:
+                continue
+            if new_end is not None and t_val > new_end:
+                continue
+            tu_kept_indices.append(i)
+
+        if tu_kept_indices:
+            first_idx = tu_kept_indices[0]
+            new_start_time = tu_start_time + first_idx * tu_period - tu_shift
+        else:
+            new_start_time = (
+                (tu_start_time - tu_shift)
+                if new_start is None
+                else (float(new_start) - tu_shift)
+            )
+
+        tu_new_extent = msgspec.structs.replace(
+            extent, start_time=float(new_start_time)
+        )
+        new_payload = _subset_struct_lists(payload, tu_kept_indices)
+        new_confidence = _subset_struct_lists(confidence, tu_kept_indices)
+        new_groupings = _subset_groupings(groupings, tu_kept_indices)
+
+        return _rebuild_annotation(
+            annotation,
+            parents=new_parents,
+            sandbox=new_sandbox,
+            metadata=derived_metadata,
+            extent=tu_new_extent,
+            payload=new_payload,  # type: ignore[arg-type]
+            confidence=new_confidence,
+            groupings=new_groupings,
+        )
 
     if axis_config is None:
         return _rebuild_annotation(
@@ -1127,15 +1222,25 @@ def to_times(
     extent_tag: str | None = None
     if extent is not None and extent is not msgspec.UNSET:
         extent_tag = _get_tag(extent)
-        if extent_tag not in ("time", "time_interval", "time_frequency_box"):
+        valid_temporal_extents = (
+            "time",
+            "time_interval",
+            "time_frequency_box",
+            "time_uniform",
+            "spherical_time",
+            "spherical_time_interval",
+            "cartesian_time",
+            "cartesian_time_interval",
+        )
+        if extent_tag not in valid_temporal_extents:
             raise BoppArgumentError(
                 f"Extent type '{extent_tag}' is incompatible with to_times. "
-                f"Supported extents are 'time', 'time_interval', 'time_frequency_box', or None (global)."
+                f"Supported extents are {valid_temporal_extents}, or None (global)."
             )
 
     # Determine observations count
     n_source_obs = 0
-    if extent_tag is not None and extent is not None:
+    if extent_tag is not None and extent is not None and extent_tag != "time_uniform":
         first_extent_col = next(iter(_get_facet_list_fields(extent).values()), [])
         n_source_obs = len(first_extent_col)
     elif payload_cols:
@@ -1197,10 +1302,15 @@ def to_times(
                 "sample_rate requires an extent with observations to determine temporal bounds. "
                 "Specify explicit 'times' instead."
             )
-        if extent_tag == "time":
+        if extent_tag in ("time", "spherical_time", "cartesian_time"):
             time_arr = extent.time  # type: ignore[union-attr]
             t_min = min(time_arr)
             t_max = max(time_arr)
+        elif extent_tag == "time_uniform":
+            st_val = float(extent.start_time)  # type: ignore[union-attr]
+            sp_val = float(extent.sampling_period)  # type: ignore[union-attr]
+            t_min = st_val
+            t_max = st_val + max(0, n_source_obs - 1) * sp_val
         else:
             time_arr = extent.time  # type: ignore[union-attr]
             dur_arr = extent.duration  # type: ignore[union-attr]
@@ -1241,7 +1351,12 @@ def to_times(
         # Global annotation: broadcast the single observation across all query times
         out_times = list(target_times)
         matched_indices = [0] * len(out_times)
-    elif extent_tag in ("time_interval", "time_frequency_box"):
+    elif extent_tag in (
+        "time_interval",
+        "time_frequency_box",
+        "spherical_time_interval",
+        "cartesian_time_interval",
+    ):
         t_starts = extent.time  # type: ignore[union-attr]
         durations = extent.duration  # type: ignore[union-attr]
 
@@ -1266,8 +1381,18 @@ def to_times(
                 out_times.append(t)
                 matched_indices.append(covers[-1])
 
-    elif extent_tag == "time":
-        src_times = extent.time  # type: ignore[union-attr]
+    elif extent_tag in (
+        "time",
+        "spherical_time",
+        "cartesian_time",
+        "time_uniform",
+    ):
+        if extent_tag == "time_uniform":
+            st_val = float(extent.start_time)  # type: ignore[union-attr]
+            sp_val = float(extent.sampling_period)  # type: ignore[union-attr]
+            src_times = [st_val + i * sp_val for i in range(n_source_obs)]
+        else:
+            src_times = extent.time  # type: ignore[union-attr]
         for t in target_times:
             if method == "previous":
                 prev_candidates = [i for i, st in enumerate(src_times) if st <= t]

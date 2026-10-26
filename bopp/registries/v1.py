@@ -4,15 +4,25 @@ from ..models.v1.annotation import Annotation
 from ..models.v1.confidence.agreement import ConfidenceByInterAnnotatorAgreement
 from ..models.v1.confidence.likelihood import LikelihoodConfidence
 from ..models.v1.confidence.variance import VarianceConfidence
+from ..models.v1.extent.cartesian import CartesianExtent
+from ..models.v1.extent.cartesian_time import CartesianTimeExtent
+from ..models.v1.extent.cartesian_time_interval import CartesianTimeIntervalExtent
 from ..models.v1.extent.midi_interval import MidiInterval
 from ..models.v1.extent.midi_tick import MidiTicks
 from ..models.v1.extent.pixel_box import PixelBoxExtent
+from ..models.v1.extent.pixels import Pixels
 from ..models.v1.extent.score_interval import ScoreInterval
 from ..models.v1.extent.score_interval_float import ScoreIntervalFloat
 from ..models.v1.extent.score_quarter import ScoreQuarterNotes
 from ..models.v1.extent.score_quarter_float import ScoreQuarterNotesFloat
+from ..models.v1.extent.spherical import SphericalExtent
+from ..models.v1.extent.spherical_time import SphericalTimeExtent
+from ..models.v1.extent.spherical_time_interval import SphericalTimeIntervalExtent
+from ..models.v1.extent.text import Text
+from ..models.v1.extent.text_interval import TextInterval
 from ..models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from ..models.v1.extent.time_interval import TimeIntervalExtent
+from ..models.v1.extent.time_uniform import UniformTimeExtent
 from ..models.v1.extent.times import Times
 from ..models.v1.grouping import Grouping
 from ..models.v1.metadata.algorithm import AlgorithmAnnotationMetadata
@@ -47,16 +57,26 @@ CONFIDENCE_TYPE_REGISTRY = {
 }
 
 EXTENT_TYPE_REGISTRY = {
+    "cartesian": CartesianExtent,
+    "cartesian_time": CartesianTimeExtent,
+    "cartesian_time_interval": CartesianTimeIntervalExtent,
     "midi_interval": MidiInterval,
     "midi_tick": MidiTicks,
     "pixel_box": PixelBoxExtent,
+    "pixels": Pixels,
     "score_interval": ScoreInterval,
     "score_interval_float": ScoreIntervalFloat,
     "score_quarter": ScoreQuarterNotes,
     "score_quarter_float": ScoreQuarterNotesFloat,
+    "spherical": SphericalExtent,
+    "spherical_time": SphericalTimeExtent,
+    "spherical_time_interval": SphericalTimeIntervalExtent,
+    "text": Text,
+    "text_interval": TextInterval,
     "time": Times,
     "time_frequency_box": TimeFrequencyBoxExtent,
     "time_interval": TimeIntervalExtent,
+    "time_uniform": UniformTimeExtent,
 }
 
 METADATA_TYPE_REGISTRY = {

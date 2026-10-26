@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extent/text.json",
+  "title": "Text",
+  "description": "Character point offsets in text.",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "text"
+    },
+    "offset": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of 0-based character offsets in text.",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  },
+  "required": ["extent_type", "offset"]
+}
