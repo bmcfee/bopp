@@ -195,7 +195,10 @@ def test_msgpack_roundtrip(tmp_path):
 
     assert loaded.media_id == ann.media_id
     assert _get_tag(loaded.payload) == _get_tag(ann.payload)
-    assert getattr(loaded, "sandbox", None) == {"user_note": "msgpack_test", "flag": False}
+    assert getattr(loaded, "sandbox", None) == {
+        "user_note": "msgpack_test",
+        "flag": False,
+    }
 
 
 def test_load_bopp_msgpack_invalid_schema(tmp_path):
@@ -327,17 +330,18 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
             quarter=[(0, 1), (3, 4)],
             value=["C:maj", "G:7"],
         ),
-        # pitch_contour payload with nested dictionaries
+        # object payload with nested dictionaries
         lambda: create(
             bopp_version="1.0",
-            media_id="track:pitch_contour_polars",
+            media_id="track:object_polars",
             extent_kind="time",
-            payload_kind="pitch_contour",
+            payload_kind="object",
             time=[0.0, 0.01],
             value=[
                 {"index": 0, "frequency": 440.0, "voicing": 1.0},
                 {"index": 1, "frequency": 442.5, "voicing": 1.0},
             ],
+            description="pitch test",
         ),
         # ext payload with scalar ext_schema attribute and list of nested dicts
         lambda: create(
@@ -347,7 +351,10 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
             payload_kind="ext",
             ext_schema="https://example.com/schema.json",
             time=[0.1, 0.5],
-            value=[{"feature": "val1", "flags": [1, 2]}, {"feature": "val2", "flags": [3]}],
+            value=[
+                {"feature": "val1", "flags": [1, 2]},
+                {"feature": "val2", "flags": [3]},
+            ],
         ),
     ],
 )
@@ -369,23 +376,35 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
         loaded_facet = getattr(loaded, facet, None)
         if orig_facet is not None:
             for field in msgspec.structs.fields(orig_facet):
-                assert getattr(loaded_facet, field.name) == getattr(orig_facet, field.name)
+                assert getattr(loaded_facet, field.name) == getattr(
+                    orig_facet, field.name
+                )
 
 
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"payload_kind": "marker", "extent_kind": "time", "time": [0, 1.5], "description": "marker_events"},
         {
-            "payload_kind": "tag_open",
+            "payload_kind": "marker",
+            "extent_kind": "time",
+            "time": [0, 1.5],
+            "description": "marker_events",
+        },
+        {
+            "payload_kind": "tag",
             "extent_kind": "time_interval",
             "time": [0.0, 1.0],
             "duration": [1, 1.5],
             "value": ["a", "b"],
         },
-        {"payload_kind": "tempo", "extent_kind": "time", "time": [0.0, 1.0], "value": [120, 90.5]},
         {
-            "payload_kind": "note_hz",
+            "payload_kind": "tempo",
+            "extent_kind": "time",
+            "time": [0.0, 1.0],
+            "value": [120, 90.5],
+        },
+        {
+            "payload_kind": "frequency_hz",
             "extent_kind": "time_interval",
             "time": [0.0, 1.0],
             "duration": [1.0, 1.0],
@@ -399,7 +418,7 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
             "value": [60, 61.5],
         },
         {
-            "payload_kind": "tag_open",
+            "payload_kind": "tag",
             "extent_kind": "time_frequency_box",
             "time": [0.0, 1.0],
             "duration": [1, 0.5],
@@ -408,7 +427,7 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
             "value": ["a", "b"],
         },
         {
-            "payload_kind": "tag_open",
+            "payload_kind": "tag",
             "extent_kind": "pixel_box",
             "x": [0, 1.5],
             "width": [10, 2.5],
@@ -417,7 +436,7 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
             "value": ["a", "b"],
         },
         {
-            "payload_kind": "tag_open",
+            "payload_kind": "tag",
             "extent_kind": "time",
             "confidence_kind": "likelihood",
             "time": [0.0, 1.0],
@@ -431,7 +450,9 @@ def test_csv_roundtrip_polars_mixed_int_float(tmp_path, kwargs):
     ann = create(media_id="track:mixed", generate_id=False, **kwargs)
     file_path = tmp_path / "mixed.csv"
 
-    save_bopp_csv(ann, file_path, backend="polars", generate_id=False, validate_id=False)
+    save_bopp_csv(
+        ann, file_path, backend="polars", generate_id=False, validate_id=False
+    )
     loaded = load_bopp_csv(file_path, backend="polars", validate_id=False)
 
     for facet in ("payload", "extent", "confidence"):
@@ -441,9 +462,15 @@ def test_csv_roundtrip_polars_mixed_int_float(tmp_path, kwargs):
         restored = getattr(loaded, facet)
         for field in msgspec.structs.fields(original):
             values = getattr(original, field.name)
-            if isinstance(values, list) and all(isinstance(v, (int, float)) for v in values):
-                assert getattr(restored, field.name) == [float(v) for v in values], f"{facet}.{field.name}"
-                assert all(type(v) is float for v in getattr(restored, field.name)), f"{facet}.{field.name}"
+            if isinstance(values, list) and all(
+                isinstance(v, (int, float)) for v in values
+            ):
+                assert getattr(restored, field.name) == [float(v) for v in values], (
+                    f"{facet}.{field.name}"
+                )
+                assert all(type(v) is float for v in getattr(restored, field.name)), (
+                    f"{facet}.{field.name}"
+                )
 
 
 def test_load_bopp_csv_string_with_brackets(tmp_path):
@@ -451,7 +478,7 @@ def test_load_bopp_csv_string_with_brackets(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:bracket_str_test",
-        payload_kind="tag_open",
+        payload_kind="tag",
         value=["[intro]", "(chorus)", "{verse}"],
     )
     file_path = tmp_path / "test_bracket_str.csv"
@@ -468,7 +495,7 @@ def test_csv_roundtrip_numeric_string_tags(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:numeric_str_test",
-        payload_kind="tag_open",
+        payload_kind="tag",
         value=["1", "2", "007"],
     )
     file_path = tmp_path / "test_numeric_str.csv"
@@ -507,26 +534,29 @@ def test_csv_column_validation_rules():
         from_dataframe(df_invalid_format, header)
 
     # Rule 2: Facet has multiple types
-    df_mixed_types = pd.DataFrame({
-        "extent:time:time": [0.1, 0.2],
-        "extent:time_interval:start": [0.1, 0.2],
-        "payload:beat:value": [1, 1],
-    })
+    df_mixed_types = pd.DataFrame(
+        {
+            "extent:time:time": [0.1, 0.2],
+            "extent:time_interval:start": [0.1, 0.2],
+            "payload:beat:value": [1, 1],
+        }
+    )
     with pytest.raises(BoppValidationError, match="Mixed types for facet 'extent'"):
         from_dataframe(df_mixed_types, header)
 
     # Rule 3: Unrecognized facet or type
-    df_invalid_type = pd.DataFrame({
-        "payload:nonexistent_type:value": [1, 2]
-    })
-    with pytest.raises(BoppValidationError, match="Unrecognized type 'nonexistent_type'"):
+    df_invalid_type = pd.DataFrame({"payload:nonexistent_type:value": [1, 2]})
+    with pytest.raises(
+        BoppValidationError, match="Unrecognized type 'nonexistent_type'"
+    ):
         from_dataframe(df_invalid_type, header)
 
     # Rule 4: Field does not exist on target type struct
-    df_invalid_field = pd.DataFrame({
-        "payload:beat:invalid_field_name": [1, 2]
-    })
-    with pytest.raises(BoppValidationError, match="Field 'invalid_field_name' in column .* does not exist"):
+    df_invalid_field = pd.DataFrame({"payload:beat:invalid_field_name": [1, 2]})
+    with pytest.raises(
+        BoppValidationError,
+        match="Field 'invalid_field_name' in column .* does not exist",
+    ):
         from_dataframe(df_invalid_field, header)
 
 
@@ -580,7 +610,9 @@ def test_load_bopp_csv_without_frontmatter(tmp_path):
     file_path.write_text(csv_content, encoding="utf-8")
 
     # Raises BoppValidationError because media_id is missing when frontmatter is omitted
-    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+    with pytest.raises(
+        BoppValidationError, match="Missing or invalid required 'media_id'"
+    ):
         load_bopp_csv(file_path, validate_id=False)
 
 
@@ -672,7 +704,9 @@ def test_build_csv_converters_error_and_edge_cases():
     assert _build_csv_converters(header, "1.0") == {}
 
     # Valid complex and string columns map to respective parsers
-    converters = _build_csv_converters("extent:score_interval:quarter,payload:tag_open:value", "1.0")
+    converters = _build_csv_converters(
+        "extent:score_interval:quarter,payload:tag:value", "1.0"
+    )
     assert converters["extent:score_interval:quarter"] is _parse_complex_cell
 
 
@@ -772,7 +806,7 @@ class _NonSeekableTextStream:
         return ""
 
     def read(self) -> str:
-        content = "".join(self._lines[self._pos:])
+        content = "".join(self._lines[self._pos :])
         self._pos = len(self._lines)
         return content
 
@@ -867,3 +901,95 @@ def test_csv_roundtrip_marker_payload_without_extent(tmp_path):
         assert loaded.payload.description == "global_label"
         assert loaded.extent is msgspec.UNSET
         assert loaded.id == ann.id
+
+
+def test_csv_roundtrip_lyrics_payload(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:lyrics_csv",
+        payload_kind="lyrics",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=["hello", "world"],
+        language="en-US",
+    )
+    for backend in ("polars", "pandas"):
+        file_path = tmp_path / f"lyrics_{backend}.csv"
+        save_bopp_csv(ann, file_path, backend=backend)
+        loaded = load_bopp_csv(file_path, backend=backend)
+        assert loaded.media_id == ann.media_id
+        assert loaded.payload.language == "en-US"
+        assert loaded.payload.value == ["hello", "world"]
+
+
+def test_csv_roundtrip_frequency_hz_with_voiced(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:freq_voiced_csv",
+        payload_kind="frequency_hz",
+        extent_kind="time",
+        time=[0.0, 0.5, 1.0],
+        value=[440.0, 0.0, 880.0],
+        voiced=[True, False, True],
+    )
+    for backend in ("polars", "pandas"):
+        file_path = tmp_path / f"freq_voiced_{backend}.csv"
+        save_bopp_csv(ann, file_path, backend=backend)
+        loaded = load_bopp_csv(file_path, backend=backend)
+        assert loaded.media_id == ann.media_id
+        assert loaded.payload.value == [440.0, 0.0, 880.0]
+        assert loaded.payload.voiced == [True, False, True]
+
+
+def test_csv_roundtrip_object_with_description(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:object_desc_csv",
+        payload_kind="object",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=[{"k1": "v1"}, {"k2": 2}],
+        description="test structured objects",
+    )
+    for backend in ("polars", "pandas"):
+        file_path = tmp_path / f"object_desc_{backend}.csv"
+        save_bopp_csv(ann, file_path, backend=backend)
+        loaded = load_bopp_csv(file_path, backend=backend)
+        assert loaded.media_id == ann.media_id
+        assert loaded.payload.description == "test structured objects"
+        assert loaded.payload.value == [{"k1": "v1"}, {"k2": 2}]
+
+
+def test_csv_roundtrip_note_spn_payload(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:note_spn_csv",
+        payload_kind="note",
+        extent_kind="time",
+        time=[0.0, 1.0, 2.0],
+        value=["C4", "C♯4", "E♭3"],
+    )
+    for backend in ("polars", "pandas"):
+        file_path = tmp_path / f"note_{backend}.csv"
+        save_bopp_csv(ann, file_path, backend=backend)
+        loaded = load_bopp_csv(file_path, backend=backend)
+        assert loaded.media_id == ann.media_id
+        assert loaded.payload.value == ["C4", "C♯4", "E♭3"]
+
+
+def test_csv_roundtrip_chord_unicode_accidentals(tmp_path):
+    ann = create(
+        bopp_version="1.0",
+        media_id="track:chord_unicode_csv",
+        payload_kind="chord",
+        extent_kind="time_interval",
+        time=[0.0, 2.0],
+        duration=[2.0, 2.0],
+        value=["C♯:maj", "D♭:min7"],
+    )
+    for backend in ("polars", "pandas"):
+        file_path = tmp_path / f"chord_{backend}.csv"
+        save_bopp_csv(ann, file_path, backend=backend)
+        loaded = load_bopp_csv(file_path, backend=backend)
+        assert loaded.media_id == ann.media_id
+        assert loaded.payload.value == ["C♯:maj", "D♭:min7"]

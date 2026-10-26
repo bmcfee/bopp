@@ -10,7 +10,7 @@ from msgspec import Meta, Struct
 type ValueItem = Annotated[
     str,
     Meta(
-        pattern="^N|([A-G][b#]?)(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?$"
+        pattern="^((N)|(([A-G]([b♭]*|𝄫|[#♯]*|𝄪|♮))(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?))$"
     ),
 ]
 

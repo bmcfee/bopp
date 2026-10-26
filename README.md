@@ -78,14 +78,14 @@ In princple, BOPP data encoded as json or msgpack should be self-parsing and dir
 ### Global tags
 
 Global annotations (such as track-level tags) contain a payload without requiring an extent array.
-This annotation uses the `tag_open` payload type to indicate that each value is a string with no further constraints (i.e., open vocabulary).
+This annotation uses the `tag` payload type to indicate that each value is a string with no further constraints (i.e., open vocabulary).
 
 ```json
 {
     "media_id": "spotify:track:6rqhFgbbK3f2mR3L4A1Lpq",
     "bopp_version": "1.0",
     "payload": {
-        "payload_type": "tag_open",
+        "payload_type": "tag",
         "value": ["rock", "classic rock", "70s"]
     }
 }
@@ -199,7 +199,7 @@ import bopp
 
 ann = bopp.create(
     media_id="musicxml:score_001",
-    payload_kind="tag_open",
+    payload_kind="tag",
     extent_kind="score_interval_float",
     quarter=[-0.5, 0.0, 1.25],
     duration=[0.5, 1.25, 0.75],

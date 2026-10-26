@@ -18,7 +18,7 @@ from bopp.models.v1.grouping import Grouping
 from bopp.models.v1.metadata.derived import DerivedAnnotationMetadata
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.mood_thayer import MoodThayerPayload
-from bopp.models.v1.payload.tag_open import TagOpenPayload
+from bopp.models.v1.payload.tag import TagPayload
 from bopp.transforms import (
     AXIS_CONFIGS,
     DEFAULT_TARGET_FIELDS,
@@ -54,7 +54,7 @@ def test_derive_parents_and_sandbox_helpers():
         parents=["parent_0"],
         sandbox={"custom": [1, 2]},
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["pop"]),
+        payload=TagPayload(value=["pop"]),
     )
     parents, sandbox = _derive_parents_and_sandbox(ann, "Testing")
     assert parents == ["parent_0", "ann_1"]
@@ -67,7 +67,7 @@ def test_derive_parents_and_sandbox_helpers():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["pop"]),
+        payload=TagPayload(value=["pop"]),
     )
     with pytest.warns(UserWarning, match="Testing an annotation with no ID"):
         parents_no_id, sandbox_no_id = _derive_parents_and_sandbox(ann_no_id, "Testing")
@@ -84,7 +84,7 @@ def test_derive_parents_when_existing_parents_is_none():
         bopp_version="1.0.0",
         metadata=metadata,
         parents=None,
-        payload=TagOpenPayload(value=["test"]),
+        payload=TagPayload(value=["test"]),
     )
     parents, sandbox = _derive_parents_and_sandbox(ann, "Testing")
     assert parents == ["ann_none_parents"]
@@ -107,9 +107,7 @@ def test_subset_struct_lists_helper():
     assert subsetted.extra_scalar == 42
 
     # With overrides
-    overridden = _subset_struct_lists(
-        sample, [1], overrides={"tags": ["custom"]}
-    )
+    overridden = _subset_struct_lists(sample, [1], overrides={"tags": ["custom"]})
     assert overridden.tags == ["custom"]
     assert overridden.scores == [2.0]
 
@@ -133,7 +131,7 @@ def test_resample_struct_helper():
     assert _resample_struct(None, {}, [], {}) is None
     assert _resample_struct(msgspec.UNSET, {}, [], {}) is msgspec.UNSET
 
-    payload = TagOpenPayload(value=["apple", "banana"])
+    payload = TagPayload(value=["apple", "banana"])
     cols = _get_facet_list_fields(payload)
     resampled = _resample_struct(
         payload, cols, [1, None, 0], fill_map={"value": "empty"}
@@ -162,14 +160,14 @@ def test_rebuild_annotation_helper():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=Times(time=[1.0]),
-        payload=TagOpenPayload(value=["test"]),
+        payload=TagPayload(value=["test"]),
         groupings=[g],
     )
     rebuilt = _rebuild_annotation(
         ann,
         parents=["old_id"],
         sandbox={"foo": "bar"},
-        payload=TagOpenPayload(value=["new_test"]),
+        payload=TagPayload(value=["new_test"]),
         extent=Times(time=[2.0]),
         groupings=[Grouping(name="layer", ids=[2])],
     )
@@ -184,7 +182,7 @@ def test_rebuild_annotation_helper():
 def test_trim_invalid_arguments():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 2.0],
         value=["rock", "pop"],
@@ -210,14 +208,14 @@ def test_trim_invalid_arguments():
 def test_trim_argument_error_order():
     tm = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[0.0, 1.0],
         value=["a", "b"],
     )
     pb = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="pixel_box",
         x=[0.0],
         y=[0.0],
@@ -248,7 +246,7 @@ def test_trim_warning_no_id():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["pop"]),
+        payload=TagPayload(value=["pop"]),
     )
 
     with pytest.warns(UserWarning, match="Trimming an annotation with no ID"):
@@ -268,7 +266,7 @@ def test_trim_invalid_extent_tag():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=UntaggedExtent(time=[1.0, 2.0]),
-        payload=TagOpenPayload(value=["a", "b"]),
+        payload=TagPayload(value=["a", "b"]),
     )
     bopp.ensure_annotation_id(ann)
 
@@ -283,7 +281,7 @@ def test_trim_no_extent():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["pop"]),
+        payload=TagPayload(value=["pop"]),
     )
     bopp.ensure_annotation_id(ann)
 
@@ -299,7 +297,7 @@ def test_trim_no_extent():
 def test_trim_time_extent():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         confidence_kind="likelihood",
         time=[1.0, 3.0, 5.0, 8.0],
@@ -319,14 +317,16 @@ def test_trim_time_extent():
 
 
 def test_trim_with_groupings():
-    g1 = Grouping(name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2})
+    g1 = Grouping(
+        name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2}
+    )
     g2 = Grouping(name="stream", ids=[10, 11, 12, 13])
     ann = Annotation(
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=Times(time=[1.0, 3.0, 5.0, 8.0]),
-        payload=TagOpenPayload(value=["a", "b", "c", "d"]),
+        payload=TagPayload(value=["a", "b", "c", "d"]),
         confidence=LikelihoodConfidence(confidence=[0.1, 0.3, 0.5, 0.8]),
         groupings=[g1, g2],
     )
@@ -355,7 +355,7 @@ def test_trim_with_groupings():
 def test_trim_numeric_bounds_pass_through():
     tm = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[0.0, 1.0, 2.0],
         value=list("abc"),
@@ -378,7 +378,7 @@ def test_trim_no_extent_infinite_bound():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["pop"]),
+        payload=TagPayload(value=["pop"]),
     )
     bopp.ensure_annotation_id(ann)
 
@@ -392,7 +392,7 @@ def test_trim_point_extent_open_ended_bounds():
     """Verify trim on point extent with only start, only end, and check boundary conditions."""
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 2.0, 3.0, 4.0, 5.0],
         value=["a", "b", "c", "d", "e"],
@@ -413,7 +413,7 @@ def test_trim_time_interval_non_strict():
     # Intervals: [0, 2], [2, 6], [5, 9]
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time_interval",
         confidence_kind="likelihood",
         time=[0.0, 2.0, 5.0],
@@ -439,7 +439,7 @@ def test_trim_time_interval_strict():
     # Intervals: [0, 2], [2, 6], [5, 9]
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time_interval",
         time=[0.0, 2.0, 5.0],
         duration=[2.0, 4.0, 4.0],
@@ -464,7 +464,7 @@ def test_trim_time_frequency_box():
             freq_min=[100.0, 200.0],
             freq_max=[500.0, 800.0],
         ),
-        payload=TagOpenPayload(value=["low", "high"]),
+        payload=TagPayload(value=["low", "high"]),
     )
     bopp.ensure_annotation_id(ann)
 
@@ -488,18 +488,22 @@ def test_trim_time_frequency_box_along_frequency():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=extent,
-        payload=TagOpenPayload(value=["low", "mid", "high", "ultra"]),
+        payload=TagPayload(value=["low", "mid", "high", "ultra"]),
     )
     bopp.ensure_annotation_id(ann)
 
     # Trim frequency axis non-strict [250..600]
-    trimmed_freq = trim(ann, start=250.0, end=600.0, target_field="frequency", reset=True)
+    trimmed_freq = trim(
+        ann, start=250.0, end=600.0, target_field="frequency", reset=True
+    )
     assert trimmed_freq.extent.freq_min == [0.0, 0.0, 250.0]
     assert trimmed_freq.extent.freq_max == [50.0, 150.0, 350.0]
     assert trimmed_freq.payload.value == ["low", "mid", "high"]
 
     # Trim frequency axis strict (150 to 450 strictly contains [200, 400])
-    trimmed_freq_strict = trim(ann, start=150.0, end=450.0, target_field="frequency", strict=True)
+    trimmed_freq_strict = trim(
+        ann, start=150.0, end=450.0, target_field="frequency", strict=True
+    )
     assert trimmed_freq_strict.extent.freq_min == [200.0]
     assert trimmed_freq_strict.extent.freq_max == [400.0]
     assert trimmed_freq_strict.payload.value == ["mid"]
@@ -517,18 +521,22 @@ def test_trim_min_max_strict_and_non_strict():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=extent,
-        payload=TagOpenPayload(value=["low", "mid", "high", "ultra"]),
+        payload=TagPayload(value=["low", "mid", "high", "ultra"]),
     )
     bopp.ensure_annotation_id(ann)
 
     # Non-strict trim with start and end
-    trimmed_non_strict = trim(ann, start=150.0, end=600.0, target_field="frequency", strict=False)
+    trimmed_non_strict = trim(
+        ann, start=150.0, end=600.0, target_field="frequency", strict=False
+    )
     assert trimmed_non_strict.extent.freq_min == [200.0, 500.0]
     assert trimmed_non_strict.extent.freq_max == [400.0, 600.0]
     assert trimmed_non_strict.payload.value == ["mid", "high"]
 
     # Non-strict trim with only start (tests start is not None, end is None branch)
-    trimmed_only_start_ns = trim(ann, start=300.0, target_field="frequency", strict=False)
+    trimmed_only_start_ns = trim(
+        ann, start=300.0, target_field="frequency", strict=False
+    )
     assert trimmed_only_start_ns.extent.freq_min == [300.0, 500.0, 700.0]
     assert trimmed_only_start_ns.extent.freq_max == [400.0, 800.0, 900.0]
 
@@ -538,7 +546,9 @@ def test_trim_min_max_strict_and_non_strict():
     assert trimmed_only_end_ns.extent.freq_max == [100.0, 400.0]
 
     # Strict trim with start and end
-    trimmed_strict = trim(ann, start=150.0, end=600.0, target_field="frequency", strict=True)
+    trimmed_strict = trim(
+        ann, start=150.0, end=600.0, target_field="frequency", strict=True
+    )
     assert trimmed_strict.extent.freq_min == [200.0]
     assert trimmed_strict.extent.freq_max == [400.0]
     assert trimmed_strict.payload.value == ["mid"]
@@ -568,11 +578,13 @@ def test_trim_empty_and_out_of_bounds_extents():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=extent_empty,
-        payload=TagOpenPayload(value=[]),
+        payload=TagPayload(value=[]),
     )
     bopp.ensure_annotation_id(ann_empty)
 
-    trimmed_empty = trim(ann_empty, start=100.0, end=200.0, target_field="frequency", strict=True)
+    trimmed_empty = trim(
+        ann_empty, start=100.0, end=200.0, target_field="frequency", strict=True
+    )
     assert trimmed_empty.extent.freq_min == []
     assert trimmed_empty.extent.freq_max == []
     assert trimmed_empty.payload.value == []
@@ -590,12 +602,14 @@ def test_trim_empty_and_out_of_bounds_extents():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=extent_out_of_bounds,
-        payload=TagOpenPayload(value=["low1", "low2"]),
+        payload=TagPayload(value=["low1", "low2"]),
     )
     bopp.ensure_annotation_id(ann_oob)
 
     # Trim frequency axis [100.0, 200.0] - all observations should be filtered out
-    trimmed_oob = trim(ann_oob, start=100.0, end=200.0, target_field="frequency", strict=False)
+    trimmed_oob = trim(
+        ann_oob, start=100.0, end=200.0, target_field="frequency", strict=False
+    )
     assert trimmed_oob.extent.freq_min == []
     assert trimmed_oob.extent.freq_max == []
     assert trimmed_oob.payload.value == []
@@ -605,7 +619,7 @@ def test_trim_empty_and_out_of_bounds_extents():
 def test_trim_pixel_box():
     ann = create(
         media_id="test_image",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="pixel_box",
         x=[10.0, 50.0, 100.0],
         width=[20.0, 30.0, 40.0],
@@ -635,7 +649,7 @@ def test_trim_pixel_box():
 def test_trim_transitive_parents_and_immutability():
     ann1 = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 3.0, 5.0, 8.0],
         value=["a", "b", "c", "d"],
@@ -677,7 +691,7 @@ def test_filter_record_attribute_access():
 def test_filter_by_default_payload():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         confidence_kind="likelihood",
         time=[1.0, 2.0, 3.0, 4.0],
@@ -699,7 +713,7 @@ def test_filter_by_default_payload():
 def test_filter_by_target_on_payload():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 2.0, 3.0],
         value=["rock", "pop", "metal"],
@@ -713,7 +727,7 @@ def test_filter_by_target_on_payload():
 def test_filter_by_target_on_extent():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         confidence_kind="likelihood",
         time=[1.0, 2.0, 3.0, 4.0],
@@ -730,7 +744,7 @@ def test_filter_by_target_on_extent():
 def test_filter_by_confidence_facet():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         confidence_kind="likelihood",
         time=[1.0, 2.0, 3.0],
@@ -738,27 +752,33 @@ def test_filter_by_confidence_facet():
         confidence=[0.2, 0.8, 0.5],
     )
 
-    filtered = filter_by(ann, lambda c: c >= 0.5, facet="confidence", target="confidence")
+    filtered = filter_by(
+        ann, lambda c: c >= 0.5, facet="confidence", target="confidence"
+    )
     assert filtered.confidence.confidence == [0.8, 0.5]
     assert filtered.payload.value == ["b", "c"]
     assert filtered.extent.time == [2.0, 3.0]
 
 
 def test_filter_by_groupings_facet():
-    g1 = Grouping(name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2})
+    g1 = Grouping(
+        name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2}
+    )
     g2 = Grouping(name="track", ids=[10, 20, 20, 30])
     ann = Annotation(
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
-        payload=TagOpenPayload(value=["a", "b", "c", "d"]),
+        payload=TagPayload(value=["a", "b", "c", "d"]),
         groupings=[g1, g2],
     )
     bopp.ensure_annotation_id(ann)
 
     # Filter by specific grouping target
-    res_verse = filter_by(ann, lambda gid: gid == 1, facet="groupings", target="pattern")
+    res_verse = filter_by(
+        ann, lambda gid: gid == 1, facet="groupings", target="pattern"
+    )
     assert res_verse.payload.value == ["b", "c"]
     assert res_verse.extent.time == [2.0, 3.0]
     assert res_verse.groupings[0].ids == [1, 1]
@@ -766,7 +786,9 @@ def test_filter_by_groupings_facet():
     assert bopp.validate(res_verse)
 
     # Filter with record access across multiple grouping layers
-    res_rec = filter_by(ann, lambda r: r.pattern == 1 and r.track == 20, facet="groupings")
+    res_rec = filter_by(
+        ann, lambda r: r.pattern == 1 and r.track == 20, facet="groupings"
+    )
     assert res_rec.payload.value == ["b", "c"]
 
     # Filter when only 1 grouping is present and target is None
@@ -776,7 +798,7 @@ def test_filter_by_groupings_facet():
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 2.0]),
-        payload=TagOpenPayload(value=["a", "b"]),
+        payload=TagPayload(value=["a", "b"]),
         groupings=[g_single],
     )
     bopp.ensure_annotation_id(ann_single_g)
@@ -814,7 +836,7 @@ def test_filter_by_facet_all():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
-        payload=TagOpenPayload(value=["intro", "verse", "chorus", "verse"]),
+        payload=TagPayload(value=["intro", "verse", "chorus", "verse"]),
         confidence=LikelihoodConfidence(confidence=[0.9, 0.4, 0.95, 0.85]),
         groupings=[g],
     )
@@ -862,7 +884,7 @@ def test_filter_by_skips_empty_facet_in_obs_counting():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["one", "two", "three"]),
+        payload=TagPayload(value=["one", "two", "three"]),
     )
     filtered = filter_by(ann, lambda v: v != "two")
     assert filtered.payload.value == ["one", "three"]
@@ -872,7 +894,7 @@ def test_filter_by_skips_empty_facet_in_obs_counting():
 def test_filter_by_invalid_arguments():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 2.0],
         value=["a", "b"],
@@ -887,10 +909,15 @@ def test_filter_by_invalid_arguments():
     with pytest.raises(BoppArgumentError, match="Facet 'groupings' is not present"):
         filter_by(ann, lambda x: True, facet="groupings")
 
-    with pytest.raises(BoppArgumentError, match="Target field 'unknown' not found in facet 'payload'"):
+    with pytest.raises(
+        BoppArgumentError, match="Target field 'unknown' not found in facet 'payload'"
+    ):
         filter_by(ann, lambda x: True, target="unknown")
 
-    with pytest.raises(BoppArgumentError, match="Target field 'unknown' not found in any annotation facet"):
+    with pytest.raises(
+        BoppArgumentError,
+        match="Target field 'unknown' not found in any annotation facet",
+    ):
         filter_by(ann, lambda x: True, facet="all", target="unknown")
 
     # Groupings target not found
@@ -899,11 +926,13 @@ def test_filter_by_invalid_arguments():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0]),
-        payload=TagOpenPayload(value=["a"]),
+        payload=TagPayload(value=["a"]),
         groupings=[Grouping(name="valid_layer", ids=[0])],
     )
     bopp.ensure_annotation_id(ann_with_g)
-    with pytest.raises(BoppArgumentError, match="Target grouping 'invalid_layer' not found"):
+    with pytest.raises(
+        BoppArgumentError, match="Target grouping 'invalid_layer' not found"
+    ):
         filter_by(ann_with_g, lambda x: True, facet="groupings", target="invalid_layer")
 
 
@@ -914,7 +943,7 @@ def test_filter_by_no_id_warning():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["pop"]),
+        payload=TagPayload(value=["pop"]),
     )
 
     with pytest.warns(UserWarning, match="Filtering an annotation with no ID"):
@@ -928,7 +957,7 @@ def test_filter_by_no_id_warning():
 def test_filter_by_empty_or_none_remaining():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 2.0],
         value=["a", "b"],
@@ -949,7 +978,7 @@ def test_filter_by_empty_or_none_remaining():
 def test_filter_by_sandbox_and_immutability():
     ann = create(
         media_id="test_media",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 2.0],
         value=["a", "b"],
@@ -968,18 +997,22 @@ def test_filter_by_sandbox_and_immutability():
 def test_to_times_invalid_args():
     ann = create(
         media_id="test",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 2.0],
         value=["a", "b"],
     )
 
     # Neither times nor sample_rate
-    with pytest.raises(BoppArgumentError, match="Exactly one of 'times' or 'sample_rate'"):
+    with pytest.raises(
+        BoppArgumentError, match="Exactly one of 'times' or 'sample_rate'"
+    ):
         to_times(ann)
 
     # Both times and sample_rate
-    with pytest.raises(BoppArgumentError, match="Exactly one of 'times' or 'sample_rate'"):
+    with pytest.raises(
+        BoppArgumentError, match="Exactly one of 'times' or 'sample_rate'"
+    ):
         to_times(ann, times=[1.0], sample_rate=2.0)
 
     # Non-positive sample_rate
@@ -1000,7 +1033,7 @@ def test_to_times_invalid_args():
 def test_to_times_incompatible_extent():
     ann = create(
         media_id="img",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="pixel_box",
         x=[0.0],
         y=[0.0],
@@ -1016,7 +1049,7 @@ def test_to_times_incompatible_extent_types():
     """Verify to_times rejects unsupported extent types like midi_tick or score_quarter."""
     ann_midi = create(
         media_id="track",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="midi_tick",
         tick=[0, 480],
         value=["a", "b"],
@@ -1026,7 +1059,7 @@ def test_to_times_incompatible_extent_types():
 
     ann_score = create(
         media_id="track",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_quarter",
         quarter=[[0, 1], [1, 1]],
         value=["a", "b"],
@@ -1038,7 +1071,7 @@ def test_to_times_incompatible_extent_types():
 def test_to_times_from_time_interval_with_sample_rate():
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time_interval",
         confidence_kind="likelihood",
         time=[0.0, 2.0],
@@ -1067,7 +1100,7 @@ def test_to_times_with_groupings():
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
         extent=Times(time=[1.0, 3.0]),
-        payload=TagOpenPayload(value=["a", "b"]),
+        payload=TagPayload(value=["a", "b"]),
         confidence=LikelihoodConfidence(confidence=[0.7, 0.9]),
         groupings=[g1, g2],
     )
@@ -1077,7 +1110,12 @@ def test_to_times_with_groupings():
     res = to_times(
         ann,
         times=[0.0, 1.5, 3.0],
-        fill_value={"value": "gap_val", "confidence": 0.0, "pattern": -1, "source": -99},
+        fill_value={
+            "value": "gap_val",
+            "confidence": 0.0,
+            "pattern": -1,
+            "source": -99,
+        },
     )
     assert res.extent.time == [0.0, 1.5, 3.0]
     assert res.payload.value == ["gap_val", "a", "b"]
@@ -1106,7 +1144,7 @@ def test_to_times_with_groupings():
 def test_to_times_overlap_strategies():
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time_interval",
         time=[0.0, 1.0],
         duration=[2.0, 2.0],
@@ -1128,7 +1166,7 @@ def test_to_times_overlap_strategies():
 def test_to_times_interval_gaps_and_fill_value():
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time_interval",
         confidence_kind="likelihood",
         time=[1.0],
@@ -1150,14 +1188,16 @@ def test_to_times_interval_gaps_and_fill_value():
 def test_to_times_from_point_time_extent():
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0, 3.0],
         value=["a", "b"],
     )
 
     # previous lookup
-    res_prev = to_times(ann, times=[0.5, 1.5, 3.0, 4.0], method="previous", fill_value="none")
+    res_prev = to_times(
+        ann, times=[0.5, 1.5, 3.0, 4.0], method="previous", fill_value="none"
+    )
     assert res_prev.payload.value == ["none", "a", "b", "b"]
 
     # nearest lookup
@@ -1172,7 +1212,7 @@ def test_to_times_global_annotation():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["rock"]),
+        payload=TagPayload(value=["rock"]),
     )
     bopp.ensure_annotation_id(ann)
 
@@ -1197,7 +1237,7 @@ def test_to_times_time_frequency_box():
             freq_min=[100.0, 200.0],
             freq_max=[500.0, 600.0],
         ),
-        payload=TagOpenPayload(value=["low", "high"]),
+        payload=TagPayload(value=["low", "high"]),
     )
     bopp.ensure_annotation_id(ann)
 
@@ -1210,7 +1250,7 @@ def test_to_times_fill_value_dict_with_value_fallback_and_confidence():
     """Verify fill_value dict with 'value' key fallback for single-column payload and confidence fill."""
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time_interval",
         confidence_kind="likelihood",
         time=[1.0],
@@ -1265,7 +1305,9 @@ def test_to_times_multi_column_payload_dict_fill():
         to_times(ann, times=[0.0], fill_value=0.0)
 
     # Incomplete dict raises error
-    with pytest.raises(BoppArgumentError, match="Missing fill value for payload field 'arousal'"):
+    with pytest.raises(
+        BoppArgumentError, match="Missing fill value for payload field 'arousal'"
+    ):
         to_times(ann, times=[0.0], fill_value={"valence": 0.0})
 
     # Proper dict fill
@@ -1277,7 +1319,10 @@ def test_to_times_multi_column_payload_dict_fill():
 
 def test_to_times_multi_column_payload_none_fill_value():
     """Verify multi-column payload with fill_value=None successfully fills missing positions with None."""
-    class OptionalFieldPayload(msgspec.Struct, tag_field="payload_type", tag="opt_payload"):
+
+    class OptionalFieldPayload(
+        msgspec.Struct, tag_field="payload_type", tag="opt_payload"
+    ):
         label: list[str | None]
         comment: list[str | None]
 
@@ -1301,7 +1346,7 @@ def test_to_times_sample_rate_grid_boundary_pop():
     """Verify target_times grid trimming when step multiple lands precisely on t_max."""
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[0.0, 1.0],
         value=["start", "end"],
@@ -1314,14 +1359,14 @@ def test_to_times_sample_rate_grid_boundary_pop():
 def test_to_times_fill_value_type_validation_error():
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time_interval",
         time=[1.0],
         duration=[1.0],
         value=["tag"],
     )
 
-    # tag_open requires list[str], so passing an invalid non-string (int) causes validation error
+    # tag requires list[str], so passing an invalid non-string (int) causes validation error
     with pytest.raises(BoppValidationError, match="Invalid fill value"):
         to_times(ann, times=[0.0], fill_value=123)  # type: ignore[arg-type]
 
@@ -1329,7 +1374,7 @@ def test_to_times_fill_value_type_validation_error():
 def test_to_times_empty_annotation_and_empty_times():
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[],
         value=[],
@@ -1354,7 +1399,7 @@ def test_to_times_empty_annotation_with_confidence_and_fill():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=Times(time=[]),
-        payload=TagOpenPayload(value=[]),
+        payload=TagPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )
     bopp.ensure_annotation_id(ann)
@@ -1373,20 +1418,26 @@ def test_to_times_empty_annotation_confidence_fill_validation_failure():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=Times(time=[]),
-        payload=TagOpenPayload(value=[]),
+        payload=TagPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )
     bopp.ensure_annotation_id(ann)
 
-    with pytest.raises(BoppValidationError, match="Invalid fill value for confidence struct"):
-        to_times(ann, times=[0.0, 1.0], fill_value={"value": "silence", "confidence": "not_a_float"})
+    with pytest.raises(
+        BoppValidationError, match="Invalid fill value for confidence struct"
+    ):
+        to_times(
+            ann,
+            times=[0.0, 1.0],
+            fill_value={"value": "silence", "confidence": "not_a_float"},
+        )
 
 
 def test_to_times_point_extent_previous_with_gaps_before_first_observation():
     """Verify that queries before the first timestamp in method='previous' produce gaps and trigger fill."""
     ann = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[5.0, 10.0],
         value=["a", "b"],
@@ -1403,7 +1454,7 @@ def test_to_times_warning_no_id_and_immutability():
         bopp_version="1.0.0",
         metadata=metadata,
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["v"]),
+        payload=TagPayload(value=["v"]),
     )
 
     with pytest.warns(UserWarning, match="Converting an annotation with no ID"):
@@ -1414,7 +1465,7 @@ def test_to_times_warning_no_id_and_immutability():
     # Verify immutability
     ann_with_id = create(
         media_id="audio",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[1.0],
         value=["val"],
@@ -1429,7 +1480,7 @@ def test_to_times_warning_no_id_and_immutability():
 def test_trim_fraction_points():
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_quarter",
         quarter=[[-1, 1], [-1, 2], [0, 1], [2, 4], [1, 1]],
         value=list("abcde"),
@@ -1461,7 +1512,7 @@ def test_trim_fraction_points():
 def test_trim_fraction_intervals(reset, strict):
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_interval",
         quarter=[[-1, 2], [0, 1], [2, 4], [1, 1], [3, 2]],
         duration=[[1, 1], [2, 2], [1, 2], [1, 1], [1, 1]],
@@ -1474,7 +1525,9 @@ def test_trim_fraction_intervals(reset, strict):
         expected_durations = [[1, 2]]
         expected_values = ["c"]
     else:
-        expected_quarters = [[0, 1], [0, 1], [1, 2]] if reset else [[1, 2], [1, 2], [1, 1]]
+        expected_quarters = (
+            [[0, 1], [0, 1], [1, 2]] if reset else [[1, 2], [1, 2], [1, 1]]
+        )
         expected_durations = [[1, 2], [1, 2], [1, 2]]
         expected_values = list("bcd")
     assert [list(q) for q in result.extent.quarter] == expected_quarters
@@ -1489,11 +1542,14 @@ def test_trim_fraction_intervals(reset, strict):
     assert empty.payload.value == []
 
 
-@pytest.mark.parametrize("strict, expected_values", [(False, ["inside"]), (True, ["left", "inside", "right"])])
+@pytest.mark.parametrize(
+    "strict, expected_values",
+    [(False, ["inside"]), (True, ["left", "inside", "right"])],
+)
 def test_trim_fraction_interval_boundaries(strict, expected_values):
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_interval",
         quarter=[[1, 2], [1, 2], [1, 1]],
         duration=[[0, 1], [1, 2], [0, 1]],
@@ -1511,7 +1567,7 @@ def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_kind):
     kwargs = {"duration": [[1, 2]] * 4} if extent_kind == "score_interval" else {}
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind=extent_kind,
         quarter=[[-1, 2], [0, 1], [2, 4], [1, 1]],
         value=list("abcd"),
@@ -1526,7 +1582,9 @@ def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_kind):
     if kwargs:
         assert [list(d) for d in result.extent.duration] == [[1, 2], [1, 2]]
     assert result.payload.value == list("cd")
-    assert result.metadata.parameters["start"] == (0.5 if isinstance(bound, float) else [1, 2])
+    assert result.metadata.parameters["start"] == (
+        0.5 if isinstance(bound, float) else [1, 2]
+    )
     assert result.metadata.parameters["end"] == [3, 2]
     assert not any(isinstance(v, Fraction) for v in result.metadata.parameters.values())
     assert bopp.validate(result)
@@ -1541,7 +1599,7 @@ def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_kind):
 def test_trim_fraction_exact_float_bound():
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_interval",
         quarter=[[0, 1]],
         duration=[[1, 1]],
@@ -1558,26 +1616,32 @@ def test_trim_fraction_exact_float_bound():
     assert isinstance(result.metadata.parameters["end"], int)
 
 
-@pytest.mark.parametrize("bound", [[1, 0], [1, -2], [1, 2, 3], [], [1.0, 2], [1, "2"], [1, True], [True, 2]])
+@pytest.mark.parametrize(
+    "bound", [[1, 0], [1, -2], [1, 2, 3], [], [1.0, 2], [1, "2"], [1, True], [True, 2]]
+)
 @pytest.mark.parametrize("name", ["start", "end"])
 def test_trim_fraction_malformed_bounds(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
-    with pytest.raises(BoppArgumentError, match="Fraction bound must be a pair of ints"):
+    with pytest.raises(
+        BoppArgumentError, match="Fraction bound must be a pair of ints"
+    ):
         trim(ann, **{name: bound})
 
 
-@pytest.mark.parametrize("bound", ["1/2", Decimal("0.5"), float("nan"), float("inf"), True])
+@pytest.mark.parametrize(
+    "bound", ["1/2", Decimal("0.5"), float("nan"), float("inf"), True]
+)
 @pytest.mark.parametrize("name", ["start", "end"])
 def test_trim_fraction_unsupported_bounds(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
@@ -1589,12 +1653,15 @@ def test_trim_fraction_unsupported_bounds(bound, name):
 def test_trim_fraction_non_comparable_bounds():
     pt = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
-    with pytest.raises(BoppArgumentError, match="Trim bound must be an int, finite float, Fraction, or pair of ints"):
+    with pytest.raises(
+        BoppArgumentError,
+        match="Trim bound must be an int, finite float, Fraction, or pair of ints",
+    ):
         trim(pt, start="1/2", end=Fraction(1))
 
 
@@ -1603,21 +1670,24 @@ def test_trim_fraction_non_comparable_bounds():
 def test_trim_fraction_validates_bounds_before_order(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_interval",
         quarter=[[0, 1]],
         duration=[[1, 1]],
         value=["a"],
     )
     bounds = {"start": 0, "end": 1, name: bound}
-    with pytest.raises(BoppArgumentError, match="Trim bound must be an int, finite float, Fraction, or pair of ints"):
+    with pytest.raises(
+        BoppArgumentError,
+        match="Trim bound must be an int, finite float, Fraction, or pair of ints",
+    ):
         trim(ann, **bounds)
 
 
 def test_trim_numeric_rejects_string_before_order():
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[0.0, 1.0],
         value=list("ab"),
@@ -1626,13 +1696,35 @@ def test_trim_numeric_rejects_string_before_order():
         trim(ann, start="a", end=1)
 
 
-@pytest.mark.parametrize("extent_kind", ["time", "time_interval", "midi_interval", None])
+@pytest.mark.parametrize(
+    "extent_kind", ["time", "time_interval", "midi_interval", None]
+)
 @pytest.mark.parametrize(
     "bound",
-    [Decimal("0.5"), Decimal("NaN"), Decimal("sNaN"), math.nan, "a", True, np.float64(0.5), np.int64(1)],
-    ids=["decimal", "decimal_nan", "decimal_snan", "nan", "string", "bool", "numpy_float", "numpy_int"],
+    [
+        Decimal("0.5"),
+        Decimal("NaN"),
+        Decimal("sNaN"),
+        math.nan,
+        "a",
+        True,
+        np.float64(0.5),
+        np.int64(1),
+    ],
+    ids=[
+        "decimal",
+        "decimal_nan",
+        "decimal_snan",
+        "nan",
+        "string",
+        "bool",
+        "numpy_float",
+        "numpy_int",
+    ],
 )
-@pytest.mark.parametrize("position", ["start", "end", "both", "start_with_end", "end_with_start"])
+@pytest.mark.parametrize(
+    "position", ["start", "end", "both", "start_with_end", "end_with_start"]
+)
 def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
     if extent_kind is None:
         ann = Annotation(
@@ -1640,7 +1732,7 @@ def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
             bopp_version="1.0.0",
             metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
             extent=msgspec.UNSET,
-            payload=TagOpenPayload(value=["a"]),
+            payload=TagPayload(value=["a"]),
         )
         bopp.ensure_annotation_id(ann)
     else:
@@ -1649,7 +1741,7 @@ def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
             coords["duration"] = [1]
         ann = create(
             media_id="track:1",
-            payload_kind="tag_open",
+            payload_kind="tag",
             extent_kind=extent_kind,
             value=["a"],
             **coords,
@@ -1661,7 +1753,11 @@ def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
         "start_with_end": {"start": bound, "end": 2},
         "end_with_start": {"start": 0, "end": bound},
     }[position]
-    message = "Trim bound must not be NaN" if type(bound) is float else "Trim bound must be an int or float"
+    message = (
+        "Trim bound must not be NaN"
+        if type(bound) is float
+        else "Trim bound must be an int or float"
+    )
     with pytest.raises(BoppArgumentError, match=message):
         trim(ann, **bounds)
 
@@ -1672,46 +1768,59 @@ def test_trim_no_extent_rejects_fraction_before_order():
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
         extent=msgspec.UNSET,
-        payload=TagOpenPayload(value=["a"]),
+        payload=TagPayload(value=["a"]),
     )
     bopp.ensure_annotation_id(ann)
-    with pytest.raises(BoppArgumentError, match="Fraction or pair bounds require a fraction axis"):
+    with pytest.raises(
+        BoppArgumentError, match="Fraction or pair bounds require a fraction axis"
+    ):
         trim(ann, start=[9, 1], end=5)
 
 
 def test_trim_numeric_rejects_fraction_before_order():
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[0.0, 1.0],
         value=list("ab"),
     )
-    with pytest.raises(BoppArgumentError, match="Fraction or pair bounds require a fraction axis"):
+    with pytest.raises(
+        BoppArgumentError, match="Fraction or pair bounds require a fraction axis"
+    ):
         trim(ann, start=[9, 1], end=5)
 
 
 def test_trim_fraction_reversed_bounds_message():
     pt = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
-    with pytest.raises(BoppArgumentError, match=r"start \(0\.3\) must be <= end \(0\.1\)"):
+    with pytest.raises(
+        BoppArgumentError, match=r"start \(0\.3\) must be <= end \(0\.1\)"
+    ):
         trim(pt, start=0.3, end=0.1)
-    with pytest.raises(BoppArgumentError, match=r"start \(\[3, 1\]\) must be <= end \(1\)"):
+    with pytest.raises(
+        BoppArgumentError, match=r"start \(\[3, 1\]\) must be <= end \(1\)"
+    ):
         trim(pt, start=[3, 1], end=1)
-    with pytest.raises(BoppArgumentError, match=r"start \(\[3, 1\]\) must be <= end \(1\)"):
+    with pytest.raises(
+        BoppArgumentError, match=r"start \(\[3, 1\]\) must be <= end \(1\)"
+    ):
         trim(pt, start=(3, 1), end=1)
 
 
-@pytest.mark.parametrize("start, end", [([3, 1], 1), (Fraction(3), [1, 1]), (3.0, (1, 1)), ((3, 1), Fraction(1))])
+@pytest.mark.parametrize(
+    "start, end",
+    [([3, 1], 1), (Fraction(3), [1, 1]), (3.0, (1, 1)), ((3, 1), Fraction(1))],
+)
 def test_trim_fraction_reversed_bounds(start, end):
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
@@ -1725,7 +1834,7 @@ def test_trim_fraction_reversed_bounds(start, end):
 def test_trim_numeric_axis_rejects_fraction_bounds(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="time",
         time=[0.0, 1.0],
         value=list("ab"),
@@ -1737,7 +1846,7 @@ def test_trim_numeric_axis_rejects_fraction_bounds(bound, name):
 def test_trim_midi_tick():
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="midi_tick",
         tick=[0, 240, 480, 960],
         value=list("abcd"),
@@ -1750,7 +1859,7 @@ def test_trim_midi_tick():
 def test_trim_midi_interval():
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="midi_interval",
         tick=[0, 240, 480, 960],
         duration=[480, 240, 480, 240],
@@ -1771,22 +1880,26 @@ def test_trim_axis_configuration_keys():
     ]:
         assert DEFAULT_TARGET_FIELDS[tag] == field
         assert AXIS_CONFIGS[(tag, field)] == (kind, field, span)
-    assert FRACTION_AXES == frozenset({
-        ("score_quarter", "quarter"),
-        ("score_interval", "quarter"),
-    })
+    assert FRACTION_AXES == frozenset(
+        {
+            ("score_quarter", "quarter"),
+            ("score_interval", "quarter"),
+        }
+    )
 
 
 def test_filter_by_fraction_extent():
     ann = create(
         media_id="track:1",
-        payload_kind="tag_open",
+        payload_kind="tag",
         extent_kind="score_interval",
         quarter=[[-1, 2], [2, 4], [1, 1], [3, 2]],
         duration=[[1, 2], [1, 2], [2, 1], [1, 1]],
         value=list("abcd"),
     )
-    result = filter_by(ann, lambda q: Fraction(*q) >= 1, facet="extent", target="quarter")
+    result = filter_by(
+        ann, lambda q: Fraction(*q) >= 1, facet="extent", target="quarter"
+    )
     assert [list(q) for q in result.extent.quarter] == [[1, 1], [3, 2]]
     assert [list(d) for d in result.extent.duration] == [[2, 1], [1, 1]]
     assert result.payload.value == list("cd")
@@ -1801,16 +1914,32 @@ def test_filter_by_all_name_collision():
         value=[1, 1],
         groupings=[Grouping(name="time", ids=[0, 1])],
     )
-    with pytest.raises(BoppArgumentError, match="Ambiguous target field 'time' found in multiple facets when facet='all'"):
+    with pytest.raises(
+        BoppArgumentError,
+        match="Ambiguous target field 'time' found in multiple facets when facet='all'",
+    ):
         filter_by(ann, lambda x: x > 0, facet="all", target="time")
 
-    with pytest.raises(BoppArgumentError, match=r"Column name collision across facets for \['time'\] when facet='all'"):
+    with pytest.raises(
+        BoppArgumentError,
+        match=r"Column name collision across facets for \['time'\] when facet='all'",
+    ):
         filter_by(ann, lambda r: r.time > 0, facet="all")
 
 
 SCORE_CONVERSIONS = [
-    ("to_score_quarter", "score_quarter_float", "score_quarter", {"max_denominator": 12}),
-    ("to_score_interval", "score_interval_float", "score_interval", {"max_denominator": 12}),
+    (
+        "to_score_quarter",
+        "score_quarter_float",
+        "score_quarter",
+        {"max_denominator": 12},
+    ),
+    (
+        "to_score_interval",
+        "score_interval_float",
+        "score_interval",
+        {"max_denominator": 12},
+    ),
     ("to_score_quarter_float", "score_quarter", "score_quarter_float", {}),
     ("to_score_interval_float", "score_interval", "score_interval_float", {}),
 ]
@@ -1820,17 +1949,22 @@ def _score_annotation(tag, **kwargs):
     """Create representative score columns, including zero and negative positions."""
     columns = (
         {"quarter": [-0.5, 0.0, 0.5, 1.0 / 3.0, 3.0]}
-        if tag.endswith("_float") else
-        {"quarter": [[-1, 2], [0, 1], [2, 4], [1, 3], [3, 1]]}
+        if tag.endswith("_float")
+        else {"quarter": [[-1, 2], [0, 1], [2, 4], [1, 3], [3, 1]]}
     )
     if "interval" in tag:
         columns["duration"] = (
-            [0.0, 0.5, 1.0 / 3.0, 3.0, 0.125] if tag.endswith("_float") else
-            [[0, 1], [2, 4], [1, 3], [3, 1], [1, 8]]
+            [0.0, 0.5, 1.0 / 3.0, 3.0, 0.125]
+            if tag.endswith("_float")
+            else [[0, 1], [2, 4], [1, 3], [3, 1], [1, 8]]
         )
     return create(
-        media_id="track:score", payload_kind="tag_open", extent_kind=tag,
-        value=list("abcde"), **columns, **kwargs,
+        media_id="track:score",
+        payload_kind="tag",
+        extent_kind=tag,
+        value=list("abcde"),
+        **columns,
+        **kwargs,
     )
 
 
@@ -1844,7 +1978,9 @@ def test_score_conversion_values_and_provenance(name, source, target, kwargs, de
     convert = getattr(bopp, name)
     assert convert is getattr(bopp.transforms, name)
     result = convert(ann, **kwargs)
-    target_cls = bopp.registries.get_registry(ann.bopp_version)["EXTENT_TYPE_REGISTRY"][target]
+    target_cls = bopp.registries.get_registry(ann.bopp_version)["EXTENT_TYPE_REGISTRY"][
+        target
+    ]
     assert type(result.extent) is target_cls
     if target.endswith("_float"):
         assert result.extent.quarter == [-0.5, 0.0, 0.5, 1.0 / 3.0, 3.0]
@@ -1878,18 +2014,24 @@ def test_score_conversion_values_and_provenance(name, source, target, kwargs, de
 
 
 @pytest.mark.parametrize("shape", ["quarter", "interval"])
-@pytest.mark.parametrize("value, bound, expected", [
-    (0.3333333333333333, 1, [0, 1]),
-    (0.3333333333333333, 2, [1, 2]),
-    (0.3333333333333333, 3, [1, 3]),
-    (2.2, 5, [11, 5]),
-    (1.1, 5, [6, 5]),
-    (-1.1, 5, [-6, 5]),
-])
+@pytest.mark.parametrize(
+    "value, bound, expected",
+    [
+        (0.3333333333333333, 1, [0, 1]),
+        (0.3333333333333333, 2, [1, 2]),
+        (0.3333333333333333, 3, [1, 3]),
+        (2.2, 5, [11, 5]),
+        (1.1, 5, [6, 5]),
+        (-1.1, 5, [-6, 5]),
+    ],
+)
 def test_score_conversion_denominator_bound(shape, value, bound, expected):
     ann = create(
-        media_id="track:score", payload_kind="tag_open", extent_kind=f"score_{shape}_float",
-        quarter=[value], value=["a"],
+        media_id="track:score",
+        payload_kind="tag",
+        extent_kind=f"score_{shape}_float",
+        quarter=[value],
+        value=["a"],
         **({"duration": [abs(value)]} if shape == "interval" else {}),
     )
     result = getattr(bopp, f"to_score_{shape}")(ann, max_denominator=bound)
@@ -1914,8 +2056,11 @@ def test_score_conversion_roundtrips(shape):
     assert result.parents == [source.id, intermediate.id]
 
     source = create(
-        media_id="track:score", payload_kind="tag_open", extent_kind=f"score_{shape}_float",
-        quarter=[0.0, 0.125, -0.75, 2.375], value=list("abcd"),
+        media_id="track:score",
+        payload_kind="tag",
+        extent_kind=f"score_{shape}_float",
+        quarter=[0.0, 0.125, -0.75, 2.375],
+        value=list("abcd"),
         **({"duration": [0.0, 0.125, 0.75, 2.375]} if shape == "interval" else {}),
     )
     intermediate = rational(source, max_denominator=8)
@@ -1924,23 +2069,40 @@ def test_score_conversion_roundtrips(shape):
     assert result.parents == [source.id, intermediate.id]
 
 
-@pytest.mark.parametrize("name, source, target, kwargs, tag", [
-    (*conversion, tag)
-    for conversion in SCORE_CONVERSIONS
-    for tag in [
-        "score_quarter", "score_interval", "score_quarter_float", "score_interval_float",
-        "time", "midi_tick", None,
-    ]
-    if tag != conversion[1]
-])
+@pytest.mark.parametrize(
+    "name, source, target, kwargs, tag",
+    [
+        (*conversion, tag)
+        for conversion in SCORE_CONVERSIONS
+        for tag in [
+            "score_quarter",
+            "score_interval",
+            "score_quarter_float",
+            "score_interval_float",
+            "time",
+            "midi_tick",
+            None,
+        ]
+        if tag != conversion[1]
+    ],
+)
 def test_score_conversion_rejects_wrong_source(name, source, target, kwargs, tag):
     if tag is not None and tag.startswith("score_"):
         ann = _score_annotation(tag)
     else:
-        columns = {"time": [0.0]} if tag == "time" else {"tick": [0]} if tag == "midi_tick" else {}
+        columns = (
+            {"time": [0.0]}
+            if tag == "time"
+            else {"tick": [0]}
+            if tag == "midi_tick"
+            else {}
+        )
         ann = create(
-            media_id="track:score", payload_kind="tag_open", extent_kind=tag,
-            value=["a"], **columns,
+            media_id="track:score",
+            payload_kind="tag",
+            extent_kind=tag,
+            value=["a"],
+            **columns,
         )
     original = copy.deepcopy(ann)
     with pytest.raises(BoppArgumentError, match=rf"{name}:.*{source}"):
@@ -1953,7 +2115,9 @@ def test_score_conversion_rejects_wrong_source(name, source, target, kwargs, tag
 
 
 @pytest.mark.parametrize("shape", ["quarter", "interval"])
-@pytest.mark.parametrize("bound", [True, False, 2.0, 1.5, 0, -1, None, "8", np.int64(8)])
+@pytest.mark.parametrize(
+    "bound", [True, False, 2.0, 1.5, 0, -1, None, "8", np.int64(8)]
+)
 def test_score_conversion_invalid_denominator(shape, bound):
     ann = _score_annotation(f"score_{shape}_float")
     with pytest.raises(BoppArgumentError, match="max_denominator"):
@@ -1970,9 +2134,14 @@ def test_score_conversion_required_keyword(shape):
         convert(ann, 8)
 
 
-@pytest.mark.parametrize("shape, field", [
-    ("quarter", "quarter"), ("interval", "quarter"), ("interval", "duration"),
-])
+@pytest.mark.parametrize(
+    "shape, field",
+    [
+        ("quarter", "quarter"),
+        ("interval", "quarter"),
+        ("interval", "duration"),
+    ],
+)
 @pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan")])
 def test_score_conversion_nonfinite(shape, field, value):
     ann = _score_annotation(f"score_{shape}_float")
@@ -1984,7 +2153,9 @@ def test_score_conversion_nonfinite(shape, field, value):
 @pytest.mark.parametrize("name, source, target, kwargs", SCORE_CONVERSIONS)
 def test_score_conversion_lineage_and_independent_facets(name, source, target, kwargs):
     ann = _score_annotation(
-        source, confidence_kind="likelihood", confidence=[0.9, 0.8, 0.7, 0.6, 0.5],
+        source,
+        confidence_kind="likelihood",
+        confidence=[0.9, 0.8, 0.7, 0.6, 0.5],
         sandbox={"custom": {"values": [1, 2]}},
     )
     trimmed = trim(ann, start=0)
@@ -2004,9 +2175,11 @@ def test_score_conversion_lineage_and_independent_facets(name, source, target, k
     assert trimmed == original
 
     no_id = Annotation(
-        media_id=ann.media_id, bopp_version=ann.bopp_version,
+        media_id=ann.media_id,
+        bopp_version=ann.bopp_version,
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
-        extent=ann.extent, payload=ann.payload,
+        extent=ann.extent,
+        payload=ann.payload,
     )
     with pytest.warns(UserWarning, match="Converting an annotation with no ID"):
         result = getattr(bopp, name)(no_id, **kwargs)
@@ -2019,8 +2192,12 @@ def test_score_conversion_lineage_and_independent_facets(name, source, target, k
 @pytest.mark.parametrize("name, source, target, kwargs", SCORE_CONVERSIONS)
 def test_score_conversion_empty_columns(name, source, target, kwargs):
     ann = create(
-        media_id="track:score", payload_kind="tag_open", extent_kind=source,
-        quarter=[], value=[], **({"duration": []} if "interval" in source else {}),
+        media_id="track:score",
+        payload_kind="tag",
+        extent_kind=source,
+        quarter=[],
+        value=[],
+        **({"duration": []} if "interval" in source else {}),
     )
     result = getattr(bopp, name)(ann, **kwargs)
     assert result.extent.quarter == []
@@ -2062,3 +2239,74 @@ def test_marker_payload_transforms():
     assert resampled.extent.time == [0.0, 0.5, 1.5]
     assert resampled.payload.description == "cues"
 
+
+def test_lyrics_payload_transforms():
+    ann = create(
+        media_id="track:lyrics_test",
+        payload_kind="lyrics",
+        extent_kind="time",
+        time=[0.1, 0.5, 1.0, 2.0],
+        value=["hello", "world", "sing", "song"],
+        language="en-US",
+    )
+    trimmed = trim(ann, start=0.4, end=1.5)
+    assert trimmed.extent.time == [0.5, 1.0]
+    assert trimmed.payload.value == ["world", "sing"]
+    assert trimmed.payload.language == "en-US"
+
+    filtered = filter_by(ann, lambda v: len(v) == 4, facet="payload", target="value")
+    assert filtered.payload.value == ["sing", "song"]
+    assert filtered.payload.language == "en-US"
+
+
+def test_frequency_hz_with_voiced_transforms():
+    ann = create(
+        media_id="track:freq_voiced_test",
+        payload_kind="frequency_hz",
+        extent_kind="time",
+        time=[0.0, 0.5, 1.0, 1.5],
+        value=[440.0, 442.0, 0.0, 880.0],
+        voiced=[True, True, False, True],
+    )
+    trimmed = trim(ann, start=0.2, end=1.2)
+    assert trimmed.extent.time == [0.5, 1.0]
+    assert trimmed.payload.value == [442.0, 0.0]
+    assert trimmed.payload.voiced == [True, False]
+
+    # Filter by voiced flag using target
+    voiced_only = filter_by(ann, lambda v: bool(v), target="voiced")
+    assert voiced_only.extent.time == [0.0, 0.5, 1.5]
+    assert voiced_only.payload.value == [440.0, 442.0, 880.0]
+    assert voiced_only.payload.voiced == [True, True, True]
+
+    # Filter using facet="all" multi-column record access
+    voiced_all = filter_by(ann, lambda r: r.voiced, facet="all")
+    assert voiced_all.payload.value == [440.0, 442.0, 880.0]
+
+
+def test_object_with_description_transforms():
+    ann = create(
+        media_id="track:object_desc_test",
+        payload_kind="object",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=[{"track": 1}, {"track": 2}],
+        description="multi-track features",
+    )
+    trimmed = trim(ann, start=0.2)
+    assert trimmed.extent.time == [0.5]
+    assert trimmed.payload.value == [{"track": 2}]
+    assert trimmed.payload.description == "multi-track features"
+
+
+def test_note_payload_transforms():
+    ann = create(
+        media_id="track:note_spn_test",
+        payload_kind="note",
+        extent_kind="time",
+        time=[0.0, 1.0, 2.0],
+        value=["C4", "C♯4", "E♭3"],
+    )
+    trimmed = trim(ann, start=0.5, end=1.5)
+    assert trimmed.extent.time == [1.0]
+    assert trimmed.payload.value == ["C♯4"]

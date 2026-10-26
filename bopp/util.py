@@ -110,7 +110,9 @@ def _validate_dataframe_columns(
         registry = registry_or_version
 
     facet_types: dict[str, str] = {}
-    grouped_cols: dict[str, list[tuple[str, str, str]]] = {k: [] for k in FACET_REGISTRY_KEYS}
+    grouped_cols: dict[str, list[tuple[str, str, str]]] = {
+        k: [] for k in FACET_REGISTRY_KEYS
+    }
     grouping_cols: list[tuple[int, str]] = []
 
     for col in columns:
@@ -439,7 +441,9 @@ def to_dataframe(
         except (BoppRegistryError, ValueError):
             complex_registry = {}
 
-    def _get_complex_fields_for_facet(struct: msgspec.Struct | None, facet_name: str) -> set[str]:
+    def _get_complex_fields_for_facet(
+        struct: msgspec.Struct | None, facet_name: str
+    ) -> set[str]:
         if struct is None or struct is msgspec.UNSET:
             return set()
         tag = _get_tag(struct)
@@ -481,7 +485,11 @@ def to_dataframe(
             header["groupings"] = groupings_header
 
     for field in msgspec.structs.fields(annotation):
-        if field.name in FACET_REGISTRY_KEYS or field.name in ("bopp_version", "media_id", "groupings"):
+        if field.name in FACET_REGISTRY_KEYS or field.name in (
+            "bopp_version",
+            "media_id",
+            "groupings",
+        ):
             continue
         val = getattr(annotation, field.name, msgspec.UNSET)
         if val not in (msgspec.UNSET, None):
@@ -497,7 +505,9 @@ def to_dataframe(
             try:
                 import pyarrow  # noqa: F401
             except ImportError as err:
-                raise BoppIOError("pyarrow is required for backend='pandas-pyarrow'") from err
+                raise BoppIOError(
+                    "pyarrow is required for backend='pandas-pyarrow'"
+                ) from err
 
             df_pd = pd.DataFrame(data).convert_dtypes(dtype_backend="pyarrow")
         else:
@@ -578,6 +588,7 @@ def from_dataframe(
     if not valid:
         try:
             import pandas as pd
+
             valid = isinstance(df, pd.DataFrame)
         except ImportError:
             valid = False
@@ -637,7 +648,11 @@ def from_dataframe(
         groupings_header_list = header.get("groupings", [])
         grouping_items = []
         for g_idx, col_name in grouping_cols:
-            g_meta = groupings_header_list[g_idx] if g_idx < len(groupings_header_list) else {}
+            g_meta = (
+                groupings_header_list[g_idx]
+                if g_idx < len(groupings_header_list)
+                else {}
+            )
             g_dict = {
                 "name": g_meta.get("name", f"group_{g_idx}"),
                 "ids": _get_column_list(col_name),

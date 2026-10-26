@@ -24,18 +24,16 @@ from ..models.v1.metadata.sensor import SensorAnnotationMetadata
 from ..models.v1.payload.beat import BeatPositionPayload
 from ..models.v1.payload.chord import ChordPayload
 from ..models.v1.payload.ext import ExtensionPayload
+from ..models.v1.payload.frequency_hz import FrequencyHzPayload
 from ..models.v1.payload.key_mode import KeyModePayload
 from ..models.v1.payload.lyrics import LyricsPayload
 from ..models.v1.payload.marker import MarkerPayload
 from ..models.v1.payload.mood_thayer import MoodThayerPayload
-from ..models.v1.payload.note_hz import NoteHzPayload
+from ..models.v1.payload.note import NotePayload
 from ..models.v1.payload.note_midi import NoteMidiPayload
 from ..models.v1.payload.object import ObjectPayload
-from ..models.v1.payload.pitch_contour_hz import PitchContourPayload
 from ..models.v1.payload.relation import RelationPayload
-from ..models.v1.payload.segment_multi import MultiSegmentPayload
-from ..models.v1.payload.segment_open import SegmentOpenPayload
-from ..models.v1.payload.tag_open import TagOpenPayload
+from ..models.v1.payload.tag import TagPayload
 from ..models.v1.payload.tempo import TempoPayload
 
 ANNOTATION_CLASS = Annotation
@@ -43,89 +41,95 @@ ANNOTATION_CLASS = Annotation
 GROUPING_CLASS = Grouping
 
 CONFIDENCE_TYPE_REGISTRY = {
-    'agreement': ConfidenceByInterAnnotatorAgreement,
-    'likelihood': LikelihoodConfidence,
-    'variance': VarianceConfidence,
+    "agreement": ConfidenceByInterAnnotatorAgreement,
+    "likelihood": LikelihoodConfidence,
+    "variance": VarianceConfidence,
 }
 
 EXTENT_TYPE_REGISTRY = {
-    'midi_interval': MidiInterval,
-    'midi_tick': MidiTicks,
-    'pixel_box': PixelBoxExtent,
-    'score_interval': ScoreInterval,
-    'score_interval_float': ScoreIntervalFloat,
-    'score_quarter': ScoreQuarterNotes,
-    'score_quarter_float': ScoreQuarterNotesFloat,
-    'time': Times,
-    'time_frequency_box': TimeFrequencyBoxExtent,
-    'time_interval': TimeIntervalExtent,
+    "midi_interval": MidiInterval,
+    "midi_tick": MidiTicks,
+    "pixel_box": PixelBoxExtent,
+    "score_interval": ScoreInterval,
+    "score_interval_float": ScoreIntervalFloat,
+    "score_quarter": ScoreQuarterNotes,
+    "score_quarter_float": ScoreQuarterNotesFloat,
+    "time": Times,
+    "time_frequency_box": TimeFrequencyBoxExtent,
+    "time_interval": TimeIntervalExtent,
 }
 
 METADATA_TYPE_REGISTRY = {
-    'algorithm': AlgorithmAnnotationMetadata,
-    'crowd': CrowdSourcedAnnotationMetadata,
-    'derived': DerivedAnnotationMetadata,
-    'human': HumanAnnotationMetadata,
-    'other': AnnotationMetadataOther,
-    'sensor': SensorAnnotationMetadata,
+    "algorithm": AlgorithmAnnotationMetadata,
+    "crowd": CrowdSourcedAnnotationMetadata,
+    "derived": DerivedAnnotationMetadata,
+    "human": HumanAnnotationMetadata,
+    "other": AnnotationMetadataOther,
+    "sensor": SensorAnnotationMetadata,
 }
 
 PAYLOAD_TYPE_REGISTRY = {
-    'beat': BeatPositionPayload,
-    'chord': ChordPayload,
-    'ext': ExtensionPayload,
-    'key_mode': KeyModePayload,
-    'lyrics': LyricsPayload,
-    'marker': MarkerPayload,
-    'mood_thayer': MoodThayerPayload,
-    'multi_segment': MultiSegmentPayload,
-    'note_hz': NoteHzPayload,
-    'note_midi': NoteMidiPayload,
-    'object': ObjectPayload,
-    'pitch_contour': PitchContourPayload,
-    'relation': RelationPayload,
-    'segment_open': SegmentOpenPayload,
-    'tag_open': TagOpenPayload,
-    'tempo': TempoPayload,
+    "beat": BeatPositionPayload,
+    "chord": ChordPayload,
+    "ext": ExtensionPayload,
+    "frequency_hz": FrequencyHzPayload,
+    "key_mode": KeyModePayload,
+    "lyrics": LyricsPayload,
+    "marker": MarkerPayload,
+    "mood_thayer": MoodThayerPayload,
+    "note": NotePayload,
+    "note_midi": NoteMidiPayload,
+    "object": ObjectPayload,
+    "relation": RelationPayload,
+    "tag": TagPayload,
+    "tempo": TempoPayload,
 }
 
 COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
-    'extent_type': {
-        'score_interval': ['quarter', 'duration'],
-        'score_quarter': ['quarter'],
+    "extent_type": {
+        "score_interval": ["quarter", "duration"],
+        "score_quarter": ["quarter"],
     },
-    'metadata_type': {
-        'algorithm': ['parameters'],
-        'derived': ['parameters'],
-        'sensor': ['settings'],
+    "metadata_type": {
+        "algorithm": ["parameters"],
+        "derived": ["parameters"],
+        "sensor": ["settings"],
     },
-    'payload_type': {
-        'ext': ['value'],
-        'object': ['value'],
-        'pitch_contour': ['value'],
+    "payload_type": {
+        "ext": ["value"],
+        "object": ["value"],
     },
 }
 
 STRING_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
-    'metadata_type': {
-        'algorithm': ['algorithm_id', 'version'],
-        'crowd': ['platform', 'consensus'],
-        'derived': ['transform', 'software', 'description'],
-        'human': ['annotator_id', 'tool'],
-        'other': ['notes'],
-        'sensor': ['device'],
+    "metadata_type": {
+        "algorithm": ["algorithm_id", "version"],
+        "crowd": ["platform", "consensus"],
+        "derived": ["transform", "software", "description"],
+        "human": ["annotator_id", "tool"],
+        "other": ["notes"],
+        "sensor": ["device"],
     },
-    'payload_type': {
-        'chord': ['value'],
-        'ext': ['ext_schema'],
-        'key_mode': ['value'],
-        'lyrics': ['value'],
-        'marker': ['description'],
-        'multi_segment': ['label'],
-        'relation': ['performance_id', 'value', 'relation'],
-        'segment_open': ['value'],
-        'tag_open': ['value'],
+    "payload_type": {
+        "chord": ["value"],
+        "ext": ["ext_schema"],
+        "key_mode": ["value"],
+        "lyrics": ["value", "language"],
+        "marker": ["description"],
+        "note": ["value"],
+        "object": ["description"],
+        "relation": ["performance_id", "value", "relation"],
+        "tag": ["value"],
     },
 }
 
-__all__ = ['ANNOTATION_CLASS', 'COMPLEX_FIELDS_REGISTRY', 'CONFIDENCE_TYPE_REGISTRY', 'EXTENT_TYPE_REGISTRY', 'GROUPING_CLASS', 'METADATA_TYPE_REGISTRY', 'PAYLOAD_TYPE_REGISTRY', 'STRING_FIELDS_REGISTRY']
+__all__ = [
+    "ANNOTATION_CLASS",
+    "COMPLEX_FIELDS_REGISTRY",
+    "CONFIDENCE_TYPE_REGISTRY",
+    "EXTENT_TYPE_REGISTRY",
+    "GROUPING_CLASS",
+    "METADATA_TYPE_REGISTRY",
+    "PAYLOAD_TYPE_REGISTRY",
+    "STRING_FIELDS_REGISTRY",
+]

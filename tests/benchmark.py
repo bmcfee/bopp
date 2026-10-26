@@ -14,8 +14,11 @@ LOADERS = {
     "pl_csv": lambda p: pl.read_csv(f"tests/bench/{p}.bopp.csv", comment_prefix="#"),
     "bopp_csv": lambda p: bopp.io.load_bopp_csv(f"tests/bench/{p}.bopp.csv"),
     "bopp_json": lambda p: bopp.io.load_bopp_json(f"tests/bench/{p}.bopp"),
-    "bopp_msgpack": lambda p: bopp.io.load_bopp_msgpack(f"tests/bench/{p}.bopp.msgpack"),
+    "bopp_msgpack": lambda p: bopp.io.load_bopp_msgpack(
+        f"tests/bench/{p}.bopp.msgpack"
+    ),
 }
+
 
 @pytest.mark.parametrize("prefix", PREFIXES)
 @pytest.mark.parametrize("loader_name", LOADERS.keys())

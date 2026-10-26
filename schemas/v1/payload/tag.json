@@ -1,17 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "payload/pitch_contour_hz.json",
-  "title": "Pitch_Contour Payload",
+  "$id": "payload/tag.json",
+  "title": "Tag Payload",
   "type": "object",
   "properties": {
     "payload_type": {
-      "const": "pitch_contour"
+      "const": "tag"
     },
     "value": {
       "$ref": "../core.json#/$defs/Array",
-      "description": "Pitch contours: (index, frequency, voicing)",
+      "description": "Tag vocabularies allow all strings",
       "items": {
-        "type": "object"
+        "type": "string"
       }
     }
   },

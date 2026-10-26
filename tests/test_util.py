@@ -136,9 +136,7 @@ def test_validate_dataframe_columns_invalid_format():
         "group.0.invalid_field",  # Field must be 'ids'
     ]
     for col in invalid_columns:
-        with pytest.raises(
-            BoppValidationError, match="Invalid"
-        ):
+        with pytest.raises(BoppValidationError, match="Invalid"):
             _validate_dataframe_columns([col], "1.0")
 
 
@@ -146,7 +144,7 @@ def test_validate_dataframe_columns_rules():
     """Verify DataFrame column validation rules 2, 3, and 4."""
     # Rule 2: Mixed types for facet
     with pytest.raises(BoppValidationError, match="Mixed types for facet 'payload'"):
-        _validate_dataframe_columns(["payload:tag_open:value", "payload:beat:value"], "1.0")
+        _validate_dataframe_columns(["payload:tag:value", "payload:beat:value"], "1.0")
 
     # Rule 3a: Invalid facet
     with pytest.raises(BoppValidationError, match="Invalid facet 'unknown_facet'"):
@@ -158,7 +156,8 @@ def test_validate_dataframe_columns_rules():
 
     # Rule 4: Field does not exist on target type struct
     with pytest.raises(
-        BoppValidationError, match="Field 'nonexistent_field' in column .* does not exist"
+        BoppValidationError,
+        match="Field 'nonexistent_field' in column .* does not exist",
     ):
         _validate_dataframe_columns(["payload:beat:nonexistent_field"], "1.0")
 
@@ -381,6 +380,7 @@ def test_polars_dataframe_roundtrip():
 
 def test_from_dataframe_with_scalar_facet_attributes():
     """Verify from_dataframe accurately restores scalar facet attributes from header across extent, payload, confidence."""
+
     class ExtentWithScalar(msgspec.Struct, tag_field="extent_type", tag="time"):
         time: list[float]
         origin: str = "start"
@@ -409,11 +409,13 @@ def test_from_dataframe_with_scalar_facet_attributes():
     }
 
     with patch("bopp.util.get_registry", return_value=mock_registry):
-        df = pd.DataFrame({
-            "extent:time:time": [0.1, 0.2],
-            "payload:beat:value": [1, 2],
-            "confidence:likelihood:confidence": [0.9, 0.95],
-        })
+        df = pd.DataFrame(
+            {
+                "extent:time:time": [0.1, 0.2],
+                "payload:beat:value": [1, 2],
+                "confidence:likelihood:confidence": [0.9, 0.95],
+            }
+        )
         header = {
             "bopp_version": "1.0",
             "media_id": "track:with_scalars",
@@ -438,7 +440,9 @@ def test_from_dataframe_missing_required_payload_facet():
         "media_id": "track:no_payload",
     }
 
-    with pytest.raises(msgspec.ValidationError, match="Object missing required field `payload`"):
+    with pytest.raises(
+        msgspec.ValidationError, match="Object missing required field `payload`"
+    ):
         from_dataframe(df, header)
 
 
@@ -448,7 +452,9 @@ def test_from_dataframe_missing_media_id():
         "bopp_version": "1.0",
     }
 
-    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+    with pytest.raises(
+        BoppValidationError, match="Missing or invalid required 'media_id'"
+    ):
         from_dataframe(df, header)
 
 
@@ -526,7 +532,9 @@ def test_from_dataframe_no_header():
     df = pd.DataFrame({"extent:time:time": [0.1], "payload:beat:value": [1]})
     header = None
 
-    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+    with pytest.raises(
+        BoppValidationError, match="Missing or invalid required 'media_id'"
+    ):
         from_dataframe(df, header=header)
 
 
@@ -599,7 +607,7 @@ def test_polars_column_dtypes_match_csv_reader():
         "extent:time_frequency_box:freq_min",
         "extent:pixel_box:width",
         "payload:tempo:value",
-        "payload:note_hz:value",
+        "payload:frequency_hz:value",
         "confidence:likelihood:confidence",
     ],
 )
@@ -613,11 +621,15 @@ def test_polars_column_dtype_constrained_numbers(column):
 
 def test_validate_dataframe_columns_grouping_indices():
     # Non-canonical integer index (leading zero)
-    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.00.ids'"):
+    with pytest.raises(
+        BoppValidationError, match="Invalid grouping column format 'group.00.ids'"
+    ):
         _validate_dataframe_columns(["payload:beat:value", "group.00.ids"], "1.0")
 
     # Negative index
-    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.-1.ids'"):
+    with pytest.raises(
+        BoppValidationError, match="Invalid grouping column format 'group.-1.ids'"
+    ):
         _validate_dataframe_columns(["payload:beat:value", "group.-1.ids"], "1.0")
 
     # Non-contiguous indices (missing 1)
@@ -625,7 +637,9 @@ def test_validate_dataframe_columns_grouping_indices():
         BoppValidationError,
         match=r"Grouping column indices must be contiguous starting from 0 \(expected \[0, 1\], got \[0, 2\]\)",
     ):
-        _validate_dataframe_columns(["payload:beat:value", "group.0.ids", "group.2.ids"], "1.0")
+        _validate_dataframe_columns(
+            ["payload:beat:value", "group.0.ids", "group.2.ids"], "1.0"
+        )
 
 
 def test_to_and_from_dataframe_marker_payload():
@@ -687,3 +701,79 @@ def test_from_dataframe_facet_header_without_type_tag():
     ann = from_dataframe(df, header=header)
     assert ann.confidence is msgspec.UNSET
 
+
+def test_to_and_from_dataframe_lyrics_payload():
+    ann = create(
+        media_id="track:lyrics_df",
+        bopp_version="1.0",
+        payload_kind="lyrics",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=["hello", "world"],
+        language="en",
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert ann_df.header["payload"]["language"] == "en"
+        assert "payload:lyrics:value" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.language == "en"
+        assert reconstructed.payload.value == ["hello", "world"]
+
+
+def test_to_and_from_dataframe_frequency_hz_with_voiced():
+    ann = create(
+        media_id="track:freq_voiced_df",
+        bopp_version="1.0",
+        payload_kind="frequency_hz",
+        extent_kind="time",
+        time=[0.0, 0.5],
+        value=[440.0, 880.0],
+        voiced=[True, False],
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert "payload:frequency_hz:value" in ann_df.df.columns
+        assert "payload:frequency_hz:voiced" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.value == [440.0, 880.0]
+        assert reconstructed.payload.voiced == [True, False]
+
+
+def test_to_and_from_dataframe_object_with_description():
+    ann = create(
+        media_id="track:object_desc_df",
+        bopp_version="1.0",
+        payload_kind="object",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=[{"a": 1, "b": 2}, {"a": 3, "b": 4}],
+        description="test objects",
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert ann_df.header["payload"]["description"] == "test objects"
+        assert "payload:object:value" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.description == "test objects"
+        assert reconstructed.payload.value == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+
+
+def test_to_and_from_dataframe_note_payload():
+    ann = create(
+        media_id="track:note_spn_df",
+        bopp_version="1.0",
+        payload_kind="note",
+        extent_kind="time",
+        time=[0.0, 1.0],
+        value=["C4", "C♯4"],
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert "payload:note:value" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.value == ["C4", "C♯4"]

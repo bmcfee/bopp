@@ -13,6 +13,10 @@
       "items": {
         "type": "object"
       }
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional human-readable description of the object payload"
     }
   },
   "required": [

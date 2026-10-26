@@ -47,10 +47,12 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("score_interval_float", "quarter"): ("origin_span", "quarter", "duration"),
 }
 
-FRACTION_AXES: frozenset[tuple[str, str]] = frozenset({
-    ("score_quarter", "quarter"),
-    ("score_interval", "quarter"),
-})
+FRACTION_AXES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("score_quarter", "quarter"),
+        ("score_interval", "quarter"),
+    }
+)
 
 
 _SCORE_EXTENT_CONVERSIONS: dict[str, tuple[str, str]] = {
@@ -73,7 +75,9 @@ class FilterRecord(dict):
         try:
             return self[name]
         except KeyError:
-            raise AttributeError(f"'FilterRecord' object has no attribute '{name}'") from None
+            raise AttributeError(
+                f"'FilterRecord' object has no attribute '{name}'"
+            ) from None
 
     def __setattr__(self, name: str, value: Any) -> None:
         self[name] = value
@@ -91,7 +95,9 @@ def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]
     return result
 
 
-def _derive_parents_and_sandbox(annotation: BoppBase, action_name: str) -> tuple[list[str], Any]:
+def _derive_parents_and_sandbox(
+    annotation: BoppBase, action_name: str
+) -> tuple[list[str], Any]:
     """Extract parent lineage and deep copy sandbox for a derived annotation."""
     existing_parents = getattr(annotation, "parents", None)
     if existing_parents is None or existing_parents is msgspec.UNSET:
@@ -217,8 +223,14 @@ def _resample_groupings(
 def _coerce_trim_bound(value: _TrimBound) -> float | Fraction | None:
     """Validate and normalize rational pairs, leaving other bounds unchanged."""
     if isinstance(value, (list, tuple)):
-        if len(value) != 2 or not all(type(item) is int for item in value) or value[1] < 1:
-            raise BoppArgumentError("Fraction bound must be a pair of ints with denominator >= 1.")
+        if (
+            len(value) != 2
+            or not all(type(item) is int for item in value)
+            or value[1] < 1
+        ):
+            raise BoppArgumentError(
+                "Fraction bound must be a pair of ints with denominator >= 1."
+            )
         return Fraction(value[0], value[1])
     return value
 
@@ -229,16 +241,22 @@ def _fraction_pair(value: Fraction) -> list[int]:
 
 
 def _conversion_extent(
-    annotation: BoppBase, transform: str, max_denominator: int | None = None,
+    annotation: BoppBase,
+    transform: str,
+    max_denominator: int | None = None,
 ) -> BoppBase:
     """Dispatch a score conversion after validating its source and parameters."""
     source_tag, target_tag = _SCORE_EXTENT_CONVERSIONS[transform]
     extent = getattr(annotation, "extent", msgspec.UNSET)
     if extent is msgspec.UNSET or extent is None:
-        raise BoppArgumentError(f"{transform}: annotation has no extent; requires '{source_tag}'.")
+        raise BoppArgumentError(
+            f"{transform}: annotation has no extent; requires '{source_tag}'."
+        )
     tag = _get_tag(extent)
     if tag != source_tag:
-        raise BoppArgumentError(f"{transform}: extent {tag!r} is unsupported; requires '{source_tag}'.")
+        raise BoppArgumentError(
+            f"{transform}: extent {tag!r} is unsupported; requires '{source_tag}'."
+        )
 
     fraction_target = source_tag.endswith("_float")
     parameters: dict[str, Any] = {}
@@ -264,10 +282,16 @@ def _conversion_extent(
                     raise BoppArgumentError(
                         f"{transform}: field {name!r} at index {index} must be finite."
                     )
-                columns[name].append(_fraction_pair(Fraction(value).limit_denominator(limit)))
+                columns[name].append(
+                    _fraction_pair(Fraction(value).limit_denominator(limit))
+                )
         else:
-            columns[name] = [numerator / denominator for numerator, denominator in values]
-    return _rebuild_converted_extent(annotation, target_tag, columns, transform, parameters)
+            columns[name] = [
+                numerator / denominator for numerator, denominator in values
+            ]
+    return _rebuild_converted_extent(
+        annotation, target_tag, columns, transform, parameters
+    )
 
 
 def _rebuild_converted_extent(
@@ -278,7 +302,8 @@ def _rebuild_converted_extent(
     parameters: dict[str, Any],
 ) -> BoppBase:
     """Build a registered twin extent and derive an annotation around it."""
-    extent_cls = get_registry(annotation.bopp_version)["EXTENT_TYPE_REGISTRY"][target_tag]  # type: ignore[attr-defined]
+    version = getattr(annotation, "bopp_version", "1.0")
+    extent_cls = get_registry(version)["EXTENT_TYPE_REGISTRY"][target_tag]
     parents, sandbox = _derive_parents_and_sandbox(annotation, "Converting")
     return _rebuild_annotation(
         annotation,
@@ -515,7 +540,9 @@ def trim(
                 if not math.isfinite(bound):
                     raise BoppArgumentError("Trim bound must be finite.")
             else:
-                raise BoppArgumentError("Trim bound must be an int, finite float, Fraction, or pair of ints.")
+                raise BoppArgumentError(
+                    "Trim bound must be an int, finite float, Fraction, or pair of ints."
+                )
         new_start = Fraction(new_start) if new_start is not None else None
         new_end = Fraction(new_end) if new_end is not None else None
     elif isinstance(new_start, Fraction) or isinstance(new_end, Fraction):
@@ -532,7 +559,9 @@ def trim(
     if new_start is not None and new_end is not None and new_start > new_end:
         display_start = list(start) if isinstance(start, tuple) else start
         display_end = list(end) if isinstance(end, tuple) else end
-        raise BoppArgumentError(f"start ({display_start}) must be <= end ({display_end}).")
+        raise BoppArgumentError(
+            f"start ({display_start}) must be <= end ({display_end})."
+        )
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Trimming")
     derived_metadata = DerivedAnnotationMetadata(
@@ -565,7 +594,11 @@ def trim(
     kind, field_a, field_b = axis_config
 
     kept_indices: list[int] = []
-    shift = new_start if (reset and new_start is not None) else (Fraction(0) if fraction_axis else 0.0)
+    shift = (
+        new_start
+        if (reset and new_start is not None)
+        else (Fraction(0) if fraction_axis else 0.0)
+    )
 
     extent_updates: dict[str, list[Any]] = {}
 
@@ -719,7 +752,7 @@ def filter_by(
     >>> import bopp
     >>> ann = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag_open",
+    ...     payload_kind="tag",
     ...     extent_kind="time",
     ...     time=[1.0, 2.0, 3.0],
     ...     value=["rock", "pop", "rock"],
@@ -752,7 +785,7 @@ def filter_by(
 
     >>> ann_multi = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag_open",
+    ...     payload_kind="tag",
     ...     extent_kind="time",
     ...     confidence_kind="likelihood",
     ...     time=[1.0, 2.0, 3.0],
@@ -824,7 +857,9 @@ def filter_by(
                 if target in cols
             ]
             if not matching_cols:
-                raise BoppArgumentError(f"Target field '{target}' not found in any annotation facet.")
+                raise BoppArgumentError(
+                    f"Target field '{target}' not found in any annotation facet."
+                )
             if len(matching_cols) > 1:
                 raise BoppArgumentError(
                     f"Ambiguous target field '{target}' found in multiple facets when facet='all'. "
@@ -853,7 +888,9 @@ def filter_by(
             ]
     elif facet == "groupings":
         if not groupings_cols:
-            raise BoppArgumentError("Facet 'groupings' is not present on annotation or contains no layers.")
+            raise BoppArgumentError(
+                "Facet 'groupings' is not present on annotation or contains no layers."
+            )
 
         if target is not None:
             if target not in groupings_cols:
@@ -864,7 +901,10 @@ def filter_by(
         elif len(groupings_cols) == 1:
             stream = next(iter(groupings_cols.values()))
         else:
-            stream = [FilterRecord({k: v[i] for k, v in groupings_cols.items()}) for i in range(n_obs)]
+            stream = [
+                FilterRecord({k: v[i] for k, v in groupings_cols.items()})
+                for i in range(n_obs)
+            ]
     else:
         facet_struct_map = {
             "payload": (payload, payload_cols),
@@ -873,7 +913,9 @@ def filter_by(
         }
         struct_obj, cols = facet_struct_map[facet]
         if struct_obj is None or struct_obj is msgspec.UNSET or not cols:
-            raise BoppArgumentError(f"Facet '{facet}' is not present on annotation or contains no columns.")
+            raise BoppArgumentError(
+                f"Facet '{facet}' is not present on annotation or contains no columns."
+            )
 
         if target is not None:
             if target not in cols:
@@ -887,7 +929,9 @@ def filter_by(
             stream = next(iter(cols.values()))
         else:
             # Multiple columns and no 'value' column: pass record
-            stream = [FilterRecord({k: v[i] for k, v in cols.items()}) for i in range(n_obs)]
+            stream = [
+                FilterRecord({k: v[i] for k, v in cols.items()}) for i in range(n_obs)
+            ]
 
     kept_indices = [i for i, item in enumerate(stream) if predicate(item)]
 
@@ -991,7 +1035,7 @@ def to_times(
     >>> import bopp
     >>> ann = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag_open",
+    ...     payload_kind="tag",
     ...     extent_kind="time_interval",
     ...     time=[0.0, 2.0],
     ...     duration=[2.0, 2.0],
@@ -1028,7 +1072,7 @@ def to_times(
 
     >>> intervals = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag_open",
+    ...     payload_kind="tag",
     ...     extent_kind="time_interval",
     ...     time=[1.0],
     ...     duration=[1.0],
@@ -1038,14 +1082,22 @@ def to_times(
     >>> filled.payload.value
     ['silence', 'solo', 'silence']
     """
-    if (times is None and sample_rate is None) or (times is not None and sample_rate is not None):
-        raise BoppArgumentError("Exactly one of 'times' or 'sample_rate' must be specified.")
+    if (times is None and sample_rate is None) or (
+        times is not None and sample_rate is not None
+    ):
+        raise BoppArgumentError(
+            "Exactly one of 'times' or 'sample_rate' must be specified."
+        )
 
     if sample_rate is not None and sample_rate <= 0:
-        raise BoppArgumentError(f"sample_rate must be positive (> 0), got {sample_rate}.")
+        raise BoppArgumentError(
+            f"sample_rate must be positive (> 0), got {sample_rate}."
+        )
 
     if method not in ("previous", "nearest"):
-        raise BoppArgumentError(f"Invalid method '{method}'. Must be 'previous' or 'nearest'.")
+        raise BoppArgumentError(
+            f"Invalid method '{method}'. Must be 'previous' or 'nearest'."
+        )
 
     if overlap not in ("latest", "first", "multiple"):
         raise BoppArgumentError(
@@ -1228,7 +1280,9 @@ def to_times(
                     matched_indices.append(best_idx)
             elif method == "nearest":
                 # Find index with minimum absolute distance
-                best_idx = min(range(len(src_times)), key=lambda i: abs(src_times[i] - t))
+                best_idx = min(
+                    range(len(src_times)), key=lambda i: abs(src_times[i] - t)
+                )
                 out_times.append(t)
                 matched_indices.append(best_idx)
 
@@ -1238,8 +1292,12 @@ def to_times(
         if confidence is not None and confidence is not msgspec.UNSET:
             _validate_fill_values(confidence, confidence_fill_map, "confidence")
 
-    new_payload = _resample_struct(payload, payload_cols, matched_indices, payload_fill_map)
-    new_confidence = _resample_struct(confidence, confidence_cols, matched_indices, confidence_fill_map)
+    new_payload = _resample_struct(
+        payload, payload_cols, matched_indices, payload_fill_map
+    )
+    new_confidence = _resample_struct(
+        confidence, confidence_cols, matched_indices, confidence_fill_map
+    )
     new_groupings = _resample_groupings(groupings, matched_indices, grouping_fill_map)
     new_extent = Times(time=out_times)
 

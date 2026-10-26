@@ -111,7 +111,9 @@ def ensure_annotation_id(annotation: Any) -> str:
     return str(annotation.id)
 
 
-def _extract_kwargs(cls: type[msgspec.Struct], kwargs: dict[str, Any]) -> dict[str, Any]:
+def _extract_kwargs(
+    cls: type[msgspec.Struct], kwargs: dict[str, Any]
+) -> dict[str, Any]:
     """
     Extract and remove keys belonging to the target msgspec.Struct class.
 
@@ -258,7 +260,11 @@ def create(
         metadata_obj = msgspec.convert(metadata, METADATA_TYPE_REGISTRY[meta_type])
 
     groupings_obj = groupings
-    if groupings is not msgspec.UNSET and groupings is not None and Grouping is not None:
+    if (
+        groupings is not msgspec.UNSET
+        and groupings is not None
+        and Grouping is not None
+    ):
         groupings_obj = [
             msgspec.convert(g, Grouping) if isinstance(g, dict) else g
             for g in groupings
@@ -320,7 +326,9 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
         if isinstance(obj, msgspec.Struct):
             target_type = cast(type[T], type(obj))
         else:
-            raise BoppArgumentError("target_type must be provided if obj is not a msgspec.Struct.")
+            raise BoppArgumentError(
+                "target_type must be provided if obj is not a msgspec.Struct."
+            )
     assert target_type is not None
 
     # 1. Handle Struct instances: convert to builtins to strip UNSET keys recursively
@@ -333,5 +341,7 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
     try:
         msgspec.convert(obj, target_type)
     except (msgspec.ValidationError, TypeError) as err:
-        raise BoppValidationError(f"Validation failed for {target_type.__name__}: {err}") from err
+        raise BoppValidationError(
+            f"Validation failed for {target_type.__name__}: {err}"
+        ) from err
     return True

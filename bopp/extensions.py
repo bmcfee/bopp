@@ -112,9 +112,7 @@ class ExtensionRegistry(MutableMapping[str, type[Any]]):
     def __getitem__(self, key: str) -> type[Any]:
         if key in self._conflicts:
             entries = self._conflicts[key]
-            entry_strs = [
-                getattr(e, "value", str(e)) for e in entries
-            ]
+            entry_strs = [getattr(e, "value", str(e)) for e in entries]
             raise BoppRegistryError(
                 f"Conflicting extension registrations detected for schema '{key}': {entry_strs}. "
                 "Resolve the conflict by specifying a single implementation."

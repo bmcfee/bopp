@@ -271,6 +271,10 @@ def generate_registry(input_dir: Path, output_file: Path, base_module: str) -> N
         all_exports.sort()
         f.write(f"__all__ = {all_exports!r}\n")
 
+    import subprocess
+
+    subprocess.run(["ruff", "format", str(output_file)], check=False, capture_output=True)
+
 
 def main():
     if str(Path.cwd()) not in sys.path:

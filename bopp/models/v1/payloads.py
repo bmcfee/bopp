@@ -11,37 +11,33 @@ from .payload import (
     beat,
     chord,
     ext,
+    frequency_hz,
     key_mode,
     lyrics,
     marker,
     mood_thayer,
-    note_hz,
+    note,
     note_midi,
     object,
-    pitch_contour_hz,
     relation,
-    segment_multi,
-    segment_open,
-    tag_open,
+    tag,
     tempo,
 )
 
 type AnyPayload = Annotated[
     beat.BeatPositionPayload
     | chord.ChordPayload
+    | ext.ExtensionPayload
+    | frequency_hz.FrequencyHzPayload
     | key_mode.KeyModePayload
     | lyrics.LyricsPayload
+    | marker.MarkerPayload
     | mood_thayer.MoodThayerPayload
-    | note_hz.NoteHzPayload
+    | note.NotePayload
     | note_midi.NoteMidiPayload
     | object.ObjectPayload
-    | ext.ExtensionPayload
-    | marker.MarkerPayload
-    | pitch_contour_hz.PitchContourPayload
     | relation.RelationPayload
-    | segment_multi.MultiSegmentPayload
-    | segment_open.SegmentOpenPayload
-    | tag_open.TagOpenPayload
+    | tag.TagPayload
     | tempo.TempoPayload,
     Meta(
         description="A discriminated union of all supported columnar payload types.",

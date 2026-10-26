@@ -39,8 +39,11 @@ def test_decode_valid_score_float(tag, cls, columns):
     for name, expected in columns.items():
         assert getattr(decoded, name) == expected
     ann = bopp.create(
-        media_id="test:score", payload_kind="tag_open", extent_kind=tag,
-        value=["pickup", "start", "later"], **columns,
+        media_id="test:score",
+        payload_kind="tag",
+        extent_kind=tag,
+        value=["pickup", "start", "later"],
+        **columns,
     )
     assert bopp.validate(ann)
     assert EXTENT_TYPE_REGISTRY[tag] is cls
@@ -55,7 +58,8 @@ def test_score_float_rejects_fraction_columns(tag, cls, columns):
         invalid[name][0] = [1, 2]
         with pytest.raises(msgspec.ValidationError, match=rf"\$\.{name}"):
             msgspec.json.decode(
-                msgspec.json.encode({"extent_type": tag, **invalid}), type=cls,
+                msgspec.json.encode({"extent_type": tag, **invalid}),
+                type=cls,
             )
 
 
@@ -67,21 +71,33 @@ def test_score_float_rejects_negative_duration():
         )
     with pytest.raises(bopp.BoppValidationError):
         bopp.validate(
-            {"extent_type": "score_interval_float", "quarter": [-1.0], "duration": [-0.5]},
+            {
+                "extent_type": "score_interval_float",
+                "quarter": [-1.0],
+                "duration": [-0.5],
+            },
             target_type=ScoreIntervalFloat,
         )
 
 
 @pytest.mark.parametrize("tag, cls, columns", EXTENTS)
-@pytest.mark.parametrize("save, load, suffix, keeps_id", [
-    (save_bopp_json, load_bopp_json, "json", True),
-    (save_bopp_msgpack, load_bopp_msgpack, "msgpack", True),
-    (save_bopp_csv, load_bopp_csv, "csv", False),
-])
-def test_score_float_roundtrip(tmp_path, tag, cls, columns, save, load, suffix, keeps_id):
+@pytest.mark.parametrize(
+    "save, load, suffix, keeps_id",
+    [
+        (save_bopp_json, load_bopp_json, "json", True),
+        (save_bopp_msgpack, load_bopp_msgpack, "msgpack", True),
+        (save_bopp_csv, load_bopp_csv, "csv", False),
+    ],
+)
+def test_score_float_roundtrip(
+    tmp_path, tag, cls, columns, save, load, suffix, keeps_id
+):
     ann = bopp.create(
-        media_id="test:score", payload_kind="tag_open", extent_kind=tag,
-        value=["pickup", "start", "later"], **columns,
+        media_id="test:score",
+        payload_kind="tag",
+        extent_kind=tag,
+        value=["pickup", "start", "later"],
+        **columns,
     )
     path = tmp_path / f"{tag}.{suffix}"
     save(ann, path)
@@ -103,9 +119,13 @@ def test_trim_score_float_matches_time(interval, strict, reset):
     tag = "score_interval_float" if interval else "score_quarter_float"
     positions = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
     kwargs = {"duration": [1.0, 1.0, 0.5, 1.0, 0.0, 1.0]} if interval else {}
-    common = dict(media_id="test:score", payload_kind="tag_open", value=list("abcdef"), **kwargs)
+    common = dict(
+        media_id="test:score", payload_kind="tag", value=list("abcdef"), **kwargs
+    )
     ann = bopp.create(extent_kind=tag, quarter=positions, **common)
-    timed = bopp.create(extent_kind="time_interval" if interval else "time", time=positions, **common)
+    timed = bopp.create(
+        extent_kind="time_interval" if interval else "time", time=positions, **common
+    )
     original = copy.deepcopy(ann)
     bounds = {"start": 0.5, "end": 1.5, "strict": strict, "reset": reset}
     actual = bopp.trim(ann, **bounds)
@@ -118,7 +138,9 @@ def test_trim_score_float_matches_time(interval, strict, reset):
     assert ann == original
     assert DEFAULT_TARGET_FIELDS[tag] == "quarter"
     assert AXIS_CONFIGS[(tag, "quarter")] == (
-        "origin_span" if interval else "point", "quarter", "duration" if interval else None,
+        "origin_span" if interval else "point",
+        "quarter",
+        "duration" if interval else None,
     )
     assert (tag, "quarter") not in FRACTION_AXES
 
@@ -128,8 +150,11 @@ def test_trim_score_float_matches_time(interval, strict, reset):
 @pytest.mark.parametrize("name", ["start", "end"])
 def test_trim_score_float_rejects_fraction_bounds(tag, cls, columns, bound, name):
     ann = bopp.create(
-        media_id="test:score", payload_kind="tag_open", extent_kind=tag,
-        value=list("abc"), **columns,
+        media_id="test:score",
+        payload_kind="tag",
+        extent_kind=tag,
+        value=list("abc"),
+        **columns,
     )
     with pytest.raises(bopp.BoppArgumentError, match="bounds require a fraction axis"):
         bopp.trim(ann, **{name: bound})

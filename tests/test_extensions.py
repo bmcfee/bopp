@@ -158,7 +158,9 @@ def test_update_extensions_conflict_warning():
         ):
             REGISTRY.clear()
             # Warning is issued during update/initialization
-            with pytest.warns(UserWarning, match="Conflict for extension 'conflict.schema'"):
+            with pytest.warns(
+                UserWarning, match="Conflict for extension 'conflict.schema'"
+            ):
                 update_extensions()
 
             extensions = get_extensions()
@@ -338,7 +340,9 @@ def test_resolve_extensions_missing_schema_error():
         resolve_ext=False,
     )
 
-    with pytest.raises(BoppRegistryError, match="Extension schema 'unregistered.schema' not found"):
+    with pytest.raises(
+        BoppRegistryError, match="Extension schema 'unregistered.schema' not found"
+    ):
         resolve_extensions(ann, allow_missing=False)
 
 

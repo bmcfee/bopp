@@ -49,7 +49,11 @@ class _VersionHeader(msgspec.Struct):
 
 def _is_path_like(obj: Any) -> bool:
     """Check if an object represents a filesystem path."""
-    return isinstance(obj, (str, Path)) and not hasattr(obj, "read") and not hasattr(obj, "write")
+    return (
+        isinstance(obj, (str, Path))
+        and not hasattr(obj, "read")
+        and not hasattr(obj, "write")
+    )
 
 
 @typing.overload
@@ -93,7 +97,9 @@ def _open_or_yield_write(
         yield target  # type: ignore[misc]
 
 
-def _read_bytes_from_source(source: str | Path | bytes | bytearray | BinaryIO | TextIO) -> bytes:
+def _read_bytes_from_source(
+    source: str | Path | bytes | bytearray | BinaryIO | TextIO,
+) -> bytes:
     """Read binary data from a path, raw bytes, or an open binary/text stream."""
     if isinstance(source, (bytes, bytearray, memoryview)):
         return bytes(source)
@@ -153,7 +159,9 @@ def _parse_complex_cell(val: str | None) -> Any:
         return val_stripped
 
 
-def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Callable[[str], Any]]:
+def _build_csv_converters(
+    header_line: str, bopp_version: str
+) -> dict[str, Callable[[str], Any]]:
     """
     Inspect the CSV header row and construct column converters using the schema registry.
 
@@ -186,8 +194,12 @@ def _build_csv_converters(header_line: str, bopp_version: str) -> dict[str, Call
     except (BoppRegistryError, ValueError):
         return converters
 
-    complex_registry: dict[str, dict[str, list[str]]] = registry.get("COMPLEX_FIELDS_REGISTRY", {})
-    string_registry: dict[str, dict[str, list[str]]] = registry.get("STRING_FIELDS_REGISTRY", {})
+    complex_registry: dict[str, dict[str, list[str]]] = registry.get(
+        "COMPLEX_FIELDS_REGISTRY", {}
+    )
+    string_registry: dict[str, dict[str, list[str]]] = registry.get(
+        "STRING_FIELDS_REGISTRY", {}
+    )
 
     for col in columns:
         parts = col.split(":")
@@ -265,7 +277,9 @@ def _build_polars_csv_schema(
             schema[col] = pl.String
         return schema, complex_columns
 
-    complex_registry: dict[str, dict[str, list[str]]] = registry.get("COMPLEX_FIELDS_REGISTRY", {})
+    complex_registry: dict[str, dict[str, list[str]]] = registry.get(
+        "COMPLEX_FIELDS_REGISTRY", {}
+    )
 
     # Cache field types per struct class
     struct_type_hints: dict[type[msgspec.Struct], dict[str, Any]] = {}
@@ -273,7 +287,12 @@ def _build_polars_csv_schema(
     for col in columns:
         if col.startswith("group."):
             dot_parts = col.split(".")
-            if len(dot_parts) == 3 and dot_parts[0] == "group" and dot_parts[1].isdigit() and dot_parts[2] == "ids":
+            if (
+                len(dot_parts) == 3
+                and dot_parts[0] == "group"
+                and dot_parts[1].isdigit()
+                and dot_parts[2] == "ids"
+            ):
                 schema[col] = pl.Int64
                 continue
 
@@ -413,7 +432,9 @@ def _save_msgspec_encoded(
     validate_id: bool,
     generate_id: bool,
 ) -> None:
-    _prepare_annotation_for_save(annotation, validate_id=validate_id, generate_id=generate_id)
+    _prepare_annotation_for_save(
+        annotation, validate_id=validate_id, generate_id=generate_id
+    )
     encoded_data = codec.encode(annotation)
 
     with _open_or_yield_write(target, binary=True) as f:  # type: ignore[attr-defined]
@@ -472,7 +493,9 @@ def load_bopp_json(
     BoppBase
         Decoded and validated Annotation instance.
     """
-    return _load_msgspec_encoded(source, msgspec.json, validate_id=validate_id, resolve_ext=resolve_ext)
+    return _load_msgspec_encoded(
+        source, msgspec.json, validate_id=validate_id, resolve_ext=resolve_ext
+    )
 
 
 def save_bopp_json(
@@ -569,7 +592,9 @@ def load_bopp_msgpack(
     BoppBase
         Decoded and validated Annotation instance.
     """
-    return _load_msgspec_encoded(source, msgspec.msgpack, validate_id=validate_id, resolve_ext=resolve_ext)
+    return _load_msgspec_encoded(
+        source, msgspec.msgpack, validate_id=validate_id, resolve_ext=resolve_ext
+    )
 
 
 def load_bopp_csv(

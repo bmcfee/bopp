@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/note.json",
+  "title": "Note Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "note"
+    },
+    "value": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Musical notes in scientific pitch notation (e.g. C4, A4, C♯4, E♭3, F𝄪5, B𝄫2, D♮4, C-1)",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-G]([b♭]*|𝄫|[#♯]*|𝄪|♮)-?[0-9]+$"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "value"
+  ]
+}

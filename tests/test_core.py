@@ -86,7 +86,10 @@ def test_create_full():
     assert ann.extent.__struct_config__.tag == "time"
     assert ann.confidence is not None
     assert ann.confidence.__struct_config__.tag == "likelihood"
-    assert getattr(ann, "sandbox", None) == {"custom_key": "custom_value", "notes": [1, 2, 3]}
+    assert getattr(ann, "sandbox", None) == {
+        "custom_key": "custom_value",
+        "notes": [1, 2, 3],
+    }
 
 
 def test_uuid5_idempotence_and_mutation():
@@ -139,7 +142,9 @@ def test_create_with_parents():
 
 def test_create_invalid_payload_kind():
     with pytest.raises(BoppRegistryError, match="Unrecognized kind identifier"):
-        create(bopp_version="1.0", media_id="audio:123", payload_kind="non_existent_kind")
+        create(
+            bopp_version="1.0", media_id="audio:123", payload_kind="non_existent_kind"
+        )
 
 
 def test_create_invalid_extent_kind():
@@ -283,7 +288,10 @@ def test_grouping_negative_ids_allowed_unmapped():
 
 
 def test_grouping_warns_unmapped_non_negative_ids():
-    with pytest.warns(UserWarning, match="contains non-negative group IDs not included in label mapping: \\[2\\]"):
+    with pytest.warns(
+        UserWarning,
+        match="contains non-negative group IDs not included in label mapping: \\[2\\]",
+    ):
         Grouping(
             name="sections",
             ids=[0, 1, 2],
@@ -372,7 +380,11 @@ def test_create_with_metadata_and_groupings():
     ann2 = create(
         media_id="audio:1",
         payload_kind="marker",
-        metadata={"metadata_type": "human", "annotator_id": "user_2", "tool": "audacity"},
+        metadata={
+            "metadata_type": "human",
+            "annotator_id": "user_2",
+            "tool": "audacity",
+        },
         groupings=[{"name": "sections", "ids": [0, 1], "labels": {"a": 0, "b": 1}}],
         description="sections",
     )
@@ -392,7 +404,9 @@ def test_create_with_metadata_and_groupings():
 
 
 def test_create_metadata_errors():
-    with pytest.raises(BoppArgumentError, match="Cannot specify both 'metadata' and 'metadata_kind'"):
+    with pytest.raises(
+        BoppArgumentError, match="Cannot specify both 'metadata' and 'metadata_kind'"
+    ):
         create(
             media_id="audio:1",
             payload_kind="marker",
@@ -401,7 +415,9 @@ def test_create_metadata_errors():
             description="test",
         )
 
-    with pytest.raises(BoppRegistryError, match="Unrecognized metadata kind: 'nonexistent'"):
+    with pytest.raises(
+        BoppRegistryError, match="Unrecognized metadata kind: 'nonexistent'"
+    ):
         create(
             media_id="audio:1",
             payload_kind="marker",
@@ -409,7 +425,9 @@ def test_create_metadata_errors():
             description="test",
         )
 
-    with pytest.raises(BoppRegistryError, match="Unrecognized metadata kind: 'bad_type'"):
+    with pytest.raises(
+        BoppRegistryError, match="Unrecognized metadata kind: 'bad_type'"
+    ):
         create(
             media_id="audio:1",
             payload_kind="marker",
@@ -429,3 +447,193 @@ def test_create_marker_payload_without_extent():
     assert ann.extent is msgspec.UNSET
     assert validate(ann) is True
 
+
+def test_create_chord_unicode_accidentals():
+    ann = create(
+        media_id="audio:chord_unicode",
+        payload_kind="chord",
+        extent_kind="time_interval",
+        time=[0.0, 1.0, 2.0, 3.0, 4.0],
+        duration=[1.0, 1.0, 1.0, 1.0, 1.0],
+        value=["C♯:maj", "D♭:min", "F𝄪:maj7", "B𝄫:dim", "A:min(♮7)"],
+    )
+    assert validate(ann) is True
+
+    # Invalid chord should raise validation error
+    bad_chord = create(
+        media_id="audio:chord_invalid",
+        payload_kind="chord",
+        extent_kind="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        value=["H:invalid"],
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_chord)
+
+
+def test_create_key_mode_unicode_accidentals():
+    ann = create(
+        media_id="audio:key_unicode",
+        payload_kind="key_mode",
+        extent_kind="time_interval",
+        time=[0.0, 1.0, 2.0, 3.0],
+        duration=[1.0, 1.0, 1.0, 1.0],
+        value=["C♯:minor", "D♭:dorian", "F𝄪:lydian", "B𝄫:mixolydian"],
+    )
+    assert validate(ann) is True
+
+    # Invalid key mode
+    bad_key = create(
+        media_id="audio:key_invalid",
+        payload_kind="key_mode",
+        extent_kind="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        value=["InvalidKey"],
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_key)
+
+
+def test_create_note_payload():
+    ann = create(
+        media_id="audio:note_spn",
+        payload_kind="note",
+        extent_kind="time",
+        time=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+        value=["C4", "A4", "C♯4", "E♭3", "F𝄪5", "B𝄫2", "D♮4", "C-1"],
+    )
+    assert validate(ann) is True
+
+    # Invalid SPN notes
+    bad_note1 = create(
+        media_id="audio:note_invalid",
+        payload_kind="note",
+        extent_kind="time",
+        time=[0.0],
+        value=["H4"],
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_note1)
+
+    bad_note2 = create(
+        media_id="audio:note_invalid",
+        payload_kind="note",
+        extent_kind="time",
+        time=[0.0],
+        value=["C"],  # missing octave
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_note2)
+
+
+def test_create_lyrics_payload():
+    # Valid BCP 47 language tags
+    for lang in ("en", "en-US", "es-419", "zh-Hans", "und"):
+        ann = create(
+            media_id="audio:lyrics",
+            payload_kind="lyrics",
+            extent_kind="time",
+            time=[0.1],
+            value=["hello"],
+            language=lang,
+        )
+        assert ann.payload.language == lang
+        assert validate(ann) is True
+
+    # Missing mandatory language
+    with pytest.raises((BoppValidationError, TypeError)):
+        create(
+            media_id="audio:lyrics",
+            payload_kind="lyrics",
+            extent_kind="time",
+            time=[0.1],
+            value=["hello"],
+        )
+
+    # Invalid BCP 47 tags
+    for invalid_lang in ("123", "en_US", "e"):
+        bad_lyrics = create(
+            media_id="audio:lyrics",
+            payload_kind="lyrics",
+            extent_kind="time",
+            time=[0.1],
+            value=["hello"],
+            language=invalid_lang,
+        )
+        with pytest.raises(BoppValidationError):
+            validate(bad_lyrics)
+
+
+def test_create_frequency_hz_payload():
+    # Frequency with value alone
+    ann = create(
+        media_id="audio:freq",
+        payload_kind="frequency_hz",
+        extent_kind="time",
+        time=[0.1, 0.2],
+        value=[440.0, 880.0],
+    )
+    assert ann.payload.voiced is msgspec.UNSET
+    assert validate(ann) is True
+
+    # Frequency with voiced boolean vector
+    ann_voiced = create(
+        media_id="audio:freq_voiced",
+        payload_kind="frequency_hz",
+        extent_kind="time",
+        time=[0.1, 0.2],
+        value=[440.0, 0.0],
+        voiced=[True, False],
+    )
+    assert ann_voiced.payload.voiced == [True, False]
+    assert validate(ann_voiced) is True
+
+    # Mismatched voiced length raises BoppArrayError
+    with pytest.raises(BoppArrayError):
+        create(
+            media_id="audio:freq_mismatch",
+            payload_kind="frequency_hz",
+            extent_kind="time",
+            time=[0.1, 0.2],
+            value=[440.0, 880.0],
+            voiced=[True],
+        )
+
+
+def test_create_object_payload_with_optional_description():
+    # Without description
+    ann = create(
+        media_id="audio:obj",
+        payload_kind="object",
+        extent_kind="time",
+        time=[0.1],
+        value=[{"feature": 1}],
+    )
+    assert ann.payload.description is msgspec.UNSET
+    assert validate(ann) is True
+
+    # With description
+    ann_desc = create(
+        media_id="audio:obj_desc",
+        payload_kind="object",
+        extent_kind="time",
+        time=[0.1],
+        value=[{"feature": 1}],
+        description="spectral features",
+    )
+    assert ann_desc.payload.description == "spectral features"
+    assert validate(ann_desc) is True
+
+
+def test_create_tag_payload():
+    ann = create(
+        media_id="audio:tag",
+        payload_kind="tag",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=["rock", "guitar"],
+    )
+    assert ann.payload.value == ["rock", "guitar"]
+    assert validate(ann) is True
