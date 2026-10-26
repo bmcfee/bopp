@@ -638,32 +638,25 @@ def load_bopp_csv(
             f = io.StringIO(remaining)
 
         # 2. Hand the open file pointer to Polars or Pandas
-        if not header_line.strip():
-            if backend == "polars":
+        df: Any
+        if backend == "polars":
+            if not header_line.strip():
                 df = pl.DataFrame()
-            elif backend == "pandas":
-                try:
-                    import pandas as pd
-                except ImportError as err:
-                    raise BoppIOError("pandas is required for backend='pandas'") from err
-                df = pd.DataFrame()
             else:
-                raise BoppArgumentError(f"Unsupported backend: {backend}")
-        elif backend == "polars":
-            schema, complex_columns = _build_polars_csv_schema(
-                header_line, bopp_version
-            )
-            df = pl.read_csv(f, schema=schema if schema else None)
-
-            if complex_columns:
-                df = df.with_columns(
-                    [
-                        pl.col(c).map_elements(
-                            _parse_complex_cell, return_dtype=pl.Object
-                        )
-                        for c in complex_columns
-                    ]
+                schema, complex_columns = _build_polars_csv_schema(
+                    header_line, bopp_version
                 )
+                df = pl.read_csv(f, schema=schema if schema else None)
+
+                if complex_columns:
+                    df = df.with_columns(
+                        [
+                            pl.col(c).map_elements(
+                                _parse_complex_cell, return_dtype=pl.Object
+                            )
+                            for c in complex_columns
+                        ]
+                    )
 
         elif backend == "pandas":
             try:
@@ -671,8 +664,11 @@ def load_bopp_csv(
             except ImportError as err:
                 raise BoppIOError("pandas is required for backend='pandas'") from err
 
-            converters = _build_csv_converters(header_line, bopp_version)
-            df = pd.read_csv(f, converters=converters if converters else None)  # type: ignore[assignment]
+            if not header_line.strip():
+                df = pd.DataFrame()
+            else:
+                converters = _build_csv_converters(header_line, bopp_version)
+                df = pd.read_csv(f, converters=converters if converters else None)
         else:
             raise BoppArgumentError(f"Unsupported backend: {backend}")
 

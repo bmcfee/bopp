@@ -54,9 +54,12 @@ def test_get_tag():
 
 
 def test_extract_facet_data_scalar_attributes():
-    class DummyFacet(msgspec.Struct, tag_field="payload_type", tag="beat"):
+    class DummyFacet(msgspec.Struct, tag="beat"):
         value: list[int]
         sample_rate: float
+        payload_type: str = "beat"
+        optional_attr: str | None = None
+        unset_attr: str = msgspec.UNSET
 
     facet = DummyFacet(value=[1, 2], sample_rate=44100.0)
     target_dict: dict[str, list[int]] = {}
@@ -672,4 +675,15 @@ def test_to_and_from_dataframe_marker_payload_without_extent():
         assert reconstructed.payload.description == "global_marker"
         assert reconstructed.extent is msgspec.UNSET
         assert reconstructed.id == ann.id
+
+
+def test_from_dataframe_facet_header_without_type_tag():
+    df = pd.DataFrame({"extent:time:time": [0.1], "payload:beat:value": [1]})
+    header = {
+        "bopp_version": "1.0",
+        "media_id": "track:no_tag",
+        "confidence": {"custom_note": "no_tag_present"},
+    }
+    ann = from_dataframe(df, header=header)
+    assert ann.confidence is msgspec.UNSET
 

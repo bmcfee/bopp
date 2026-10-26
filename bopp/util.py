@@ -618,14 +618,8 @@ def from_dataframe(
     for facet, cols in grouped_cols.items():
         facet_header = header.get(facet)
         if not cols:
-            if isinstance(facet_header, dict):
-                f_type = facet_header.get(f"{facet}_type")
-                if f_type is None and facet == "payload" and "description" in facet_header:
-                    f_type = "marker"
-                if f_type is not None:
-                    f_dict = dict(facet_header)
-                    f_dict[f"{facet}_type"] = f_type
-                    bopp_data[facet] = f_dict
+            if isinstance(facet_header, dict) and f"{facet}_type" in facet_header:
+                bopp_data[facet] = dict(facet_header)
             continue
 
         facet_type = cols[0][0]
