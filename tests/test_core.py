@@ -699,3 +699,79 @@ def test_create_relation_payload():
             extent_kind="time",
             time=[0.0, 10.0],
         )
+
+
+def test_create_with_type_aliases():
+    ann = create(
+        media_id="audio:alias",
+        payload_type="tag",
+        value=["rock"],
+        extent_type="time",
+        time=[1.0],
+        confidence_type="likelihood",
+        confidence=[0.95],
+        metadata_type="human",
+        annotator_id="h1",
+        tool="manual",
+    )
+    assert ann.payload.__struct_config__.tag == "tag"
+    assert ann.extent.__struct_config__.tag == "time"
+    assert ann.confidence.__struct_config__.tag == "likelihood"
+    assert ann.metadata.__struct_config__.tag == "human"
+    assert validate(ann) is True
+
+
+def test_create_missing_payload_identifier():
+    with pytest.raises(
+        BoppArgumentError, match="Must specify 'payload_kind' or 'payload_type'"
+    ):
+        create(media_id="audio:missing")
+
+
+def test_create_conflicting_kind_and_type():
+    with pytest.raises(BoppArgumentError, match="Conflicting 'payload_kind'"):
+        create(media_id="a", payload_kind="tag", payload_type="chord", value=["C"])
+
+    with pytest.raises(BoppArgumentError, match="Conflicting 'extent_kind'"):
+        create(
+            media_id="a",
+            payload_kind="tag",
+            extent_kind="time",
+            extent_type="pixel",
+            value=["a"],
+            time=[0.0],
+        )
+
+    with pytest.raises(BoppArgumentError, match="Conflicting 'confidence_kind'"):
+        create(
+            media_id="a",
+            payload_kind="tag",
+            confidence_kind="likelihood",
+            confidence_type="variance",
+            value=["a"],
+            confidence=[0.5],
+        )
+
+    with pytest.raises(BoppArgumentError, match="Conflicting 'metadata_kind'"):
+        create(
+            media_id="a",
+            payload_kind="tag",
+            metadata_kind="human",
+            metadata_type="sensor",
+            value=["a"],
+            annotator_id="h1",
+        )
+
+
+def test_create_identical_kind_and_type_allowed():
+    ann = create(
+        media_id="a",
+        payload_kind="tag",
+        payload_type="tag",
+        extent_kind="time",
+        extent_type="time",
+        value=["test"],
+        time=[0.0],
+    )
+    assert ann.payload.value == ["test"]
+    assert ann.extent.time == [0.0]

@@ -137,10 +137,14 @@ def _extract_kwargs(
 def create(
     *,
     media_id: str,
-    payload_kind: str,
+    payload_kind: str | None = None,
     extent_kind: str | None = None,
     confidence_kind: str | None = None,
     metadata_kind: str | None = None,
+    payload_type: str | None = None,
+    extent_type: str | None = None,
+    confidence_type: str | None = None,
+    metadata_type: str | None = None,
     metadata: Any = msgspec.UNSET,
     groupings: list[Any] | Any = msgspec.UNSET,
     parents: list[str] | Any = msgspec.UNSET,
@@ -157,18 +161,26 @@ def create(
     ----------
     media_id : str
         Unique media identifier associated with the annotation.
-    payload_kind : str
-        Kind identifier registered for the payload struct.
+    payload_kind : str or None, optional
+        Kind identifier registered for the payload struct (alias: `payload_type`).
     extent_kind : str or None, optional
-        Kind identifier registered for the extent struct, if applicable.
+        Kind identifier registered for the extent struct, if applicable (alias: `extent_type`).
     confidence_kind : str or None, optional
-        Kind identifier registered for the confidence struct, if applicable.
+        Kind identifier registered for the confidence struct, if applicable (alias: `confidence_type`).
     metadata_kind : str or None, optional
-        Kind identifier registered for the metadata struct, if applicable.
+        Kind identifier registered for the metadata struct, if applicable (alias: `metadata_type`).
         Mutually exclusive with `metadata`.
+    payload_type : str or None, optional
+        Alias for `payload_kind`.
+    extent_type : str or None, optional
+        Alias for `extent_kind`.
+    confidence_type : str or None, optional
+        Alias for `confidence_kind`.
+    metadata_type : str or None, optional
+        Alias for `metadata_kind`.
     metadata : msgspec.Struct or dict, optional
         Explicit metadata struct instance or dictionary representation.
-        Mutually exclusive with `metadata_kind`.
+        Mutually exclusive with `metadata_kind` / `metadata_type`.
     groupings : list of Grouping or list of dict, optional
         List of Grouping struct instances or dictionary representations.
     parents : list of str, optional
@@ -197,9 +209,54 @@ def create(
         If an unrecognized `payload_kind`, `extent_kind`, `confidence_kind`, or
         `metadata_kind` is provided.
     BoppArgumentError
-        If unused keyword arguments remain or both `metadata` and `metadata_kind`
-        are specified.
+        If neither `payload_kind` nor `payload_type` is provided, if conflicting
+        aliases are supplied, if unused keyword arguments remain, or if both
+        `metadata` and `metadata_kind` are specified.
     """
+    # Resolve *_type aliases for *_kind
+    if payload_kind is None:
+        if payload_type is not None:
+            payload_kind = payload_type
+        else:
+            raise BoppArgumentError("Must specify 'payload_kind' or 'payload_type'.")
+    elif payload_type is not None and payload_type != payload_kind:
+        raise BoppArgumentError(
+            f"Conflicting 'payload_kind' ({payload_kind!r}) and 'payload_type' ({payload_type!r})."
+        )
+
+    if extent_kind is None and extent_type is not None:
+        extent_kind = extent_type
+    elif (
+        extent_kind is not None
+        and extent_type is not None
+        and extent_kind != extent_type
+    ):
+        raise BoppArgumentError(
+            f"Conflicting 'extent_kind' ({extent_kind!r}) and 'extent_type' ({extent_type!r})."
+        )
+
+    if confidence_kind is None and confidence_type is not None:
+        confidence_kind = confidence_type
+    elif (
+        confidence_kind is not None
+        and confidence_type is not None
+        and confidence_kind != confidence_type
+    ):
+        raise BoppArgumentError(
+            f"Conflicting 'confidence_kind' ({confidence_kind!r}) and 'confidence_type' ({confidence_type!r})."
+        )
+
+    if metadata_kind is None and metadata_type is not None:
+        metadata_kind = metadata_type
+    elif (
+        metadata_kind is not None
+        and metadata_type is not None
+        and metadata_kind != metadata_type
+    ):
+        raise BoppArgumentError(
+            f"Conflicting 'metadata_kind' ({metadata_kind!r}) and 'metadata_type' ({metadata_type!r})."
+        )
+
     if bopp_version is None:
         bopp_version = get_current_schema_version()
 

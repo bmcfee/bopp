@@ -31,7 +31,7 @@ BOPP annotations may optionally contain structured annotation metadata (e.g. to 
 BOPP annotations include automatic identification and provenance tracking:
 
 - **Annotation ID**: Annotation objects automatically generate a deterministic `annotation_id` based on a UUIDv5 digest computed from the core contents. Any change to the annotation's contents results in a new unique identifier.
-- **Parent Linkage**: You can track derivation and lineage across processing pipelines using the `parents` field, which takes a list of parent `annotation_id` strings. Transitive relationships are preserved when deriving annotations through the bopp API (e.g. by trimming or converting between exttent types).
+- **Parent Linkage**: You can track derivation and lineage across processing pipelines using the `parents` field, which takes a list of parent `annotation_id` strings. Transitive relationships are preserved when deriving annotations through the bopp API (e.g. by trimming or converting between extent types).
 
 ```python
 >>> import bopp
@@ -153,7 +153,7 @@ produced by models.
 
 ### MIDI intervals
 
-For symbolic MIDI data, extents can be defined in MIDI ticks using `midi_ticks` or `midi_interval`. In this example, note pitch values are defined over MIDI tick intervals.
+For symbolic MIDI data, extents can be defined in MIDI ticks using `midi_tick` or `midi_interval`. In this example, note pitch values are defined over MIDI tick intervals.
 
 ```json
 {
@@ -187,7 +187,8 @@ Musical scores and sheet music annotations can use score-based extents like `sco
   },
   "payload": {
     "payload_type": "lyrics",
-    "value": ["Hello", "world", "how", "are"]
+    "value": ["Hello", "world", "how", "are"],
+    "language": "en"
   }
 }
 ```
@@ -234,6 +235,15 @@ For visual annotations on sheet music or audio spectrogram images, the `pixel_bo
   }
 }
 ```
+
+### Multimodal extents (spatial, text, and uniform time)
+
+BOPP supports a rich set of 20 standardized extent types spanning multiple observation domains:
+
+- **Temporal**: `time` (continuous timestamps), `time_interval` (timestamps and durations), `time_frequency_box` (time-frequency bounding boxes), and `time_uniform` (implicitly sampled regular grids via `start_time` and `sampling_period`).
+- **Spatial & Vision**: `pixel` (2D point coordinates `x, y`), `pixel_box` (2D bounding boxes `x, y, width, height`), `cartesian` (3D coordinates `x, y, z`), and `spherical` (3D coordinates `azimuth, elevation, radius`), with spatiotemporal variants (`cartesian_time`, `cartesian_time_interval`, `spherical_time`, `spherical_time_interval`).
+- **Text**: `text` (character point offsets `offset`) and `text_interval` (character spans `offset, length`).
+- **Musical Score & Symbolic**: `score_quarter` / `score_quarter_float` (quarter note positions), `score_interval` / `score_interval_float` (quarter note spans), and `midi_tick` / `midi_interval` (MIDI tick positions and durations).
 
 ## Dataframe conversion
 
