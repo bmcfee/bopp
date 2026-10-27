@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extent/text_interval.json",
+  "title": "Text Interval",
+  "description": "Character span intervals (offset and length) in text.",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "text_interval"
+    },
+    "offset": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of 0-based character start offsets in text.",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "length": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of character span lengths (number of characters).",
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  },
+  "required": ["extent_type", "offset", "length"]
+}

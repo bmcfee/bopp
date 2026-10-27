@@ -23,7 +23,7 @@ class BoppArrayError(BoppValidationError):
 
 
 class BoppRegistryError(BoppError, KeyError):
-    """Raised when an unregistered kind identifier is requested."""
+    """Raised when an unregistered type identifier is requested."""
 
 
 class BoppArgumentError(BoppError, ValueError):

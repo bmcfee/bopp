@@ -12,14 +12,14 @@
         "type": "string"
     },
     "value": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/Array",
       "items": {
         "type": "string"
       },
       "description": "Array of referenced work or clique identifiers."
     },
     "relation": {
-      "type": "array",
+      "$ref": "../core.json#/$defs/Array",
       "items": {
         "type": "string",
         "enum": ["cover", "quote", "medley_part", "sample", "interpolation", "remix", "live_performance"]

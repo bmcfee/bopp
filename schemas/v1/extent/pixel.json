@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extent/pixel.json",
+  "title": "Pixel",
+  "description": "2D point coordinates (x, y) in pixel space.",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "pixel"
+    },
+    "x": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of horizontal x-coordinates in pixels.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "y": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of vertical y-coordinates in pixels.",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["extent_type", "x", "y"]
+}

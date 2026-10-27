@@ -56,7 +56,9 @@ def test_nested_aliases():
     container = typing.TypeAliasType("Container", Annotated[A, Meta()])
     scalar = typing.TypeAliasType("Scalar", Annotated[S, Meta()])
     column = typing.TypeAliasType("Column", Annotated[list[container], Meta()])
-    scalar_column = typing.TypeAliasType("ScalarColumn", Annotated[list[scalar], Meta()])
+    scalar_column = typing.TypeAliasType(
+        "ScalarColumn", Annotated[list[scalar], Meta()]
+    )
 
     assert generate_registry._is_complex_field(column)
     assert not generate_registry._is_complex_field(scalar_column)
@@ -97,17 +99,20 @@ def test_score_interval_registry():
 
 
 def test_string_fields_registry():
-    """The generated registry includes string fields like tag_open value."""
-    fields = STRING_FIELDS_REGISTRY["payload_type"]["tag_open"]
-    assert "value" in fields
+    """The generated registry includes string fields like tag, lyrics, object, and note."""
+    assert "value" in STRING_FIELDS_REGISTRY["payload_type"]["tag"]
+    assert "value" in STRING_FIELDS_REGISTRY["payload_type"]["lyrics"]
+    assert "language" in STRING_FIELDS_REGISTRY["payload_type"]["lyrics"]
+    assert "description" in STRING_FIELDS_REGISTRY["payload_type"]["object"]
+    assert "value" in STRING_FIELDS_REGISTRY["payload_type"]["note"]
 
 
 def test_score_interval_csv_roundtrip(tmp_path):
     """CSV loading restores both score interval fraction columns."""
     ann = bopp.create(
         media_id="test:reg",
-        payload_kind="tag_open",
-        extent_kind="score_interval",
+        payload_type="tag",
+        extent_type="score_interval",
         quarter=[[1, 2], [3, 4]],
         duration=[[1, 4], [7, 8]],
         value=["a", "b"],
@@ -117,5 +122,9 @@ def test_score_interval_csv_roundtrip(tmp_path):
     save_bopp_csv(ann, path)
     loaded = load_bopp_csv(path)
 
-    assert [list(x) for x in loaded.extent.quarter] == [list(x) for x in ann.extent.quarter]
-    assert [list(x) for x in loaded.extent.duration] == [list(x) for x in ann.extent.duration]
+    assert [list(x) for x in loaded.extent.quarter] == [
+        list(x) for x in ann.extent.quarter
+    ]
+    assert [list(x) for x in loaded.extent.duration] == [
+        list(x) for x in ann.extent.duration
+    ]

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/frequency_hz.json",
+  "title": "Frequency_Hz Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "frequency_hz"
+    },
+    "value": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Frequencies in Hz",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "voiced": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Optional voicing flag indicating whether each observation is voiced",
+      "items": {
+        "type": "boolean"
+      }
+    }
+  },
+  "required": [
+    "payload_type",
+    "value"
+  ]
+}

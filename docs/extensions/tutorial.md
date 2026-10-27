@@ -62,14 +62,14 @@ from my_drums.models import DrumComponent, DrumStroke
 
 ann = bopp.create(
     media_id="audio:funk_groove_01",
-    payload_kind="ext",
+    payload_type="ext",
     ext_schema="org.example.drums:v1",
     value=[
         {"component": "kick", "velocity": 110},
         {"component": "hihat_closed", "velocity": 85},
         {"component": "snare", "velocity": 115},
     ],
-    extent_kind="time",
+    extent_type="time",
     time=[0.0, 0.25, 0.5],
 )
 

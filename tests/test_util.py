@@ -18,10 +18,11 @@ from bopp.io import _type_to_polars_dtype
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.extent.score_interval import ScoreInterval
-from bopp.models.v1.extent.times import Times
+from bopp.models.v1.extent.time import Time
 from bopp.models.v1.grouping import Grouping
+from bopp.models.v1.payload.beat import BeatPositionPayload
+from bopp.models.v1.payload.marker import MarkerPayload
 from bopp.models.v1.payload.object import ObjectPayload
-from bopp.models.v1.payload.onset import OnsetPayload
 from bopp.registries import FACET_REGISTRY_KEYS, get_registry
 from bopp.util import (
     AnnotationDataFrame,
@@ -53,9 +54,12 @@ def test_get_tag():
 
 
 def test_extract_facet_data_scalar_attributes():
-    class DummyFacet(msgspec.Struct, tag_field="payload_type", tag="onset"):
+    class DummyFacet(msgspec.Struct, tag="beat"):
         value: list[int]
         sample_rate: float
+        payload_type: str = "beat"
+        optional_attr: str | None = None
+        unset_attr: str = msgspec.UNSET
 
     facet = DummyFacet(value=[1, 2], sample_rate=44100.0)
     target_dict: dict[str, list[int]] = {}
@@ -63,7 +67,7 @@ def test_extract_facet_data_scalar_attributes():
 
     _extract_facet_data(facet, "payload", target_dict, attrs_dict)
 
-    assert target_dict == {"payload:onset:value": [1, 2]}
+    assert target_dict == {"payload:beat:value": [1, 2]}
     assert attrs_dict == {"payload": {"sample_rate": 44100.0}}
 
     # When struct is None or UNSET, function returns early
@@ -126,15 +130,13 @@ def test_validate_dataframe_columns_invalid_format():
     invalid_columns = [
         "invalid_column_no_colons",
         "extent:time",  # Too few parts (2)
-        "payload:onset:value:extra",  # Too many parts (4)
+        "payload:beat:value:extra",  # Too many parts (4)
         ":::",  # Empty parts
         "group.notanint.ids",  # Invalid grouping index
         "group.0.invalid_field",  # Field must be 'ids'
     ]
     for col in invalid_columns:
-        with pytest.raises(
-            BoppValidationError, match="Invalid"
-        ):
+        with pytest.raises(BoppValidationError, match="Invalid"):
             _validate_dataframe_columns([col], "1.0")
 
 
@@ -142,11 +144,11 @@ def test_validate_dataframe_columns_rules():
     """Verify DataFrame column validation rules 2, 3, and 4."""
     # Rule 2: Mixed types for facet
     with pytest.raises(BoppValidationError, match="Mixed types for facet 'payload'"):
-        _validate_dataframe_columns(["payload:onset:value", "payload:beat:value"], "1.0")
+        _validate_dataframe_columns(["payload:tag:value", "payload:beat:value"], "1.0")
 
     # Rule 3a: Invalid facet
     with pytest.raises(BoppValidationError, match="Invalid facet 'unknown_facet'"):
-        _validate_dataframe_columns(["unknown_facet:onset:value"], "1.0")
+        _validate_dataframe_columns(["unknown_facet:beat:value"], "1.0")
 
     # Rule 3b: Unrecognized type tag in registry
     with pytest.raises(BoppValidationError, match="Unrecognized type 'unknown_tag'"):
@@ -154,9 +156,10 @@ def test_validate_dataframe_columns_rules():
 
     # Rule 4: Field does not exist on target type struct
     with pytest.raises(
-        BoppValidationError, match="Field 'nonexistent_field' in column .* does not exist"
+        BoppValidationError,
+        match="Field 'nonexistent_field' in column .* does not exist",
     ):
-        _validate_dataframe_columns(["payload:onset:nonexistent_field"], "1.0")
+        _validate_dataframe_columns(["payload:beat:nonexistent_field"], "1.0")
 
 
 def test_to_dataframe_partial_facets():
@@ -164,7 +167,7 @@ def test_to_dataframe_partial_facets():
     ann = create(
         bopp_version="1.0",
         media_id="track:no_extent",
-        payload_kind="onset",
+        payload_type="beat",
         value=[1, 1],
     )
     ann_df = to_dataframe(ann, backend="pandas")
@@ -188,8 +191,8 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
         media_id="track:skip_test",
         bopp_version="1.0",
         metadata=msgspec.UNSET,
-        extent=Times(time=[0.1, 0.2]),
-        payload=OnsetPayload(value=[1, 1]),
+        extent=Time(time=[0.1, 0.2]),
+        payload=BeatPositionPayload(value=[1, 1]),
         confidence=LikelihoodConfidence(confidence=[0.8, 0.9]),
     )
 
@@ -197,12 +200,12 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
 
     # Verify parallel array data columns are created correctly
     assert list(df["extent:time:time"]) == [0.1, 0.2]
-    assert list(df["payload:onset:value"]) == [1, 1]
+    assert list(df["payload:beat:value"]) == [1, 1]
     assert list(df["confidence:likelihood:confidence"]) == [0.8, 0.9]
 
     # Verify discriminator tag fields are excluded from DataFrame columns
     assert "extent:time:extent_type" not in df.columns
-    assert "payload:onset:payload_type" not in df.columns
+    assert "payload:beat:payload_type" not in df.columns
     assert "confidence:likelihood:confidence_type" not in df.columns
 
     # Verify UNSET metadata is not in header
@@ -214,9 +217,9 @@ def test_to_dataframe_covers_extent_and_confidence_branches():
     ann = create(
         bopp_version="1.0",
         media_id="track:facets_coverage",
-        payload_kind="onset",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.85, 0.95],
@@ -230,8 +233,8 @@ def test_groupings_to_and_from_dataframe_pandas():
     ann = Annotation(
         media_id="track:grouping_pandas",
         bopp_version="1.0",
-        payload=OnsetPayload(value=[1, 2, 3]),
-        extent=Times(time=[0.1, 0.2, 0.3]),
+        payload=BeatPositionPayload(value=[1, 2, 3]),
+        extent=Time(time=[0.1, 0.2, 0.3]),
         groupings=[
             Grouping(name="voices", ids=[0, 1, 0], labels={"soprano": 0, "alto": 1}),
             Grouping(name="measures", ids=[1, 1, 2]),
@@ -266,7 +269,7 @@ def test_groupings_to_and_from_dataframe_polars():
     ann = Annotation(
         media_id="track:grouping_polars",
         bopp_version="1.0",
-        payload=OnsetPayload(value=[1, 2]),
+        payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
             Grouping(name="section", ids=[0, 1]),
         ],
@@ -287,7 +290,7 @@ def test_groupings_mismatched_length_raises():
         Annotation(
             media_id="track:mismatch",
             bopp_version="1.0",
-            payload=OnsetPayload(value=[1, 2]),
+            payload=BeatPositionPayload(value=[1, 2]),
             groupings=[
                 Grouping(name="voices", ids=[0]),  # length 1 vs 2
             ],
@@ -298,9 +301,9 @@ def test_pandas_dataframe_roundtrip():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="onset",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
@@ -331,9 +334,9 @@ def test_pandas_pyarrow_dataframe_roundtrip():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="onset",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
@@ -355,9 +358,9 @@ def test_polars_dataframe_roundtrip():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="onset",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
@@ -377,11 +380,12 @@ def test_polars_dataframe_roundtrip():
 
 def test_from_dataframe_with_scalar_facet_attributes():
     """Verify from_dataframe accurately restores scalar facet attributes from header across extent, payload, confidence."""
+
     class ExtentWithScalar(msgspec.Struct, tag_field="extent_type", tag="time"):
         time: list[float]
         origin: str = "start"
 
-    class PayloadWithScalar(msgspec.Struct, tag_field="payload_type", tag="onset"):
+    class PayloadWithScalar(msgspec.Struct, tag_field="payload_type", tag="beat"):
         value: list[int]
         source: str = "mic"
 
@@ -399,17 +403,19 @@ def test_from_dataframe_with_scalar_facet_attributes():
     mock_registry = {
         "Annotation": CustomAnnotation,
         "EXTENT_TYPE_REGISTRY": {"time": ExtentWithScalar},
-        "PAYLOAD_TYPE_REGISTRY": {"onset": PayloadWithScalar},
+        "PAYLOAD_TYPE_REGISTRY": {"beat": PayloadWithScalar},
         "CONFIDENCE_TYPE_REGISTRY": {"likelihood": ConfWithScalar},
         "COMPLEX_FIELDS_REGISTRY": {},
     }
 
     with patch("bopp.util.get_registry", return_value=mock_registry):
-        df = pd.DataFrame({
-            "extent:time:time": [0.1, 0.2],
-            "payload:onset:value": [1, 2],
-            "confidence:likelihood:confidence": [0.9, 0.95],
-        })
+        df = pd.DataFrame(
+            {
+                "extent:time:time": [0.1, 0.2],
+                "payload:beat:value": [1, 2],
+                "confidence:likelihood:confidence": [0.9, 0.95],
+            }
+        )
         header = {
             "bopp_version": "1.0",
             "media_id": "track:with_scalars",
@@ -434,23 +440,27 @@ def test_from_dataframe_missing_required_payload_facet():
         "media_id": "track:no_payload",
     }
 
-    with pytest.raises(msgspec.ValidationError, match="Object missing required field `payload`"):
+    with pytest.raises(
+        msgspec.ValidationError, match="Object missing required field `payload`"
+    ):
         from_dataframe(df, header)
 
 
 def test_from_dataframe_missing_media_id():
-    df = pd.DataFrame({"payload:onset:value": [1, 2]})
+    df = pd.DataFrame({"payload:beat:value": [1, 2]})
     header = {
         "bopp_version": "1.0",
     }
 
-    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+    with pytest.raises(
+        BoppValidationError, match="Missing or invalid required 'media_id'"
+    ):
         from_dataframe(df, header)
 
 
 def test_from_dataframe_extra_attrs():
     # Test metadata and annotated_domain attributes handling in from_dataframe
-    df = pd.DataFrame({"extent:time:time": [0.1], "payload:onset:value": [1]})
+    df = pd.DataFrame({"extent:time:time": [0.1], "payload:beat:value": [1]})
     header = {
         "bopp_version": "1.0",
         "media_id": "track:extra_attrs",
@@ -468,8 +478,8 @@ def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="onset",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
     )
@@ -491,7 +501,7 @@ def test_from_dataframe_raises_argument_error_when_dataframe_libraries_missing()
     """Verify that `from_dataframe` raises a BoppArgumentError when required DataFrame
     library (pandas) cannot be imported to inspect the input object.
     """
-    df_pd = pd.DataFrame({"payload:onset:value": [1]})
+    df_pd = pd.DataFrame({"payload:beat:value": [1]})
     with (
         patch.dict("sys.modules", {"pandas": None}),
         pytest.raises(BoppArgumentError, match="Unsupported DataFrame type"),
@@ -503,8 +513,8 @@ def test_invalid_backend():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="onset",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
     )
@@ -519,10 +529,12 @@ def test_from_dataframe_unsupported_type():
 
 
 def test_from_dataframe_no_header():
-    df = pd.DataFrame({"extent:time:time": [0.1], "payload:onset:value": [1]})
+    df = pd.DataFrame({"extent:time:time": [0.1], "payload:beat:value": [1]})
     header = None
 
-    with pytest.raises(BoppValidationError, match="Missing or invalid required 'media_id'"):
+    with pytest.raises(
+        BoppValidationError, match="Missing or invalid required 'media_id'"
+    ):
         from_dataframe(df, header=header)
 
 
@@ -595,7 +607,7 @@ def test_polars_column_dtypes_match_csv_reader():
         "extent:time_frequency_box:freq_min",
         "extent:pixel_box:width",
         "payload:tempo:value",
-        "payload:note_hz:value",
+        "payload:frequency_hz:value",
         "confidence:likelihood:confidence",
     ],
 )
@@ -609,17 +621,159 @@ def test_polars_column_dtype_constrained_numbers(column):
 
 def test_validate_dataframe_columns_grouping_indices():
     # Non-canonical integer index (leading zero)
-    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.00.ids'"):
-        _validate_dataframe_columns(["payload:onset:value", "group.00.ids"], "1.0")
+    with pytest.raises(
+        BoppValidationError, match="Invalid grouping column format 'group.00.ids'"
+    ):
+        _validate_dataframe_columns(["payload:beat:value", "group.00.ids"], "1.0")
 
     # Negative index
-    with pytest.raises(BoppValidationError, match="Invalid grouping column format 'group.-1.ids'"):
-        _validate_dataframe_columns(["payload:onset:value", "group.-1.ids"], "1.0")
+    with pytest.raises(
+        BoppValidationError, match="Invalid grouping column format 'group.-1.ids'"
+    ):
+        _validate_dataframe_columns(["payload:beat:value", "group.-1.ids"], "1.0")
 
     # Non-contiguous indices (missing 1)
     with pytest.raises(
         BoppValidationError,
         match=r"Grouping column indices must be contiguous starting from 0 \(expected \[0, 1\], got \[0, 2\]\)",
     ):
-        _validate_dataframe_columns(["payload:onset:value", "group.0.ids", "group.2.ids"], "1.0")
+        _validate_dataframe_columns(
+            ["payload:beat:value", "group.0.ids", "group.2.ids"], "1.0"
+        )
 
+
+def test_to_and_from_dataframe_marker_payload():
+    ann = create(
+        media_id="track:marker_df",
+        bopp_version="1.0",
+        payload_type="marker",
+        extent_type="time",
+        time=[0.1, 0.5, 1.2],
+        description="cues",
+        sandbox={"extra": "data"},
+    )
+    for backend in ("pandas", "pandas-pyarrow", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert ann_df.header["media_id"] == "track:marker_df"
+        assert ann_df.header["payload"]["payload_type"] == "marker"
+        assert ann_df.header["payload"]["description"] == "cues"
+        # No payload columns in the DataFrame
+        assert not any(col.startswith("payload:") for col in ann_df.df.columns)
+        assert "extent:time:time" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.media_id == ann.media_id
+        assert isinstance(reconstructed.payload, MarkerPayload)
+        assert reconstructed.payload.description == "cues"
+        assert reconstructed.extent.time == [0.1, 0.5, 1.2]
+        assert reconstructed.id == ann.id
+
+
+def test_to_and_from_dataframe_marker_payload_without_extent():
+    ann = create(
+        media_id="track:marker_global",
+        bopp_version="1.0",
+        payload_type="marker",
+        description="global_marker",
+    )
+    for backend in ("pandas", "pandas-pyarrow", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert ann_df.header["media_id"] == "track:marker_global"
+        assert ann_df.header["payload"]["payload_type"] == "marker"
+        assert ann_df.header["payload"]["description"] == "global_marker"
+        assert len(ann_df.df.columns) == 0
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.media_id == ann.media_id
+        assert isinstance(reconstructed.payload, MarkerPayload)
+        assert reconstructed.payload.description == "global_marker"
+        assert reconstructed.extent is msgspec.UNSET
+        assert reconstructed.id == ann.id
+
+
+def test_from_dataframe_facet_header_without_type_tag():
+    df = pd.DataFrame({"extent:time:time": [0.1], "payload:beat:value": [1]})
+    header = {
+        "bopp_version": "1.0",
+        "media_id": "track:no_tag",
+        "confidence": {"custom_note": "no_tag_present"},
+    }
+    ann = from_dataframe(df, header=header)
+    assert ann.confidence is msgspec.UNSET
+
+
+def test_to_and_from_dataframe_lyrics_payload():
+    ann = create(
+        media_id="track:lyrics_df",
+        bopp_version="1.0",
+        payload_type="lyrics",
+        extent_type="time",
+        time=[0.1, 0.5],
+        value=["hello", "world"],
+        language="en",
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert ann_df.header["payload"]["language"] == "en"
+        assert "payload:lyrics:value" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.language == "en"
+        assert reconstructed.payload.value == ["hello", "world"]
+
+
+def test_to_and_from_dataframe_frequency_hz_with_voiced():
+    ann = create(
+        media_id="track:freq_voiced_df",
+        bopp_version="1.0",
+        payload_type="frequency_hz",
+        extent_type="time",
+        time=[0.0, 0.5],
+        value=[440.0, 880.0],
+        voiced=[True, False],
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert "payload:frequency_hz:value" in ann_df.df.columns
+        assert "payload:frequency_hz:voiced" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.value == [440.0, 880.0]
+        assert reconstructed.payload.voiced == [True, False]
+
+
+def test_to_and_from_dataframe_object_with_description():
+    ann = create(
+        media_id="track:object_desc_df",
+        bopp_version="1.0",
+        payload_type="object",
+        extent_type="time",
+        time=[0.1, 0.5],
+        value=[{"a": 1, "b": 2}, {"a": 3, "b": 4}],
+        description="test objects",
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert ann_df.header["payload"]["description"] == "test objects"
+        assert "payload:object:value" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.description == "test objects"
+        assert reconstructed.payload.value == [{"a": 1, "b": 2}, {"a": 3, "b": 4}]
+
+
+def test_to_and_from_dataframe_note_payload():
+    ann = create(
+        media_id="track:note_spn_df",
+        bopp_version="1.0",
+        payload_type="note",
+        extent_type="time",
+        time=[0.0, 1.0],
+        value=["C4", "C♯4"],
+    )
+    for backend in ("pandas", "polars"):
+        ann_df = to_dataframe(ann, backend=backend)
+        assert "payload:note:value" in ann_df.df.columns
+
+        reconstructed = from_dataframe(ann_df)
+        assert reconstructed.payload.value == ["C4", "C♯4"]

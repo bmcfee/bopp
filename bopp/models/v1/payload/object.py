@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class ObjectPayload(Struct, tag_field="payload_type", tag="object"):
@@ -13,3 +13,12 @@ class ObjectPayload(Struct, tag_field="payload_type", tag="object"):
         list[dict[str, Any]],
         Meta(description="Annotations consisting of structured object data"),
     ]
+    description: (
+        Annotated[
+            str,
+            Meta(
+                description="Optional human-readable description of the object payload"
+            ),
+        ]
+        | UnsetType
+    ) = UNSET

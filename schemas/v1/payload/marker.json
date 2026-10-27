@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "payload/marker.json",
+  "title": "Marker Payload",
+  "type": "object",
+  "properties": {
+    "payload_type": {
+      "const": "marker"
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "payload_type",
+    "description"
+  ]
+}

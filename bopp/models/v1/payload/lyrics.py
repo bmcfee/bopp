@@ -10,3 +10,10 @@ from msgspec import Meta, Struct
 
 class LyricsPayload(Struct, tag_field="payload_type", tag="lyrics"):
     value: Annotated[list[str], Meta(description="Open strings for lyrics annotations")]
+    language: Annotated[
+        str,
+        Meta(
+            description="Language tag conforming to IETF BCP 47 (RFC 5646)",
+            pattern="^[a-zA-Z]{2,3}(-[a-zA-Z]{3})?(-[a-zA-Z]{4})?(-([a-zA-Z]{2}|[0-9]{3}))?(-([a-zA-Z0-9]{5,8}|[0-9][a-zA-Z0-9]{3}))*(-[a-wy-z0-9](-[a-zA-Z0-9]{2,8})+)*(-x(-[a-zA-Z0-9]{1,8})+)?$",
+        ),
+    ]

@@ -59,4 +59,6 @@ def get_registry(version: str) -> dict[str, Any]:
             "Grouping": getattr(v1, "GROUPING_CLASS", None),
         }
 
-    raise ValueError(f"Unknown registry version '{registry_key}' for schema '{version}'.")
+    raise ValueError(
+        f"Unknown registry version '{registry_key}' for schema '{version}'."
+    )

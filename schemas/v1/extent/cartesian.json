@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "extent/cartesian.json",
+  "title": "Cartesian Extent",
+  "description": "3D spatial coordinates in Cartesian space (x, y, z).",
+  "type": "object",
+  "properties": {
+    "extent_type": {
+      "const": "cartesian"
+    },
+    "x": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of x-coordinates in space.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "y": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of y-coordinates in space.",
+      "items": {
+        "type": "number"
+      }
+    },
+    "z": {
+      "$ref": "../core.json#/$defs/Array",
+      "description": "Array of z-coordinates in space.",
+      "items": {
+        "type": "number"
+      }
+    }
+  },
+  "required": ["extent_type", "x", "y", "z"]
+}

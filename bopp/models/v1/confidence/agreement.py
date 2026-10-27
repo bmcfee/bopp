@@ -10,7 +10,7 @@ from msgspec import UNSET, Meta, Struct, UnsetType
 type ConfidenceItem = Annotated[float, Meta(ge=0.0, le=1.0)]
 
 
-type NAnnotator = Annotated[int, Meta(ge=1)]
+type NumAnnotator = Annotated[int, Meta(ge=1)]
 
 
 class ConfidenceByInterAnnotatorAgreement(
@@ -20,7 +20,7 @@ class ConfidenceByInterAnnotatorAgreement(
         list[ConfidenceItem],
         Meta(description="The fraction of annotators agreeing on this measurement"),
     ]
-    n_annotators_common: (
+    num_annotators_common: (
         Annotated[
             int,
             Meta(
@@ -30,9 +30,9 @@ class ConfidenceByInterAnnotatorAgreement(
         ]
         | UnsetType
     ) = UNSET
-    n_annotators: (
+    num_annotators: (
         Annotated[
-            list[NAnnotator],
+            list[NumAnnotator],
             Meta(description="The number of annotators who produced each observation"),
         ]
         | UnsetType

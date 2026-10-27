@@ -120,7 +120,7 @@ def test_union_type_support():
         ann = create(
             bopp_version="1.0",
             media_id="track:union_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.union",
             value=[
                 {"type": "TaggedItemA", "name": "foo", "score": 1.0},
@@ -158,7 +158,9 @@ def test_update_extensions_conflict_warning():
         ):
             REGISTRY.clear()
             # Warning is issued during update/initialization
-            with pytest.warns(UserWarning, match="Conflict for extension 'conflict.schema'"):
+            with pytest.warns(
+                UserWarning, match="Conflict for extension 'conflict.schema'"
+            ):
                 update_extensions()
 
             extensions = get_extensions()
@@ -303,9 +305,9 @@ def test_resolve_extensions_none_or_unset_payload():
 def test_resolve_extensions_non_extension_payload():
     ann = create(
         bopp_version="1.0",
-        media_id="track:onset_test",
-        payload_kind="onset",
-        extent_kind="time",
+        media_id="track:beat_test",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
     )
@@ -318,7 +320,7 @@ def test_resolve_extensions_missing_schema_warning():
     ann = create(
         bopp_version="1.0",
         media_id="track:ext_test",
-        payload_kind="ext",
+        payload_type="ext",
         ext_schema="unregistered.schema",
         value=[{"name": "foo", "score": 1.0}],
         resolve_ext=False,
@@ -332,13 +334,15 @@ def test_resolve_extensions_missing_schema_error():
     ann = create(
         bopp_version="1.0",
         media_id="track:ext_test",
-        payload_kind="ext",
+        payload_type="ext",
         ext_schema="unregistered.schema",
         value=[{"name": "foo", "score": 1.0}],
         resolve_ext=False,
     )
 
-    with pytest.raises(BoppRegistryError, match="Extension schema 'unregistered.schema' not found"):
+    with pytest.raises(
+        BoppRegistryError, match="Extension schema 'unregistered.schema' not found"
+    ):
         resolve_extensions(ann, allow_missing=False)
 
 
@@ -350,7 +354,7 @@ def test_resolve_extensions_successful_conversion():
         ann = create(
             bopp_version="1.0",
             media_id="track:ext_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=[{"name": "test", "score": 42.0}],
             resolve_ext=False,
@@ -373,7 +377,7 @@ def test_resolve_extensions_validation_error():
         ann = create(
             bopp_version="1.0",
             media_id="track:ext_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=[{"name": "test", "score": "not-a-float"}],
             resolve_ext=False,
@@ -394,7 +398,7 @@ def test_resolve_extensions_strict_coercion_rejected():
         ann = create(
             bopp_version="1.0",
             media_id="track:ext_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=[{"name": "test", "score": "12.34"}],
             resolve_ext=False,
@@ -416,7 +420,7 @@ def test_annotation_id_invariance_with_extension_resolution():
         ann_unresolved = create(
             bopp_version="1.0",
             media_id="track:invariance_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=raw_items,
             resolve_ext=False,
@@ -425,7 +429,7 @@ def test_annotation_id_invariance_with_extension_resolution():
         ann_resolved = create(
             bopp_version="1.0",
             media_id="track:invariance_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=raw_items,
             resolve_ext=True,
@@ -449,7 +453,7 @@ def test_create_with_resolve_ext():
         ann = create(
             bopp_version="1.0",
             media_id="track:ext_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=[{"name": "item1", "score": 1.5}],
             resolve_ext=True,
@@ -459,7 +463,7 @@ def test_create_with_resolve_ext():
         ann_unresolved = create(
             bopp_version="1.0",
             media_id="track:ext_test",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=[{"name": "item1", "score": 1.5}],
             resolve_ext=False,
@@ -477,7 +481,7 @@ def test_io_loaders_resolve_ext(tmp_path):
         ann = create(
             bopp_version="1.0",
             media_id="track:ext_io",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=[{"name": "item1", "score": 2.5}],
             resolve_ext=False,
@@ -524,7 +528,7 @@ def test_resolved_extension_csv_roundtrip(tmp_path):
         ann = create(
             bopp_version="1.0",
             media_id="track:csv_resolved",
-            payload_kind="ext",
+            payload_type="ext",
             ext_schema="org.test.custom",
             value=[{"name": "snare", "score": 95.0}, {"name": "kick", "score": 100.0}],
             resolve_ext=True,

@@ -13,10 +13,16 @@
       "items": {
         "type": "string"
       }
+    },
+    "language": {
+      "type": "string",
+      "description": "Language tag conforming to IETF BCP 47 (RFC 5646)",
+      "pattern": "^[a-zA-Z]{2,3}(-[a-zA-Z]{3})?(-[a-zA-Z]{4})?(-([a-zA-Z]{2}|[0-9]{3}))?(-([a-zA-Z0-9]{5,8}|[0-9][a-zA-Z0-9]{3}))*(-[a-wy-z0-9](-[a-zA-Z0-9]{2,8})+)*(-x(-[a-zA-Z0-9]{1,8})+)?$"
     }
   },
   "required": [
     "payload_type",
-    "value"
+    "value",
+    "language"
   ]
 }

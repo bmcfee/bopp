@@ -110,7 +110,9 @@ def _validate_dataframe_columns(
         registry = registry_or_version
 
     facet_types: dict[str, str] = {}
-    grouped_cols: dict[str, list[tuple[str, str, str]]] = {k: [] for k in FACET_REGISTRY_KEYS}
+    grouped_cols: dict[str, list[tuple[str, str, str]]] = {
+        k: [] for k in FACET_REGISTRY_KEYS
+    }
     grouping_cols: list[tuple[int, str]] = []
 
     for col in columns:
@@ -323,6 +325,7 @@ def _extract_facet_data(
     type_field_name = f"{facet_name}_type"
 
     facet_attrs: dict[str, Any] = {}
+    has_list_fields = False
 
     for field in msgspec.structs.fields(type(struct)):
         if field.name == type_field_name:
@@ -332,6 +335,7 @@ def _extract_facet_data(
             continue
 
         if isinstance(val, list):
+            has_list_fields = True
             col_key = f"{facet_name}:{tag}:{field.name}"
             is_complex = False
             if encode_complex:
@@ -358,6 +362,9 @@ def _extract_facet_data(
                 column_types[col_key] = (field.type, is_complex)
         else:
             facet_attrs[field.name] = msgspec.to_builtins(val)
+
+    if not has_list_fields and tag is not None:
+        facet_attrs[type_field_name] = tag
 
     if facet_attrs:
         attrs_dict[facet_name] = facet_attrs
@@ -402,13 +409,13 @@ def to_dataframe(
     >>> from bopp.models.v1.annotation import Annotation
     >>> ann = Annotation(
     ...     media_id="audio:123",
-    ...     payload={"payload_type": "onset", "value": [1, 2]}
+    ...     payload={"payload_type": "beat", "value": [1.0, 2.0]}
     ... )
     >>> df, header = to_dataframe(ann, backend="pandas")
     >>> header["media_id"]
     'audio:123'
     >>> df.columns.tolist()
-    ['payload:onset:value']
+    ['payload:beat:value']
 
     Accessing attributes via named fields:
 
@@ -434,7 +441,9 @@ def to_dataframe(
         except (BoppRegistryError, ValueError):
             complex_registry = {}
 
-    def _get_complex_fields_for_facet(struct: msgspec.Struct | None, facet_name: str) -> set[str]:
+    def _get_complex_fields_for_facet(
+        struct: msgspec.Struct | None, facet_name: str
+    ) -> set[str]:
         if struct is None or struct is msgspec.UNSET:
             return set()
         tag = _get_tag(struct)
@@ -476,7 +485,11 @@ def to_dataframe(
             header["groupings"] = groupings_header
 
     for field in msgspec.structs.fields(annotation):
-        if field.name in FACET_REGISTRY_KEYS or field.name in ("bopp_version", "media_id", "groupings"):
+        if field.name in FACET_REGISTRY_KEYS or field.name in (
+            "bopp_version",
+            "media_id",
+            "groupings",
+        ):
             continue
         val = getattr(annotation, field.name, msgspec.UNSET)
         if val not in (msgspec.UNSET, None):
@@ -492,7 +505,9 @@ def to_dataframe(
             try:
                 import pyarrow  # noqa: F401
             except ImportError as err:
-                raise BoppIOError("pyarrow is required for backend='pandas-pyarrow'") from err
+                raise BoppIOError(
+                    "pyarrow is required for backend='pandas-pyarrow'"
+                ) from err
 
             df_pd = pd.DataFrame(data).convert_dtypes(dtype_backend="pyarrow")
         else:
@@ -573,6 +588,7 @@ def from_dataframe(
     if not valid:
         try:
             import pandas as pd
+
             valid = isinstance(df, pd.DataFrame)
         except ImportError:
             valid = False
@@ -611,14 +627,17 @@ def from_dataframe(
         return extractor() if extractor is not None else list(col_series)
 
     for facet, cols in grouped_cols.items():
+        facet_header = header.get(facet)
         if not cols:
+            if isinstance(facet_header, dict) and f"{facet}_type" in facet_header:
+                bopp_data[facet] = dict(facet_header)
             continue
 
         facet_type = cols[0][0]
         facet_dict: dict[str, Any] = {f"{facet}_type": facet_type}
 
-        if isinstance(header.get(facet), dict):
-            facet_dict.update(header[facet])
+        if isinstance(facet_header, dict):
+            facet_dict.update(facet_header)
 
         for _, field_name, full_col_name in cols:
             facet_dict[field_name] = _get_column_list(full_col_name)
@@ -629,7 +648,11 @@ def from_dataframe(
         groupings_header_list = header.get("groupings", [])
         grouping_items = []
         for g_idx, col_name in grouping_cols:
-            g_meta = groupings_header_list[g_idx] if g_idx < len(groupings_header_list) else {}
+            g_meta = (
+                groupings_header_list[g_idx]
+                if g_idx < len(groupings_header_list)
+                else {}
+            )
             g_dict = {
                 "name": g_meta.get("name", f"group_{g_idx}"),
                 "ids": _get_column_list(col_name),

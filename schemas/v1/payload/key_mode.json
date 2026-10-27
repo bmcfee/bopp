@@ -12,7 +12,7 @@
       "description": "Key and optional mode (major/minor or Greek modes)",
       "items": {
         "type": "string",
-        "pattern": "^N|([A-G][b#]?)(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?$"
+        "pattern": "^((N)|(([A-G]([b♭]*|𝄫|[#♯]*|𝄪|♮))(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?))$"
       }
     }
   },
