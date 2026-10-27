@@ -31,7 +31,7 @@ class RelationPayload(Struct, tag_field="payload_type", tag="relation"):
     relation: (
         Annotated[
             list[RelationEnum],
-            Meta(description="Array of relation types parallel to value."),
+            Meta(description="Array of relation types parallel to work_id."),
         ]
         | UnsetType
     ) = UNSET

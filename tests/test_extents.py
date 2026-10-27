@@ -229,8 +229,8 @@ def test_spherical_range_constraints():
     with pytest.raises(BoppValidationError):
         validate(bad_el2)
 
-    # Radius <= 0.0
-    bad_r0 = create(
+    # Radius == 0.0 is allowed
+    ann_r0 = create(
         media_id="audio:sph",
         payload_type="tag",
         extent_type="spherical",
@@ -239,8 +239,20 @@ def test_spherical_range_constraints():
         radius=[0.0],
         value=["v"],
     )
+    assert validate(ann_r0) is True
+
+    # Radius < 0.0
+    bad_r_neg = create(
+        media_id="audio:sph",
+        payload_type="tag",
+        extent_type="spherical",
+        azimuth=[0.0],
+        elevation=[0.0],
+        radius=[-0.1],
+        value=["v"],
+    )
     with pytest.raises(BoppValidationError):
-        validate(bad_r0)
+        validate(bad_r_neg)
 
 
 def test_time_uniform_constraints():

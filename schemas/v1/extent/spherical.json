@@ -28,10 +28,10 @@
     },
     "radius": {
       "$ref": "../core.json#/$defs/Array",
-      "description": "Array of radial distances strictly greater than 0.",
+      "description": "Array of non-negative radial distances (greater than or equal to 0).",
       "items": {
         "type": "number",
-        "exclusiveMinimum": 0.0
+        "minimum": 0.0
       }
     }
   },

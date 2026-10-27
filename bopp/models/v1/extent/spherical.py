@@ -13,7 +13,7 @@ type AzimuthItem = Annotated[float, Meta(ge=-180.0, lt=180.0)]
 type ElevationItem = Annotated[float, Meta(ge=-90.0, le=90.0)]
 
 
-type Radiu = Annotated[float, Meta(gt=0.0)]
+type Radiu = Annotated[float, Meta(ge=0.0)]
 
 
 class SphericalExtent(Struct, tag_field="extent_type", tag="spherical"):
@@ -31,5 +31,7 @@ class SphericalExtent(Struct, tag_field="extent_type", tag="spherical"):
     ]
     radius: Annotated[
         list[Radiu],
-        Meta(description="Array of radial distances strictly greater than 0."),
+        Meta(
+            description="Array of non-negative radial distances (greater than or equal to 0)."
+        ),
     ]

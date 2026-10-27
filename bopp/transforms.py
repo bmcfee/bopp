@@ -9,6 +9,7 @@ from typing import Any, Literal
 
 import msgspec
 
+from ._version import DEFAULT_SCHEMA_VERSION
 from .base import BoppBase
 from .core import ensure_annotation_id
 from .exceptions import BoppArgumentError, BoppValidationError
@@ -335,7 +336,7 @@ def _rebuild_converted_extent(
     parameters: dict[str, Any],
 ) -> BoppBase:
     """Build a registered twin extent and derive an annotation around it."""
-    version = getattr(annotation, "bopp_version", "1.0")
+    version = getattr(annotation, "bopp_version", DEFAULT_SCHEMA_VERSION)
     extent_cls = get_registry(version)["EXTENT_TYPE_REGISTRY"][target_tag]
     parents, sandbox = _derive_parents_and_sandbox(annotation, "Converting")
     return _rebuild_annotation(
@@ -619,10 +620,12 @@ def trim(
     groupings = getattr(annotation, "groupings", msgspec.UNSET)
 
     if extent_tag == "time_uniform":
-        assert extent is not None and extent is not msgspec.UNSET
-        assert isinstance(extent, msgspec.Struct)
-        tu_start_time = float(extent.start_time)  # type: ignore[attr-defined]
-        tu_period = float(extent.sampling_period)  # type: ignore[attr-defined]
+        if not isinstance(extent, msgspec.Struct):
+            raise BoppValidationError(
+                "Invalid or missing extent struct for 'time_uniform'."
+            )
+        tu_start_time = float(getattr(extent, "start_time", 0.0))
+        tu_period = float(getattr(extent, "sampling_period", 0.0))
 
         payload_cols = _get_facet_list_fields(payload)
         confidence_cols = (
@@ -1303,8 +1306,7 @@ def to_times(
     target_times: list[float]
     if times is not None:
         target_times = [float(t) for t in times]
-    else:
-        assert sample_rate is not None
+    elif sample_rate is not None:
         if extent_tag is None or n_source_obs == 0:
             raise BoppArgumentError(
                 "sample_rate requires an extent with observations to determine temporal bounds. "
