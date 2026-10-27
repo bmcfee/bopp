@@ -838,7 +838,8 @@ def filter_by(
     Raises
     ------
     BoppArgumentError
-        If arguments are invalid or the specified facet/target is not found.
+        If arguments are invalid, the specified facet/target is not found, or
+        the annotation has a 'time_uniform' extent.
 
     Examples
     --------
@@ -900,6 +901,14 @@ def filter_by(
             f"Invalid facet '{facet}'. Must be one of 'payload', 'extent', 'confidence', 'groupings', or 'all'."
         )
 
+    extent = getattr(annotation, "extent", None)
+    if extent not in (None, msgspec.UNSET) and _get_tag(extent) == "time_uniform":
+        raise BoppArgumentError(
+            "filter_by is not supported for 'time_uniform' extents because non-contiguous "
+            "filtering produces sampling gaps that break the uniform raster. "
+            "Convert the extent first using bopp.to_times() or slice contiguously using bopp.transforms.trim()."
+        )
+
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Filtering")
     derived_metadata = DerivedAnnotationMetadata(
         transform="filter_by",
@@ -907,7 +916,6 @@ def filter_by(
     )
 
     payload: msgspec.Struct = getattr(annotation, "payload", None)  # type: ignore[assignment]
-    extent = getattr(annotation, "extent", None)
     confidence = getattr(annotation, "confidence", None)
     groupings = getattr(annotation, "groupings", None)
 

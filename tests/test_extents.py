@@ -596,3 +596,10 @@ def test_filter_by_and_errors_new_extents():
         match="Unsupported target_field 'x' for extent tag 'time_uniform'",
     ):
         trim(ann_tu, start=0.0, target_field="x")
+
+    # filter_by on time_uniform raises BoppArgumentError
+    with pytest.raises(
+        BoppArgumentError,
+        match="filter_by is not supported for 'time_uniform' extents",
+    ):
+        filter_by(ann_tu, lambda v: v == "a")
