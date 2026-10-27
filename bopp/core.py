@@ -137,11 +137,7 @@ def _extract_kwargs(
 def create(
     *,
     media_id: str,
-    payload_kind: str | None = None,
-    extent_kind: str | None = None,
-    confidence_kind: str | None = None,
-    metadata_kind: str | None = None,
-    payload_type: str | None = None,
+    payload_type: str,
     extent_type: str | None = None,
     confidence_type: str | None = None,
     metadata_type: str | None = None,
@@ -161,26 +157,18 @@ def create(
     ----------
     media_id : str
         Unique media identifier associated with the annotation.
-    payload_kind : str or None, optional
-        Kind identifier registered for the payload struct (alias: `payload_type`).
-    extent_kind : str or None, optional
-        Kind identifier registered for the extent struct, if applicable (alias: `extent_type`).
-    confidence_kind : str or None, optional
-        Kind identifier registered for the confidence struct, if applicable (alias: `confidence_type`).
-    metadata_kind : str or None, optional
-        Kind identifier registered for the metadata struct, if applicable (alias: `metadata_type`).
-        Mutually exclusive with `metadata`.
-    payload_type : str or None, optional
-        Alias for `payload_kind`.
+    payload_type : str
+        Type identifier registered for the payload struct.
     extent_type : str or None, optional
-        Alias for `extent_kind`.
+        Type identifier registered for the extent struct, if applicable.
     confidence_type : str or None, optional
-        Alias for `confidence_kind`.
+        Type identifier registered for the confidence struct, if applicable.
     metadata_type : str or None, optional
-        Alias for `metadata_kind`.
+        Type identifier registered for the metadata struct, if applicable.
+        Mutually exclusive with `metadata`.
     metadata : msgspec.Struct or dict, optional
         Explicit metadata struct instance or dictionary representation.
-        Mutually exclusive with `metadata_kind` / `metadata_type`.
+        Mutually exclusive with `metadata_type`.
     groupings : list of Grouping or list of dict, optional
         List of Grouping struct instances or dictionary representations.
     parents : list of str, optional
@@ -193,7 +181,7 @@ def create(
     generate_id : bool, default True
         If True, computes and assigns deterministic UUIDv5 `id` to the annotation.
     resolve_ext : bool, default True
-        If True and payload_kind is 'ext', resolves and validates the extension payload values.
+        If True and payload_type is 'ext', resolves and validates the extension payload values.
     **kwargs : Any
         Keyword arguments matching fields for the payload, extent, confidence,
         or metadata structures.
@@ -206,62 +194,17 @@ def create(
     Raises
     ------
     BoppRegistryError
-        If an unrecognized `payload_kind`, `extent_kind`, `confidence_kind`, or
-        `metadata_kind` is provided.
+        If an unrecognized `payload_type`, `extent_type`, `confidence_type`, or
+        `metadata_type` is provided.
     BoppArgumentError
-        If neither `payload_kind` nor `payload_type` is provided, if conflicting
-        aliases are supplied, if unused keyword arguments remain, or if both
-        `metadata` and `metadata_kind` are specified.
+        If unused keyword arguments remain or both `metadata` and `metadata_type`
+        are specified.
     """
-    # Resolve *_type aliases for *_kind
-    if payload_kind is None:
-        if payload_type is not None:
-            payload_kind = payload_type
-        else:
-            raise BoppArgumentError("Must specify 'payload_kind' or 'payload_type'.")
-    elif payload_type is not None and payload_type != payload_kind:
-        raise BoppArgumentError(
-            f"Conflicting 'payload_kind' ({payload_kind!r}) and 'payload_type' ({payload_type!r})."
-        )
-
-    if extent_kind is None and extent_type is not None:
-        extent_kind = extent_type
-    elif (
-        extent_kind is not None
-        and extent_type is not None
-        and extent_kind != extent_type
-    ):
-        raise BoppArgumentError(
-            f"Conflicting 'extent_kind' ({extent_kind!r}) and 'extent_type' ({extent_type!r})."
-        )
-
-    if confidence_kind is None and confidence_type is not None:
-        confidence_kind = confidence_type
-    elif (
-        confidence_kind is not None
-        and confidence_type is not None
-        and confidence_kind != confidence_type
-    ):
-        raise BoppArgumentError(
-            f"Conflicting 'confidence_kind' ({confidence_kind!r}) and 'confidence_type' ({confidence_type!r})."
-        )
-
-    if metadata_kind is None and metadata_type is not None:
-        metadata_kind = metadata_type
-    elif (
-        metadata_kind is not None
-        and metadata_type is not None
-        and metadata_kind != metadata_type
-    ):
-        raise BoppArgumentError(
-            f"Conflicting 'metadata_kind' ({metadata_kind!r}) and 'metadata_type' ({metadata_type!r})."
-        )
-
     if bopp_version is None:
         bopp_version = get_current_schema_version()
 
-    if metadata_kind is not None and metadata is not msgspec.UNSET:
-        raise BoppArgumentError("Cannot specify both 'metadata' and 'metadata_kind'.")
+    if metadata_type is not None and metadata is not msgspec.UNSET:
+        raise BoppArgumentError("Cannot specify both 'metadata' and 'metadata_type'.")
 
     registry = get_registry(bopp_version)
 
@@ -273,47 +216,47 @@ def create(
     Grouping = registry.get("Grouping")
 
     try:
-        payload_cls = PAYLOAD_TYPE_REGISTRY[payload_kind]
+        payload_cls = PAYLOAD_TYPE_REGISTRY[payload_type]
     except KeyError as e:
-        raise BoppRegistryError(f"Unrecognized kind identifier: {e}") from e
+        raise BoppRegistryError(f"Unrecognized payload type: {e}") from e
 
     payload_args = _extract_kwargs(payload_cls, kwargs)
     payload_obj = payload_cls(**payload_args)
 
     # Extract kwargs by mutating the dictionary
     extent_obj = msgspec.UNSET
-    if extent_kind is not None:
+    if extent_type is not None:
         try:
-            extent_cls = EXTENT_TYPE_REGISTRY[extent_kind]
+            extent_cls = EXTENT_TYPE_REGISTRY[extent_type]
         except KeyError as e:
-            raise BoppRegistryError(f"Unrecognized extent kind {e}") from e
+            raise BoppRegistryError(f"Unrecognized extent type: {e}") from e
 
         extent_args = _extract_kwargs(extent_cls, kwargs)
         extent_obj = extent_cls(**extent_args)
 
     confidence_obj = msgspec.UNSET
-    if confidence_kind:
+    if confidence_type:
         try:
-            confidence_cls = CONFIDENCE_TYPE_REGISTRY[confidence_kind]
+            confidence_cls = CONFIDENCE_TYPE_REGISTRY[confidence_type]
         except KeyError as e:
-            raise BoppRegistryError(f"Unrecognized confidence kind: {e}") from e
+            raise BoppRegistryError(f"Unrecognized confidence type: {e}") from e
 
         confidence_args = _extract_kwargs(confidence_cls, kwargs)
         confidence_obj = confidence_cls(**confidence_args)
 
     metadata_obj = metadata
-    if metadata_kind is not None:
+    if metadata_type is not None:
         try:
-            metadata_cls = METADATA_TYPE_REGISTRY[metadata_kind]
+            metadata_cls = METADATA_TYPE_REGISTRY[metadata_type]
         except KeyError as e:
-            raise BoppRegistryError(f"Unrecognized metadata kind: {e}") from e
+            raise BoppRegistryError(f"Unrecognized metadata type: {e}") from e
 
         metadata_args = _extract_kwargs(metadata_cls, kwargs)
         metadata_obj = metadata_cls(**metadata_args)
     elif isinstance(metadata, dict):
         meta_type = metadata.get("metadata_type")
         if meta_type not in METADATA_TYPE_REGISTRY:
-            raise BoppRegistryError(f"Unrecognized metadata kind: {meta_type!r}")
+            raise BoppRegistryError(f"Unrecognized metadata type: {meta_type!r}")
         metadata_obj = msgspec.convert(metadata, METADATA_TYPE_REGISTRY[meta_type])
 
     groupings_obj = groupings
@@ -343,7 +286,7 @@ def create(
         groupings=groupings_obj,
     )
 
-    if resolve_ext and payload_kind == "ext":
+    if resolve_ext and payload_type == "ext":
         resolve_extensions(ann)
 
     if generate_id:

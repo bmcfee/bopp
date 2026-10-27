@@ -83,8 +83,8 @@ def test_create_and_validate_fraction_annotation():
     """Creating an annotation with zero and negative quarters passes validation."""
     annotation = bopp.create(
         media_id="test:frac",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[0, 1], [-1, 2], [3, 4]],
         value=["a", "b", "c"],
     )
@@ -104,8 +104,8 @@ def test_fraction_annotation_roundtrip(tmp_path, save, load, suffix, keeps_id):
     quarter = [[0, 1], [-1, 2], [3, 4]]
     annotation = bopp.create(
         media_id="test:frac",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=quarter,
         value=["a", "b", "c"],
     )
@@ -122,8 +122,8 @@ def test_json_loaded_fraction_annotation_csv_roundtrip(tmp_path):
     quarter = [[0, 1], [-1, 2], [3, 4]]
     annotation = bopp.create(
         media_id="test:frac",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=quarter,
         value=["a", "b", "c"],
     )

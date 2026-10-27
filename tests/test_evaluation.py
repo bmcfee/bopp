@@ -32,15 +32,15 @@ def test_evaluate_onset():
 
     ref = create(
         media_id="audio",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=ref_times,
         description="onset",
     )
     est = create(
         media_id="audio",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=est_times,
         description="onset",
     )
@@ -62,16 +62,16 @@ def test_evaluate_onset_from_time_interval():
 
     ref = create(
         media_id="audio",
-        payload_kind="marker",
-        extent_kind="time_interval",
+        payload_type="marker",
+        extent_type="time_interval",
         time=ref_times,
         duration=ref_durs,
         description="onset",
     )
     est = create(
         media_id="onset",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=est_times,
         description="onset",
     )
@@ -92,15 +92,15 @@ def test_evaluate_beat():
 
     ref = create(
         media_id="audio",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=ref_times,
         value=[1, 2, 3, 4, 1],
     )
     est = create(
         media_id="audio",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=est_times,
         value=[1, 2, 3, 4, 1],
     )
@@ -159,16 +159,16 @@ def test_evaluate_chord():
 
     ref = create(
         media_id="audio",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=ref_labels,
     )
     est = create(
         media_id="audio",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=est_labels,
@@ -183,15 +183,15 @@ def test_evaluate_chord_from_point_times():
     # Consecutive point events infer intervals: [0.0, 2.0] -> 'C:maj', [2.0, 4.0] -> 'G:maj'
     ref = create(
         media_id="audio",
-        payload_kind="chord",
-        extent_kind="time",
+        payload_type="chord",
+        extent_type="time",
         time=[0.0, 2.0, 4.0],
         value=["C:maj", "G:maj", "C:maj"],
     )
     est = create(
         media_id="audio",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=["C:maj", "G:maj"],
@@ -213,16 +213,16 @@ def test_evaluate_chord_unicode_accidentals():
     # Verify that chords with Unicode accidentals (♯, ♭, 𝄪, 𝄫, ♮) normalize correctly for mir_eval
     ref = create(
         media_id="audio",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0, 2.0, 4.0],
         duration=[2.0, 2.0, 2.0],
         value=["C♯:maj", "D♭:min", "F𝄪:7"],
     )
     est = create(
         media_id="audio",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0, 2.0, 4.0],
         duration=[2.0, 2.0, 2.0],
         value=["C#:maj", "Db:min", "F##:7"],
@@ -255,16 +255,16 @@ def test_evaluate_segment():
 
     ref = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time_interval",
+        payload_type="tag",
+        extent_type="time_interval",
         time=[0.0, 4.0],
         duration=[4.0, 6.0],
         value=ref_labels,
     )
     est = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time_interval",
+        payload_type="tag",
+        extent_type="time_interval",
         time=[0.0, 4.0],
         duration=[4.0, 6.0],
         value=est_labels,
@@ -290,16 +290,16 @@ def test_evaluate_transcription():
 
     ref = create(
         media_id="audio",
-        payload_kind="frequency_hz",
-        extent_kind="time_interval",
+        payload_type="frequency_hz",
+        extent_type="time_interval",
         time=[1.0, 2.0],
         duration=[0.5, 0.5],
         value=[440.0, 880.0],
     )
     est = create(
         media_id="audio",
-        payload_kind="frequency_hz",
-        extent_kind="time_interval",
+        payload_type="frequency_hz",
+        extent_type="time_interval",
         time=[1.01, 2.01],
         duration=[0.49, 0.49],
         value=[440.0, 880.0],
@@ -326,16 +326,16 @@ def test_evaluate_transcription_midi_notes():
 
     ref = create(
         media_id="audio",
-        payload_kind="note_midi",
-        extent_kind="time_interval",
+        payload_type="note_midi",
+        extent_type="time_interval",
         time=[1.0],
         duration=[1.0],
         value=[69.0],
     )
     est = create(
         media_id="audio",
-        payload_kind="frequency_hz",
-        extent_kind="time_interval",
+        payload_type="frequency_hz",
+        extent_type="time_interval",
         time=[1.01],
         duration=[0.99],
         value=[440.0],
@@ -361,16 +361,16 @@ def test_evaluate_transcription_spn_notes():
 
     ref = create(
         media_id="audio",
-        payload_kind="note",
-        extent_kind="time_interval",
+        payload_type="note",
+        extent_type="time_interval",
         time=[1.0],
         duration=[1.0],
         value=["A4"],
     )
     est = create(
         media_id="audio",
-        payload_kind="note",
-        extent_kind="time_interval",
+        payload_type="note",
+        extent_type="time_interval",
         time=[1.01],
         duration=[0.99],
         value=["A4"],
@@ -547,8 +547,8 @@ def test_evaluate_unknown_task_and_no_inferred_task():
     # Valid payload tag but no registered evaluation task (e.g. 'object')
     ann_obj = create(
         media_id="audio",
-        payload_kind="object",
-        extent_kind="time",
+        payload_type="object",
+        extent_type="time",
         time=[0.0],
         value=[{"test": 1}],
     )

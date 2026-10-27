@@ -167,7 +167,7 @@ def test_to_dataframe_partial_facets():
     ann = create(
         bopp_version="1.0",
         media_id="track:no_extent",
-        payload_kind="beat",
+        payload_type="beat",
         value=[1, 1],
     )
     ann_df = to_dataframe(ann, backend="pandas")
@@ -217,9 +217,9 @@ def test_to_dataframe_covers_extent_and_confidence_branches():
     ann = create(
         bopp_version="1.0",
         media_id="track:facets_coverage",
-        payload_kind="beat",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.85, 0.95],
@@ -301,9 +301,9 @@ def test_pandas_dataframe_roundtrip():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="beat",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
@@ -334,9 +334,9 @@ def test_pandas_pyarrow_dataframe_roundtrip():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="beat",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
@@ -358,9 +358,9 @@ def test_polars_dataframe_roundtrip():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="beat",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="beat",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.2],
         value=[1, 1],
         confidence=[0.8, 0.9],
@@ -478,8 +478,8 @@ def test_to_dataframe_raises_ioerror_when_backend_dependency_missing():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
     )
@@ -513,8 +513,8 @@ def test_invalid_backend():
     ann = create(
         bopp_version="1.0",
         media_id="track:1",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
     )
@@ -646,8 +646,8 @@ def test_to_and_from_dataframe_marker_payload():
     ann = create(
         media_id="track:marker_df",
         bopp_version="1.0",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1, 0.5, 1.2],
         description="cues",
         sandbox={"extra": "data"},
@@ -673,7 +673,7 @@ def test_to_and_from_dataframe_marker_payload_without_extent():
     ann = create(
         media_id="track:marker_global",
         bopp_version="1.0",
-        payload_kind="marker",
+        payload_type="marker",
         description="global_marker",
     )
     for backend in ("pandas", "pandas-pyarrow", "polars"):
@@ -706,8 +706,8 @@ def test_to_and_from_dataframe_lyrics_payload():
     ann = create(
         media_id="track:lyrics_df",
         bopp_version="1.0",
-        payload_kind="lyrics",
-        extent_kind="time",
+        payload_type="lyrics",
+        extent_type="time",
         time=[0.1, 0.5],
         value=["hello", "world"],
         language="en",
@@ -726,8 +726,8 @@ def test_to_and_from_dataframe_frequency_hz_with_voiced():
     ann = create(
         media_id="track:freq_voiced_df",
         bopp_version="1.0",
-        payload_kind="frequency_hz",
-        extent_kind="time",
+        payload_type="frequency_hz",
+        extent_type="time",
         time=[0.0, 0.5],
         value=[440.0, 880.0],
         voiced=[True, False],
@@ -746,8 +746,8 @@ def test_to_and_from_dataframe_object_with_description():
     ann = create(
         media_id="track:object_desc_df",
         bopp_version="1.0",
-        payload_kind="object",
-        extent_kind="time",
+        payload_type="object",
+        extent_type="time",
         time=[0.1, 0.5],
         value=[{"a": 1, "b": 2}, {"a": 3, "b": 4}],
         description="test objects",
@@ -766,8 +766,8 @@ def test_to_and_from_dataframe_note_payload():
     ann = create(
         media_id="track:note_spn_df",
         bopp_version="1.0",
-        payload_kind="note",
-        extent_kind="time",
+        payload_type="note",
+        extent_type="time",
         time=[0.0, 1.0],
         value=["C4", "C♯4"],
     )

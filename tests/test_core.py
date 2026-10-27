@@ -43,8 +43,8 @@ def test_create_minimal():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1, 0.5],
         description="onset",
     )
@@ -61,8 +61,8 @@ def test_create_generate_id_false():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1, 0.5],
         description="onset",
         generate_id=False,
@@ -74,9 +74,9 @@ def test_create_full():
     ann = create(
         bopp_version="1.0",
         media_id="audio:456",
-        payload_kind="marker",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="marker",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[0.1, 0.5],
         description="onset",
         confidence=[0.9, 0.95],
@@ -96,8 +96,8 @@ def test_uuid5_idempotence_and_mutation():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1, 0.5],
         description="onset",
     )
@@ -117,8 +117,8 @@ def test_validate_annotation_id_missing():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1, 0.5],
         description="onset",
         generate_id=False,
@@ -131,8 +131,8 @@ def test_create_with_parents():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1],
         description="onset",
         parents=[parent_id],
@@ -140,32 +140,32 @@ def test_create_with_parents():
     assert getattr(ann, "parents", None) == [parent_id]
 
 
-def test_create_invalid_payload_kind():
-    with pytest.raises(BoppRegistryError, match="Unrecognized kind identifier"):
+def test_create_invalid_payload_type():
+    with pytest.raises(BoppRegistryError, match="Unrecognized payload type"):
         create(
-            bopp_version="1.0", media_id="audio:123", payload_kind="non_existent_kind"
+            bopp_version="1.0", media_id="audio:123", payload_type="non_existent_type"
         )
 
 
-def test_create_invalid_extent_kind():
-    with pytest.raises(BoppRegistryError, match="Unrecognized extent kind"):
+def test_create_invalid_extent_type():
+    with pytest.raises(BoppRegistryError, match="Unrecognized extent type"):
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="marker",
-            extent_kind="non_existent_extent",
+            payload_type="marker",
+            extent_type="non_existent_extent",
             time=[0.1],
             description="onset",
         )
 
 
-def test_create_invalid_confidence_kind():
-    with pytest.raises(BoppRegistryError, match="Unrecognized confidence kind"):
+def test_create_invalid_confidence_type():
+    with pytest.raises(BoppRegistryError, match="Unrecognized confidence type"):
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="marker",
-            confidence_kind="non_existent_conf",
+            payload_type="marker",
+            confidence_type="non_existent_conf",
             description="onset",
         )
 
@@ -175,7 +175,7 @@ def test_create_unconsumed_kwargs():
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="marker",
+            payload_type="marker",
             description="onset",
             unused_param="invalid",
         )
@@ -186,8 +186,8 @@ def test_create_mismatched_array_lengths():
         create(
             bopp_version="1.0",
             media_id="audio:123",
-            payload_kind="beat",
-            extent_kind="time",
+            payload_type="beat",
+            extent_type="time",
             time=[0.1, 0.5],
             value=[1],
         )
@@ -197,8 +197,8 @@ def test_validate_struct():
     ann = create(
         bopp_version="1.0",
         media_id="audio:123",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1],
         description="onset",
         sandbox={"experiment_id": "exp-42"},
@@ -235,8 +235,8 @@ def test_repr_mimebundle():
     ann = create(
         bopp_version="1.0",
         media_id="audio:repr_test",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.25, 0.75],
         description="onset",
     )
@@ -360,11 +360,11 @@ def test_duplicate_grouping_names_raises():
 
 
 def test_create_with_metadata_and_groupings():
-    # 1. metadata_kind + kwargs
+    # 1. metadata_type + kwargs
     ann1 = create(
         media_id="audio:1",
-        payload_kind="marker",
-        metadata_kind="human",
+        payload_type="marker",
+        metadata_type="human",
         annotator_id="user_1",
         tool="sonic-visualiser",
         description="beats",
@@ -379,7 +379,7 @@ def test_create_with_metadata_and_groupings():
     # 2. metadata as dict + groupings as list of dicts
     ann2 = create(
         media_id="audio:1",
-        payload_kind="marker",
+        payload_type="marker",
         metadata={
             "metadata_type": "human",
             "annotator_id": "user_2",
@@ -396,7 +396,7 @@ def test_create_with_metadata_and_groupings():
     # 3. metadata as struct instance
     ann3 = create(
         media_id="audio:1",
-        payload_kind="marker",
+        payload_type="marker",
         metadata=HumanAnnotationMetadata(annotator_id="user_3", tool="manual"),
         description="manual",
     )
@@ -405,32 +405,32 @@ def test_create_with_metadata_and_groupings():
 
 def test_create_metadata_errors():
     with pytest.raises(
-        BoppArgumentError, match="Cannot specify both 'metadata' and 'metadata_kind'"
+        BoppArgumentError, match="Cannot specify both 'metadata' and 'metadata_type'"
     ):
         create(
             media_id="audio:1",
-            payload_kind="marker",
-            metadata_kind="human",
+            payload_type="marker",
+            metadata_type="human",
             metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
             description="test",
         )
 
     with pytest.raises(
-        BoppRegistryError, match="Unrecognized metadata kind: 'nonexistent'"
+        BoppRegistryError, match="Unrecognized metadata type: 'nonexistent'"
     ):
         create(
             media_id="audio:1",
-            payload_kind="marker",
-            metadata_kind="nonexistent",
+            payload_type="marker",
+            metadata_type="nonexistent",
             description="test",
         )
 
     with pytest.raises(
-        BoppRegistryError, match="Unrecognized metadata kind: 'bad_type'"
+        BoppRegistryError, match="Unrecognized metadata type: 'bad_type'"
     ):
         create(
             media_id="audio:1",
-            payload_kind="marker",
+            payload_type="marker",
             metadata={"metadata_type": "bad_type"},
             description="test",
         )
@@ -440,7 +440,7 @@ def test_create_marker_payload_without_extent():
     ann = create(
         bopp_version="1.0",
         media_id="audio:global_marker",
-        payload_kind="marker",
+        payload_type="marker",
         description="global_event",
     )
     assert ann.payload.description == "global_event"
@@ -451,8 +451,8 @@ def test_create_marker_payload_without_extent():
 def test_create_chord_unicode_accidentals():
     ann = create(
         media_id="audio:chord_unicode",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0, 1.0, 2.0, 3.0, 4.0],
         duration=[1.0, 1.0, 1.0, 1.0, 1.0],
         value=["C♯:maj", "D♭:min", "F𝄪:maj7", "B𝄫:dim", "A:min(♮7)"],
@@ -462,8 +462,8 @@ def test_create_chord_unicode_accidentals():
     # Invalid chord should raise validation error
     bad_chord = create(
         media_id="audio:chord_invalid",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0],
         duration=[1.0],
         value=["H:invalid"],
@@ -475,8 +475,8 @@ def test_create_chord_unicode_accidentals():
 def test_create_key_mode_unicode_accidentals():
     ann = create(
         media_id="audio:key_unicode",
-        payload_kind="key_mode",
-        extent_kind="time_interval",
+        payload_type="key_mode",
+        extent_type="time_interval",
         time=[0.0, 1.0, 2.0, 3.0],
         duration=[1.0, 1.0, 1.0, 1.0],
         value=["C♯:minor", "D♭:dorian", "F𝄪:lydian", "B𝄫:mixolydian"],
@@ -486,8 +486,8 @@ def test_create_key_mode_unicode_accidentals():
     # Invalid key mode
     bad_key = create(
         media_id="audio:key_invalid",
-        payload_kind="key_mode",
-        extent_kind="time_interval",
+        payload_type="key_mode",
+        extent_type="time_interval",
         time=[0.0],
         duration=[1.0],
         value=["InvalidKey"],
@@ -499,8 +499,8 @@ def test_create_key_mode_unicode_accidentals():
 def test_create_note_payload():
     ann = create(
         media_id="audio:note_spn",
-        payload_kind="note",
-        extent_kind="time",
+        payload_type="note",
+        extent_type="time",
         time=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
         value=["C4", "A4", "C♯4", "E♭3", "F𝄪5", "B𝄫2", "D♮4", "C-1"],
     )
@@ -509,8 +509,8 @@ def test_create_note_payload():
     # Invalid SPN notes
     bad_note1 = create(
         media_id="audio:note_invalid",
-        payload_kind="note",
-        extent_kind="time",
+        payload_type="note",
+        extent_type="time",
         time=[0.0],
         value=["H4"],
     )
@@ -519,8 +519,8 @@ def test_create_note_payload():
 
     bad_note2 = create(
         media_id="audio:note_invalid",
-        payload_kind="note",
-        extent_kind="time",
+        payload_type="note",
+        extent_type="time",
         time=[0.0],
         value=["C"],  # missing octave
     )
@@ -533,8 +533,8 @@ def test_create_lyrics_payload():
     for lang in ("en", "en-US", "es-419", "zh-Hans", "und"):
         ann = create(
             media_id="audio:lyrics",
-            payload_kind="lyrics",
-            extent_kind="time",
+            payload_type="lyrics",
+            extent_type="time",
             time=[0.1],
             value=["hello"],
             language=lang,
@@ -546,8 +546,8 @@ def test_create_lyrics_payload():
     with pytest.raises((BoppValidationError, TypeError)):
         create(
             media_id="audio:lyrics",
-            payload_kind="lyrics",
-            extent_kind="time",
+            payload_type="lyrics",
+            extent_type="time",
             time=[0.1],
             value=["hello"],
         )
@@ -556,8 +556,8 @@ def test_create_lyrics_payload():
     for invalid_lang in ("123", "en_US", "e"):
         bad_lyrics = create(
             media_id="audio:lyrics",
-            payload_kind="lyrics",
-            extent_kind="time",
+            payload_type="lyrics",
+            extent_type="time",
             time=[0.1],
             value=["hello"],
             language=invalid_lang,
@@ -570,8 +570,8 @@ def test_create_frequency_hz_payload():
     # Frequency with value alone
     ann = create(
         media_id="audio:freq",
-        payload_kind="frequency_hz",
-        extent_kind="time",
+        payload_type="frequency_hz",
+        extent_type="time",
         time=[0.1, 0.2],
         value=[440.0, 880.0],
     )
@@ -581,8 +581,8 @@ def test_create_frequency_hz_payload():
     # Frequency with voiced boolean vector
     ann_voiced = create(
         media_id="audio:freq_voiced",
-        payload_kind="frequency_hz",
-        extent_kind="time",
+        payload_type="frequency_hz",
+        extent_type="time",
         time=[0.1, 0.2],
         value=[440.0, 0.0],
         voiced=[True, False],
@@ -594,8 +594,8 @@ def test_create_frequency_hz_payload():
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:freq_mismatch",
-            payload_kind="frequency_hz",
-            extent_kind="time",
+            payload_type="frequency_hz",
+            extent_type="time",
             time=[0.1, 0.2],
             value=[440.0, 880.0],
             voiced=[True],
@@ -606,8 +606,8 @@ def test_create_object_payload_with_optional_description():
     # Without description
     ann = create(
         media_id="audio:obj",
-        payload_kind="object",
-        extent_kind="time",
+        payload_type="object",
+        extent_type="time",
         time=[0.1],
         value=[{"feature": 1}],
     )
@@ -617,8 +617,8 @@ def test_create_object_payload_with_optional_description():
     # With description
     ann_desc = create(
         media_id="audio:obj_desc",
-        payload_kind="object",
-        extent_kind="time",
+        payload_type="object",
+        extent_type="time",
         time=[0.1],
         value=[{"feature": 1}],
         description="spectral features",
@@ -630,8 +630,8 @@ def test_create_object_payload_with_optional_description():
 def test_create_tag_payload():
     ann = create(
         media_id="audio:tag",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.1, 0.5],
         value=["rock", "guitar"],
     )
@@ -642,11 +642,11 @@ def test_create_tag_payload():
 def test_create_agreement_confidence():
     ann = create(
         media_id="audio:agreement",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.1, 0.5],
         value=["vocal", "speech"],
-        confidence_kind="agreement",
+        confidence_type="agreement",
         confidence=[0.8, 1.0],
         num_annotators=[5, 5],
         num_annotators_common=5,
@@ -662,11 +662,11 @@ def test_create_agreement_confidence():
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:agreement_err",
-            payload_kind="tag",
-            extent_kind="time",
+            payload_type="tag",
+            extent_type="time",
             time=[0.1, 0.5],
             value=["vocal", "speech"],
-            confidence_kind="agreement",
+            confidence_type="agreement",
             confidence=[0.8, 1.0],
             num_annotators=[5],
         )
@@ -675,11 +675,11 @@ def test_create_agreement_confidence():
 def test_create_relation_payload():
     ann = create(
         media_id="audio:relation",
-        payload_kind="relation",
+        payload_type="relation",
         performance_id="perf:100",
         value=["work:1", "work:2"],
         relation=["cover", "quote"],
-        extent_kind="time",
+        extent_type="time",
         time=[0.0, 10.0],
     )
     assert ann.payload.__struct_config__.tag == "relation"
@@ -692,18 +692,18 @@ def test_create_relation_payload():
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:relation_err",
-            payload_kind="relation",
+            payload_type="relation",
             performance_id="perf:100",
             value=["work:1", "work:2"],
             relation=["cover"],
-            extent_kind="time",
+            extent_type="time",
             time=[0.0, 10.0],
         )
 
 
-def test_create_with_type_aliases():
+def test_create_with_types():
     ann = create(
-        media_id="audio:alias",
+        media_id="audio:types",
         payload_type="tag",
         value=["rock"],
         extent_type="time",
@@ -721,57 +721,6 @@ def test_create_with_type_aliases():
     assert validate(ann) is True
 
 
-def test_create_missing_payload_identifier():
-    with pytest.raises(
-        BoppArgumentError, match="Must specify 'payload_kind' or 'payload_type'"
-    ):
-        create(media_id="audio:missing")
-
-
-def test_create_conflicting_kind_and_type():
-    with pytest.raises(BoppArgumentError, match="Conflicting 'payload_kind'"):
-        create(media_id="a", payload_kind="tag", payload_type="chord", value=["C"])
-
-    with pytest.raises(BoppArgumentError, match="Conflicting 'extent_kind'"):
-        create(
-            media_id="a",
-            payload_kind="tag",
-            extent_kind="time",
-            extent_type="pixel",
-            value=["a"],
-            time=[0.0],
-        )
-
-    with pytest.raises(BoppArgumentError, match="Conflicting 'confidence_kind'"):
-        create(
-            media_id="a",
-            payload_kind="tag",
-            confidence_kind="likelihood",
-            confidence_type="variance",
-            value=["a"],
-            confidence=[0.5],
-        )
-
-    with pytest.raises(BoppArgumentError, match="Conflicting 'metadata_kind'"):
-        create(
-            media_id="a",
-            payload_kind="tag",
-            metadata_kind="human",
-            metadata_type="sensor",
-            value=["a"],
-            annotator_id="h1",
-        )
-
-
-def test_create_identical_kind_and_type_allowed():
-    ann = create(
-        media_id="a",
-        payload_kind="tag",
-        payload_type="tag",
-        extent_kind="time",
-        extent_type="time",
-        value=["test"],
-        time=[0.0],
-    )
-    assert ann.payload.value == ["test"]
-    assert ann.extent.time == [0.0]
+def test_create_missing_payload_type():
+    with pytest.raises(TypeError, match="payload_type"):
+        create(media_id="audio:missing")  # type: ignore[call-arg]

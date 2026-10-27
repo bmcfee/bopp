@@ -182,8 +182,8 @@ def test_rebuild_annotation_helper():
 def test_trim_invalid_arguments():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 2.0],
         value=["rock", "pop"],
     )
@@ -208,15 +208,15 @@ def test_trim_invalid_arguments():
 def test_trim_argument_error_order():
     tm = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.0, 1.0],
         value=["a", "b"],
     )
     pb = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="pixel_box",
+        payload_type="tag",
+        extent_type="pixel_box",
         x=[0.0],
         y=[0.0],
         width=[1.0],
@@ -297,9 +297,9 @@ def test_trim_no_extent():
 def test_trim_time_extent():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[1.0, 3.0, 5.0, 8.0],
         value=["a", "b", "c", "d"],
         confidence=[0.1, 0.3, 0.5, 0.8],
@@ -355,8 +355,8 @@ def test_trim_with_groupings():
 def test_trim_numeric_bounds_pass_through():
     tm = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.0, 1.0, 2.0],
         value=list("abc"),
     )
@@ -392,8 +392,8 @@ def test_trim_point_extent_open_ended_bounds():
     """Verify trim on point extent with only start, only end, and check boundary conditions."""
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 2.0, 3.0, 4.0, 5.0],
         value=["a", "b", "c", "d", "e"],
     )
@@ -413,9 +413,9 @@ def test_trim_time_interval_non_strict():
     # Intervals: [0, 2], [2, 6], [5, 9]
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time_interval",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time_interval",
+        confidence_type="likelihood",
         time=[0.0, 2.0, 5.0],
         duration=[2.0, 4.0, 4.0],
         value=["first", "second", "third"],
@@ -439,8 +439,8 @@ def test_trim_time_interval_strict():
     # Intervals: [0, 2], [2, 6], [5, 9]
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time_interval",
+        payload_type="tag",
+        extent_type="time_interval",
         time=[0.0, 2.0, 5.0],
         duration=[2.0, 4.0, 4.0],
         value=["first", "second", "third"],
@@ -619,8 +619,8 @@ def test_trim_empty_and_out_of_bounds_extents():
 def test_trim_pixel_box():
     ann = create(
         media_id="test_image",
-        payload_kind="tag",
-        extent_kind="pixel_box",
+        payload_type="tag",
+        extent_type="pixel_box",
         x=[10.0, 50.0, 100.0],
         width=[20.0, 30.0, 40.0],
         y=[100.0, 200.0, 300.0],
@@ -649,8 +649,8 @@ def test_trim_pixel_box():
 def test_trim_transitive_parents_and_immutability():
     ann1 = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 3.0, 5.0, 8.0],
         value=["a", "b", "c", "d"],
     )
@@ -691,9 +691,9 @@ def test_filter_record_attribute_access():
 def test_filter_by_default_payload():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[1.0, 2.0, 3.0, 4.0],
         value=["rock", "pop", "rock", "jazz"],
         confidence=[0.5, 0.6, 0.7, 0.8],
@@ -713,8 +713,8 @@ def test_filter_by_default_payload():
 def test_filter_by_target_on_payload():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 2.0, 3.0],
         value=["rock", "pop", "metal"],
     )
@@ -727,9 +727,9 @@ def test_filter_by_target_on_payload():
 def test_filter_by_target_on_extent():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[1.0, 2.0, 3.0, 4.0],
         value=["a", "b", "c", "d"],
         confidence=[0.1, 0.2, 0.3, 0.4],
@@ -744,9 +744,9 @@ def test_filter_by_target_on_extent():
 def test_filter_by_confidence_facet():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
         time=[1.0, 2.0, 3.0],
         value=["a", "b", "c"],
         confidence=[0.2, 0.8, 0.5],
@@ -894,8 +894,8 @@ def test_filter_by_skips_empty_facet_in_obs_counting():
 def test_filter_by_invalid_arguments():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 2.0],
         value=["a", "b"],
     )
@@ -957,8 +957,8 @@ def test_filter_by_no_id_warning():
 def test_filter_by_empty_or_none_remaining():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 2.0],
         value=["a", "b"],
     )
@@ -978,8 +978,8 @@ def test_filter_by_empty_or_none_remaining():
 def test_filter_by_sandbox_and_immutability():
     ann = create(
         media_id="test_media",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 2.0],
         value=["a", "b"],
         sandbox={"custom": [1, 2, 3]},
@@ -997,8 +997,8 @@ def test_filter_by_sandbox_and_immutability():
 def test_to_times_invalid_args():
     ann = create(
         media_id="test",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 2.0],
         value=["a", "b"],
     )
@@ -1033,8 +1033,8 @@ def test_to_times_invalid_args():
 def test_to_times_incompatible_extent():
     ann = create(
         media_id="img",
-        payload_kind="tag",
-        extent_kind="pixel_box",
+        payload_type="tag",
+        extent_type="pixel_box",
         x=[0.0],
         y=[0.0],
         width=[10.0],
@@ -1049,8 +1049,8 @@ def test_to_times_incompatible_extent_types():
     """Verify to_times rejects unsupported extent types like midi_tick or score_quarter."""
     ann_midi = create(
         media_id="track",
-        payload_kind="tag",
-        extent_kind="midi_tick",
+        payload_type="tag",
+        extent_type="midi_tick",
         tick=[0, 480],
         value=["a", "b"],
     )
@@ -1059,8 +1059,8 @@ def test_to_times_incompatible_extent_types():
 
     ann_score = create(
         media_id="track",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[0, 1], [1, 1]],
         value=["a", "b"],
     )
@@ -1071,9 +1071,9 @@ def test_to_times_incompatible_extent_types():
 def test_to_times_from_time_interval_with_sample_rate():
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time_interval",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time_interval",
+        confidence_type="likelihood",
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=["verse", "chorus"],
@@ -1144,8 +1144,8 @@ def test_to_times_with_groupings():
 def test_to_times_overlap_strategies():
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time_interval",
+        payload_type="tag",
+        extent_type="time_interval",
         time=[0.0, 1.0],
         duration=[2.0, 2.0],
         value=["first", "second"],
@@ -1166,9 +1166,9 @@ def test_to_times_overlap_strategies():
 def test_to_times_interval_gaps_and_fill_value():
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time_interval",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time_interval",
+        confidence_type="likelihood",
         time=[1.0],
         duration=[1.0],
         value=["vocal"],
@@ -1188,8 +1188,8 @@ def test_to_times_interval_gaps_and_fill_value():
 def test_to_times_from_point_time_extent():
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0, 3.0],
         value=["a", "b"],
     )
@@ -1250,9 +1250,9 @@ def test_to_times_fill_value_dict_with_value_fallback_and_confidence():
     """Verify fill_value dict with 'value' key fallback for single-column payload and confidence fill."""
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time_interval",
-        confidence_kind="likelihood",
+        payload_type="tag",
+        extent_type="time_interval",
+        confidence_type="likelihood",
         time=[1.0],
         duration=[1.0],
         value=["solo"],
@@ -1346,8 +1346,8 @@ def test_to_times_sample_rate_grid_boundary_pop():
     """Verify target_times grid trimming when step multiple lands precisely on t_max."""
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.0, 1.0],
         value=["start", "end"],
     )
@@ -1359,8 +1359,8 @@ def test_to_times_sample_rate_grid_boundary_pop():
 def test_to_times_fill_value_type_validation_error():
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time_interval",
+        payload_type="tag",
+        extent_type="time_interval",
         time=[1.0],
         duration=[1.0],
         value=["tag"],
@@ -1374,8 +1374,8 @@ def test_to_times_fill_value_type_validation_error():
 def test_to_times_empty_annotation_and_empty_times():
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[],
         value=[],
     )
@@ -1437,8 +1437,8 @@ def test_to_times_point_extent_previous_with_gaps_before_first_observation():
     """Verify that queries before the first timestamp in method='previous' produce gaps and trigger fill."""
     ann = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[5.0, 10.0],
         value=["a", "b"],
     )
@@ -1465,8 +1465,8 @@ def test_to_times_warning_no_id_and_immutability():
     # Verify immutability
     ann_with_id = create(
         media_id="audio",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[1.0],
         value=["val"],
         sandbox={"key": 1},
@@ -1480,8 +1480,8 @@ def test_to_times_warning_no_id_and_immutability():
 def test_trim_fraction_points():
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[-1, 1], [-1, 2], [0, 1], [2, 4], [1, 1]],
         value=list("abcde"),
     )
@@ -1512,8 +1512,8 @@ def test_trim_fraction_points():
 def test_trim_fraction_intervals(reset, strict):
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_interval",
+        payload_type="tag",
+        extent_type="score_interval",
         quarter=[[-1, 2], [0, 1], [2, 4], [1, 1], [3, 2]],
         duration=[[1, 1], [2, 2], [1, 2], [1, 1], [1, 1]],
         value=list("abcde"),
@@ -1549,8 +1549,8 @@ def test_trim_fraction_intervals(reset, strict):
 def test_trim_fraction_interval_boundaries(strict, expected_values):
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_interval",
+        payload_type="tag",
+        extent_type="score_interval",
         quarter=[[1, 2], [1, 2], [1, 1]],
         duration=[[0, 1], [1, 2], [0, 1]],
         value=["left", "inside", "right"],
@@ -1562,13 +1562,13 @@ def test_trim_fraction_interval_boundaries(strict, expected_values):
 
 @pytest.mark.parametrize("bound", [0.5, Fraction(1, 2), [1, 2], (1, 2)])
 @pytest.mark.parametrize("decoded", [False, True])
-@pytest.mark.parametrize("extent_kind", ["score_quarter", "score_interval"])
-def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_kind):
-    kwargs = {"duration": [[1, 2]] * 4} if extent_kind == "score_interval" else {}
+@pytest.mark.parametrize("extent_type", ["score_quarter", "score_interval"])
+def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_type):
+    kwargs = {"duration": [[1, 2]] * 4} if extent_type == "score_interval" else {}
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind=extent_kind,
+        payload_type="tag",
+        extent_type=extent_type,
         quarter=[[-1, 2], [0, 1], [2, 4], [1, 1]],
         value=list("abcd"),
         **kwargs,
@@ -1599,8 +1599,8 @@ def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_kind):
 def test_trim_fraction_exact_float_bound():
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_interval",
+        payload_type="tag",
+        extent_type="score_interval",
         quarter=[[0, 1]],
         duration=[[1, 1]],
         value=["a"],
@@ -1623,8 +1623,8 @@ def test_trim_fraction_exact_float_bound():
 def test_trim_fraction_malformed_bounds(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1641,8 +1641,8 @@ def test_trim_fraction_malformed_bounds(bound, name):
 def test_trim_fraction_unsupported_bounds(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1653,8 +1653,8 @@ def test_trim_fraction_unsupported_bounds(bound, name):
 def test_trim_fraction_non_comparable_bounds():
     pt = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1670,8 +1670,8 @@ def test_trim_fraction_non_comparable_bounds():
 def test_trim_fraction_validates_bounds_before_order(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_interval",
+        payload_type="tag",
+        extent_type="score_interval",
         quarter=[[0, 1]],
         duration=[[1, 1]],
         value=["a"],
@@ -1687,8 +1687,8 @@ def test_trim_fraction_validates_bounds_before_order(bound, name):
 def test_trim_numeric_rejects_string_before_order():
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.0, 1.0],
         value=list("ab"),
     )
@@ -1697,7 +1697,7 @@ def test_trim_numeric_rejects_string_before_order():
 
 
 @pytest.mark.parametrize(
-    "extent_kind", ["time", "time_interval", "midi_interval", None]
+    "extent_type", ["time", "time_interval", "midi_interval", None]
 )
 @pytest.mark.parametrize(
     "bound",
@@ -1725,8 +1725,8 @@ def test_trim_numeric_rejects_string_before_order():
 @pytest.mark.parametrize(
     "position", ["start", "end", "both", "start_with_end", "end_with_start"]
 )
-def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
-    if extent_kind is None:
+def test_trim_numeric_unsupported_bounds(extent_type, bound, position):
+    if extent_type is None:
         ann = Annotation(
             media_id="track:1",
             bopp_version="1.0.0",
@@ -1736,13 +1736,13 @@ def test_trim_numeric_unsupported_bounds(extent_kind, bound, position):
         )
         bopp.ensure_annotation_id(ann)
     else:
-        coords = {"tick": [0]} if extent_kind == "midi_interval" else {"time": [0.0]}
-        if extent_kind != "time":
+        coords = {"tick": [0]} if extent_type == "midi_interval" else {"time": [0.0]}
+        if extent_type != "time":
             coords["duration"] = [1]
         ann = create(
             media_id="track:1",
-            payload_kind="tag",
-            extent_kind=extent_kind,
+            payload_type="tag",
+            extent_type=extent_type,
             value=["a"],
             **coords,
         )
@@ -1780,8 +1780,8 @@ def test_trim_no_extent_rejects_fraction_before_order():
 def test_trim_numeric_rejects_fraction_before_order():
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.0, 1.0],
         value=list("ab"),
     )
@@ -1794,8 +1794,8 @@ def test_trim_numeric_rejects_fraction_before_order():
 def test_trim_fraction_reversed_bounds_message():
     pt = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1820,8 +1820,8 @@ def test_trim_fraction_reversed_bounds_message():
 def test_trim_fraction_reversed_bounds(start, end):
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_quarter",
+        payload_type="tag",
+        extent_type="score_quarter",
         quarter=[[0, 1]],
         value=["a"],
     )
@@ -1834,8 +1834,8 @@ def test_trim_fraction_reversed_bounds(start, end):
 def test_trim_numeric_axis_rejects_fraction_bounds(bound, name):
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="time",
+        payload_type="tag",
+        extent_type="time",
         time=[0.0, 1.0],
         value=list("ab"),
     )
@@ -1846,8 +1846,8 @@ def test_trim_numeric_axis_rejects_fraction_bounds(bound, name):
 def test_trim_midi_tick():
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="midi_tick",
+        payload_type="tag",
+        extent_type="midi_tick",
         tick=[0, 240, 480, 960],
         value=list("abcd"),
     )
@@ -1859,8 +1859,8 @@ def test_trim_midi_tick():
 def test_trim_midi_interval():
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="midi_interval",
+        payload_type="tag",
+        extent_type="midi_interval",
         tick=[0, 240, 480, 960],
         duration=[480, 240, 480, 240],
         value=list("abcd"),
@@ -1891,8 +1891,8 @@ def test_trim_axis_configuration_keys():
 def test_filter_by_fraction_extent():
     ann = create(
         media_id="track:1",
-        payload_kind="tag",
-        extent_kind="score_interval",
+        payload_type="tag",
+        extent_type="score_interval",
         quarter=[[-1, 2], [2, 4], [1, 1], [3, 2]],
         duration=[[1, 2], [1, 2], [2, 1], [1, 1]],
         value=list("abcd"),
@@ -1908,8 +1908,8 @@ def test_filter_by_fraction_extent():
 def test_filter_by_all_name_collision():
     ann = create(
         media_id="track:1",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.0, 1.0],
         value=[1, 1],
         groupings=[Grouping(name="time", ids=[0, 1])],
@@ -1960,8 +1960,8 @@ def _score_annotation(tag, **kwargs):
         )
     return create(
         media_id="track:score",
-        payload_kind="tag",
-        extent_kind=tag,
+        payload_type="tag",
+        extent_type=tag,
         value=list("abcde"),
         **columns,
         **kwargs,
@@ -2028,8 +2028,8 @@ def test_score_conversion_values_and_provenance(name, source, target, kwargs, de
 def test_score_conversion_denominator_bound(shape, value, bound, expected):
     ann = create(
         media_id="track:score",
-        payload_kind="tag",
-        extent_kind=f"score_{shape}_float",
+        payload_type="tag",
+        extent_type=f"score_{shape}_float",
         quarter=[value],
         value=["a"],
         **({"duration": [abs(value)]} if shape == "interval" else {}),
@@ -2057,8 +2057,8 @@ def test_score_conversion_roundtrips(shape):
 
     source = create(
         media_id="track:score",
-        payload_kind="tag",
-        extent_kind=f"score_{shape}_float",
+        payload_type="tag",
+        extent_type=f"score_{shape}_float",
         quarter=[0.0, 0.125, -0.75, 2.375],
         value=list("abcd"),
         **({"duration": [0.0, 0.125, 0.75, 2.375]} if shape == "interval" else {}),
@@ -2099,8 +2099,8 @@ def test_score_conversion_rejects_wrong_source(name, source, target, kwargs, tag
         )
         ann = create(
             media_id="track:score",
-            payload_kind="tag",
-            extent_kind=tag,
+            payload_type="tag",
+            extent_type=tag,
             value=["a"],
             **columns,
         )
@@ -2154,7 +2154,7 @@ def test_score_conversion_nonfinite(shape, field, value):
 def test_score_conversion_lineage_and_independent_facets(name, source, target, kwargs):
     ann = _score_annotation(
         source,
-        confidence_kind="likelihood",
+        confidence_type="likelihood",
         confidence=[0.9, 0.8, 0.7, 0.6, 0.5],
         sandbox={"custom": {"values": [1, 2]}},
     )
@@ -2193,8 +2193,8 @@ def test_score_conversion_lineage_and_independent_facets(name, source, target, k
 def test_score_conversion_empty_columns(name, source, target, kwargs):
     ann = create(
         media_id="track:score",
-        payload_kind="tag",
-        extent_kind=source,
+        payload_type="tag",
+        extent_type=source,
         quarter=[],
         value=[],
         **({"duration": []} if "interval" in source else {}),
@@ -2222,8 +2222,8 @@ def test_score_conversion_preserves_groupings(name, source, target, kwargs):
 def test_marker_payload_transforms():
     ann = create(
         media_id="track:marker_test",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1, 0.5, 1.0, 2.0],
         description="cues",
     )
@@ -2243,8 +2243,8 @@ def test_marker_payload_transforms():
 def test_lyrics_payload_transforms():
     ann = create(
         media_id="track:lyrics_test",
-        payload_kind="lyrics",
-        extent_kind="time",
+        payload_type="lyrics",
+        extent_type="time",
         time=[0.1, 0.5, 1.0, 2.0],
         value=["hello", "world", "sing", "song"],
         language="en-US",
@@ -2262,8 +2262,8 @@ def test_lyrics_payload_transforms():
 def test_frequency_hz_with_voiced_transforms():
     ann = create(
         media_id="track:freq_voiced_test",
-        payload_kind="frequency_hz",
-        extent_kind="time",
+        payload_type="frequency_hz",
+        extent_type="time",
         time=[0.0, 0.5, 1.0, 1.5],
         value=[440.0, 442.0, 0.0, 880.0],
         voiced=[True, True, False, True],
@@ -2287,8 +2287,8 @@ def test_frequency_hz_with_voiced_transforms():
 def test_object_with_description_transforms():
     ann = create(
         media_id="track:object_desc_test",
-        payload_kind="object",
-        extent_kind="time",
+        payload_type="object",
+        extent_type="time",
         time=[0.1, 0.5],
         value=[{"track": 1}, {"track": 2}],
         description="multi-track features",
@@ -2302,8 +2302,8 @@ def test_object_with_description_transforms():
 def test_note_payload_transforms():
     ann = create(
         media_id="track:note_spn_test",
-        payload_kind="note",
-        extent_kind="time",
+        payload_type="note",
+        extent_type="time",
         time=[0.0, 1.0, 2.0],
         value=["C4", "C♯4", "E♭3"],
     )

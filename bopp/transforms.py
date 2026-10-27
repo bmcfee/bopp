@@ -847,8 +847,8 @@ def filter_by(
     >>> import bopp
     >>> ann = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag",
-    ...     extent_kind="time",
+    ...     payload_type="tag",
+    ...     extent_type="time",
     ...     time=[1.0, 2.0, 3.0],
     ...     value=["rock", "pop", "rock"],
     ... )
@@ -868,7 +868,7 @@ def filter_by(
 
     >>> ann_mood = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="mood_thayer",
+    ...     payload_type="mood_thayer",
     ...     valence=[0.5, -0.2, 0.8],
     ...     arousal=[0.1, 0.4, -0.3],
     ... )
@@ -880,9 +880,9 @@ def filter_by(
 
     >>> ann_multi = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag",
-    ...     extent_kind="time",
-    ...     confidence_kind="likelihood",
+    ...     payload_type="tag",
+    ...     extent_type="time",
+    ...     confidence_type="likelihood",
     ...     time=[1.0, 2.0, 3.0],
     ...     value=["intro", "verse", "chorus"],
     ...     confidence=[0.9, 0.4, 0.95],
@@ -1130,8 +1130,8 @@ def to_times(
     >>> import bopp
     >>> ann = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag",
-    ...     extent_kind="time_interval",
+    ...     payload_type="tag",
+    ...     extent_type="time_interval",
     ...     time=[0.0, 2.0],
     ...     duration=[2.0, 2.0],
     ...     value=["verse", "chorus"],
@@ -1154,8 +1154,8 @@ def to_times(
 
     >>> points = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="chord",
-    ...     extent_kind="time",
+    ...     payload_type="chord",
+    ...     extent_type="time",
     ...     time=[0.0, 2.0],
     ...     value=["C:maj", "G:maj"],
     ... )
@@ -1167,8 +1167,8 @@ def to_times(
 
     >>> intervals = bopp.create(
     ...     media_id="track_1",
-    ...     payload_kind="tag",
-    ...     extent_kind="time_interval",
+    ...     payload_type="tag",
+    ...     extent_type="time_interval",
     ...     time=[1.0],
     ...     duration=[1.0],
     ...     value=["solo"],

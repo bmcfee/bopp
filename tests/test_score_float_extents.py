@@ -40,8 +40,8 @@ def test_decode_valid_score_float(tag, cls, columns):
         assert getattr(decoded, name) == expected
     ann = bopp.create(
         media_id="test:score",
-        payload_kind="tag",
-        extent_kind=tag,
+        payload_type="tag",
+        extent_type=tag,
         value=["pickup", "start", "later"],
         **columns,
     )
@@ -94,8 +94,8 @@ def test_score_float_roundtrip(
 ):
     ann = bopp.create(
         media_id="test:score",
-        payload_kind="tag",
-        extent_kind=tag,
+        payload_type="tag",
+        extent_type=tag,
         value=["pickup", "start", "later"],
         **columns,
     )
@@ -120,11 +120,11 @@ def test_trim_score_float_matches_time(interval, strict, reset):
     positions = [-0.5, 0.0, 0.5, 1.0, 1.5, 2.0]
     kwargs = {"duration": [1.0, 1.0, 0.5, 1.0, 0.0, 1.0]} if interval else {}
     common = dict(
-        media_id="test:score", payload_kind="tag", value=list("abcdef"), **kwargs
+        media_id="test:score", payload_type="tag", value=list("abcdef"), **kwargs
     )
-    ann = bopp.create(extent_kind=tag, quarter=positions, **common)
+    ann = bopp.create(extent_type=tag, quarter=positions, **common)
     timed = bopp.create(
-        extent_kind="time_interval" if interval else "time", time=positions, **common
+        extent_type="time_interval" if interval else "time", time=positions, **common
     )
     original = copy.deepcopy(ann)
     bounds = {"start": 0.5, "end": 1.5, "strict": strict, "reset": reset}
@@ -151,8 +151,8 @@ def test_trim_score_float_matches_time(interval, strict, reset):
 def test_trim_score_float_rejects_fraction_bounds(tag, cls, columns, bound, name):
     ann = bopp.create(
         media_id="test:score",
-        payload_kind="tag",
-        extent_kind=tag,
+        payload_type="tag",
+        extent_type=tag,
         value=list("abc"),
         **columns,
     )

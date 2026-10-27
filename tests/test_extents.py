@@ -79,15 +79,15 @@ NEW_EXTENT_FIXTURES = [
 ]
 
 
-@pytest.mark.parametrize("extent_kind, extent_kwargs", NEW_EXTENT_FIXTURES)
-def test_create_and_validate_new_extents(extent_kind, extent_kwargs):
-    cls = EXTENT_TYPE_REGISTRY[extent_kind]
+@pytest.mark.parametrize("extent_type, extent_kwargs", NEW_EXTENT_FIXTURES)
+def test_create_and_validate_new_extents(extent_type, extent_kwargs):
+    cls = EXTENT_TYPE_REGISTRY[extent_type]
     assert cls is not None
 
     ann = create(
-        media_id=f"media:{extent_kind}",
-        payload_kind="tag",
-        extent_kind=extent_kind,
+        media_id=f"media:{extent_type}",
+        payload_type="tag",
+        extent_type=extent_type,
         value=["obs_1", "obs_2", "obs_3"],
         **extent_kwargs,
     )
@@ -99,8 +99,8 @@ def test_pixel_validation():
     # Valid pixel
     ann = create(
         media_id="audio:pixel",
-        payload_kind="tag",
-        extent_kind="pixel",
+        payload_type="tag",
+        extent_type="pixel",
         x=[1.0, 2.0],
         y=[3.0, 4.0],
         value=["p1", "p2"],
@@ -111,8 +111,8 @@ def test_pixel_validation():
     with pytest.raises(TypeError):
         create(
             media_id="audio:pixel",
-            payload_kind="tag",
-            extent_kind="pixel",
+            payload_type="tag",
+            extent_type="pixel",
             x=[1.0],
             value=["p1"],
         )
@@ -122,8 +122,8 @@ def test_text_and_text_interval_constraints():
     # Valid text
     ann_text = create(
         media_id="doc:1",
-        payload_kind="tag",
-        extent_kind="text",
+        payload_type="tag",
+        extent_type="text",
         offset=[0, 10, 25],
         value=["token1", "token2", "token3"],
     )
@@ -132,8 +132,8 @@ def test_text_and_text_interval_constraints():
     # Invalid negative offset rejects on validation
     bad_text = create(
         media_id="doc:bad_text",
-        payload_kind="tag",
-        extent_kind="text",
+        payload_type="tag",
+        extent_type="text",
         offset=[-1],
         value=["bad"],
     )
@@ -143,8 +143,8 @@ def test_text_and_text_interval_constraints():
     # Valid text_interval
     ann_ti = create(
         media_id="doc:2",
-        payload_kind="tag",
-        extent_kind="text_interval",
+        payload_type="tag",
+        extent_type="text_interval",
         offset=[0, 10],
         length=[5, 8],
         value=["span1", "span2"],
@@ -154,8 +154,8 @@ def test_text_and_text_interval_constraints():
     # Invalid negative length rejects on validation
     bad_ti = create(
         media_id="doc:bad_ti",
-        payload_kind="tag",
-        extent_kind="text_interval",
+        payload_type="tag",
+        extent_type="text_interval",
         offset=[0],
         length=[-2],
         value=["bad"],
@@ -168,8 +168,8 @@ def test_spherical_range_constraints():
     # Valid bounds
     ann_valid = create(
         media_id="audio:spherical",
-        payload_kind="tag",
-        extent_kind="spherical",
+        payload_type="tag",
+        extent_type="spherical",
         azimuth=[-180.0, 0.0, 179.999],
         elevation=[-90.0, 0.0, 90.0],
         radius=[0.001, 1.0, 100.0],
@@ -180,8 +180,8 @@ def test_spherical_range_constraints():
     # Azimuth < -180.0
     bad_az1 = create(
         media_id="audio:sph",
-        payload_kind="tag",
-        extent_kind="spherical",
+        payload_type="tag",
+        extent_type="spherical",
         azimuth=[-180.1],
         elevation=[0.0],
         radius=[1.0],
@@ -193,8 +193,8 @@ def test_spherical_range_constraints():
     # Azimuth >= 180.0
     bad_az2 = create(
         media_id="audio:sph",
-        payload_kind="tag",
-        extent_kind="spherical",
+        payload_type="tag",
+        extent_type="spherical",
         azimuth=[180.0],
         elevation=[0.0],
         radius=[1.0],
@@ -206,8 +206,8 @@ def test_spherical_range_constraints():
     # Elevation < -90.0
     bad_el1 = create(
         media_id="audio:sph",
-        payload_kind="tag",
-        extent_kind="spherical",
+        payload_type="tag",
+        extent_type="spherical",
         azimuth=[0.0],
         elevation=[-90.1],
         radius=[1.0],
@@ -219,8 +219,8 @@ def test_spherical_range_constraints():
     # Elevation > 90.0
     bad_el2 = create(
         media_id="audio:sph",
-        payload_kind="tag",
-        extent_kind="spherical",
+        payload_type="tag",
+        extent_type="spherical",
         azimuth=[0.0],
         elevation=[90.1],
         radius=[1.0],
@@ -232,8 +232,8 @@ def test_spherical_range_constraints():
     # Radius <= 0.0
     bad_r0 = create(
         media_id="audio:sph",
-        payload_kind="tag",
-        extent_kind="spherical",
+        payload_type="tag",
+        extent_type="spherical",
         azimuth=[0.0],
         elevation=[0.0],
         radius=[0.0],
@@ -247,8 +247,8 @@ def test_time_uniform_constraints():
     # Valid time_uniform
     ann = create(
         media_id="audio:uniform",
-        payload_kind="tag",
-        extent_kind="time_uniform",
+        payload_type="tag",
+        extent_type="time_uniform",
         start_time=0.0,
         sampling_period=0.01,
         value=["a", "b", "c"],
@@ -260,8 +260,8 @@ def test_time_uniform_constraints():
     # sampling_period <= 0 rejects
     bad_period0 = create(
         media_id="audio:uniform_bad",
-        payload_kind="tag",
-        extent_kind="time_uniform",
+        payload_type="tag",
+        extent_type="time_uniform",
         start_time=0.0,
         sampling_period=0.0,
         value=["a"],
@@ -271,8 +271,8 @@ def test_time_uniform_constraints():
 
     bad_period_neg = create(
         media_id="audio:uniform_bad",
-        payload_kind="tag",
-        extent_kind="time_uniform",
+        payload_type="tag",
+        extent_type="time_uniform",
         start_time=1.0,
         sampling_period=-0.05,
         value=["a"],
@@ -286,8 +286,8 @@ def test_array_length_mismatch_raises():
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:err",
-            payload_kind="tag",
-            extent_kind="pixel",
+            payload_type="tag",
+            extent_type="pixel",
             x=[1.0, 2.0],
             y=[1.0],
             value=["a", "b"],
@@ -297,8 +297,8 @@ def test_array_length_mismatch_raises():
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:err",
-            payload_kind="tag",
-            extent_kind="cartesian",
+            payload_type="tag",
+            extent_type="cartesian",
             x=[1.0, 2.0],
             y=[1.0, 2.0],
             z=[1.0],
@@ -309,8 +309,8 @@ def test_array_length_mismatch_raises():
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:err",
-            payload_kind="tag",
-            extent_kind="spherical",
+            payload_type="tag",
+            extent_type="spherical",
             azimuth=[0.0, 10.0],
             elevation=[0.0],
             radius=[1.0, 1.0],
@@ -321,31 +321,31 @@ def test_array_length_mismatch_raises():
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:err",
-            payload_kind="tag",
-            extent_kind="text_interval",
+            payload_type="tag",
+            extent_type="text_interval",
             offset=[0, 10],
             length=[5],
             value=["a", "b"],
         )
 
 
-@pytest.mark.parametrize("extent_kind, extent_kwargs", NEW_EXTENT_FIXTURES)
-def test_dataframe_roundtrip_new_extents(extent_kind, extent_kwargs):
+@pytest.mark.parametrize("extent_type, extent_kwargs", NEW_EXTENT_FIXTURES)
+def test_dataframe_roundtrip_new_extents(extent_type, extent_kwargs):
     ann = create(
-        media_id=f"track:{extent_kind}_df",
-        payload_kind="tag",
-        extent_kind=extent_kind,
+        media_id=f"track:{extent_type}_df",
+        payload_type="tag",
+        extent_type=extent_type,
         value=["v1", "v2", "v3"],
         **extent_kwargs,
     )
     for backend in ("pandas", "polars"):
         ann_df = to_dataframe(ann, backend=backend)
-        if extent_kind == "time_uniform":
+        if extent_type == "time_uniform":
             assert ann_df.header["extent"]["extent_type"] == "time_uniform"
             assert ann_df.header["extent"]["start_time"] == 0.0
             assert ann_df.header["extent"]["sampling_period"] == 0.05
         else:
-            assert f"extent:{extent_kind}:" in "".join(ann_df.df.columns)
+            assert f"extent:{extent_type}:" in "".join(ann_df.df.columns)
 
         reconstructed = from_dataframe(ann_df)
         assert reconstructed.extent == ann.extent
@@ -353,16 +353,16 @@ def test_dataframe_roundtrip_new_extents(extent_kind, extent_kwargs):
         assert validate(reconstructed) is True
 
 
-@pytest.mark.parametrize("extent_kind, extent_kwargs", NEW_EXTENT_FIXTURES)
-def test_csv_roundtrip_new_extents(tmp_path, extent_kind, extent_kwargs):
+@pytest.mark.parametrize("extent_type, extent_kwargs", NEW_EXTENT_FIXTURES)
+def test_csv_roundtrip_new_extents(tmp_path, extent_type, extent_kwargs):
     ann = create(
-        media_id=f"track:{extent_kind}_csv",
-        payload_kind="tag",
-        extent_kind=extent_kind,
+        media_id=f"track:{extent_type}_csv",
+        payload_type="tag",
+        extent_type=extent_type,
         value=["v1", "v2", "v3"],
         **extent_kwargs,
     )
-    csv_path = tmp_path / f"{extent_kind}.csv"
+    csv_path = tmp_path / f"{extent_type}.csv"
     save_bopp_csv(ann, csv_path)
 
     loaded = load_bopp_csv(csv_path)
@@ -375,8 +375,8 @@ def test_trim_new_extents():
     # Trim pixel along x and y
     ann_pixel = create(
         media_id="track:pixel_trim",
-        payload_kind="tag",
-        extent_kind="pixel",
+        payload_type="tag",
+        extent_type="pixel",
         x=[10.0, 20.0, 30.0, 40.0],
         y=[5.0, 15.0, 25.0, 35.0],
         value=["a", "b", "c", "d"],
@@ -395,8 +395,8 @@ def test_trim_new_extents():
     # Trim text along offset
     ann_text = create(
         media_id="track:text_trim",
-        payload_kind="tag",
-        extent_kind="text",
+        payload_type="tag",
+        extent_type="text",
         offset=[0, 10, 20, 30],
         value=["w0", "w1", "w2", "w3"],
     )
@@ -407,8 +407,8 @@ def test_trim_new_extents():
     # Trim text_interval
     ann_ti = create(
         media_id="track:ti_trim",
-        payload_kind="tag",
-        extent_kind="text_interval",
+        payload_type="tag",
+        extent_type="text_interval",
         offset=[0, 10, 20],
         length=[5, 8, 10],
         value=["span0", "span1", "span2"],
@@ -420,8 +420,8 @@ def test_trim_new_extents():
     # Trim spherical along azimuth
     ann_sph = create(
         media_id="track:sph_trim",
-        payload_kind="tag",
-        extent_kind="spherical",
+        payload_type="tag",
+        extent_type="spherical",
         azimuth=[-90.0, 0.0, 45.0, 135.0],
         elevation=[0.0, 10.0, -20.0, 30.0],
         radius=[1.0, 2.0, 3.0, 4.0],
@@ -434,8 +434,8 @@ def test_trim_new_extents():
     # Trim cartesian_time along default 'time'
     ann_ct = create(
         media_id="track:ct_trim",
-        payload_kind="tag",
-        extent_kind="cartesian_time",
+        payload_type="tag",
+        extent_type="cartesian_time",
         time=[0.0, 1.0, 2.0, 3.0],
         x=[0.0, 1.0, 2.0, 3.0],
         y=[0.0, 1.0, 2.0, 3.0],
@@ -449,8 +449,8 @@ def test_trim_new_extents():
     # Trim time_uniform
     ann_tu = create(
         media_id="track:tu_trim",
-        payload_kind="tag",
-        extent_kind="time_uniform",
+        payload_type="tag",
+        extent_type="time_uniform",
         start_time=0.0,
         sampling_period=0.1,
         value=["u0", "u1", "u2", "u3", "u4"],
@@ -471,8 +471,8 @@ def test_to_times_new_extents():
     # to_times on time_uniform
     ann_tu = create(
         media_id="track:tu_totimes",
-        payload_kind="tag",
-        extent_kind="time_uniform",
+        payload_type="tag",
+        extent_type="time_uniform",
         start_time=1.0,
         sampling_period=0.5,
         value=["t1", "t2", "t3"],
@@ -489,8 +489,8 @@ def test_to_times_new_extents():
     # to_times on spherical_time
     ann_st = create(
         media_id="track:st_totimes",
-        payload_kind="tag",
-        extent_kind="spherical_time",
+        payload_type="tag",
+        extent_type="spherical_time",
         time=[0.0, 2.0],
         azimuth=[0.0, 90.0],
         elevation=[0.0, 45.0],
@@ -503,8 +503,8 @@ def test_to_times_new_extents():
     # to_times on cartesian_time_interval
     ann_cti = create(
         media_id="track:cti_totimes",
-        payload_kind="tag",
-        extent_kind="cartesian_time_interval",
+        payload_type="tag",
+        extent_type="cartesian_time_interval",
         time=[0.0, 2.0],
         duration=[1.0, 1.0],
         x=[0.0, 1.0],
@@ -520,8 +520,8 @@ def test_evaluation_helpers_new_extents():
     # _extract_events on cartesian_time
     ann_ct = create(
         media_id="a",
-        payload_kind="tag",
-        extent_kind="cartesian_time",
+        payload_type="tag",
+        extent_type="cartesian_time",
         time=[1.0, 2.5],
         x=[0.0, 1.0],
         y=[0.0, 1.0],
@@ -534,8 +534,8 @@ def test_evaluation_helpers_new_extents():
     # _extract_events on time_uniform
     ann_tu = create(
         media_id="a",
-        payload_kind="tag",
-        extent_kind="time_uniform",
+        payload_type="tag",
+        extent_type="time_uniform",
         start_time=2.0,
         sampling_period=0.5,
         value=["a", "b", "c"],
@@ -546,8 +546,8 @@ def test_evaluation_helpers_new_extents():
     # _extract_intervals on spherical_time_interval
     ann_sti = create(
         media_id="a",
-        payload_kind="tag",
-        extent_kind="spherical_time_interval",
+        payload_type="tag",
+        extent_type="spherical_time_interval",
         time=[1.0, 4.0],
         duration=[2.0, 3.0],
         azimuth=[0.0, 10.0],
@@ -567,8 +567,8 @@ def test_filter_by_and_errors_new_extents():
     # Filter by on cartesian extent
     ann_cart = create(
         media_id="a",
-        payload_kind="tag",
-        extent_kind="cartesian",
+        payload_type="tag",
+        extent_type="cartesian",
         x=[0.0, 5.0, 10.0],
         y=[0.0, 1.0, 2.0],
         z=[-1.0, 0.0, 1.0],
@@ -585,8 +585,8 @@ def test_filter_by_and_errors_new_extents():
     # Trim time_uniform with invalid target_field raises BoppArgumentError
     ann_tu = create(
         media_id="a",
-        payload_kind="tag",
-        extent_kind="time_uniform",
+        payload_type="tag",
+        extent_type="time_uniform",
         start_time=0.0,
         sampling_period=0.1,
         value=["a", "b"],

@@ -36,8 +36,8 @@ def test_json_roundtrip(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:json_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1, 0.5, 1.2],
         value=[1, 1, 1],
         sandbox={"user_note": "json_test", "flag": True},
@@ -56,8 +56,8 @@ def test_json_stream_and_string_io():
     ann = create(
         bopp_version="1.0",
         media_id="track:json_stream_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1, 0.5],
         value=[1, 1],
     )
@@ -94,8 +94,8 @@ def test_msgpack_stream_and_bytes_io():
     ann = create(
         bopp_version="1.0",
         media_id="track:msgpack_stream_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.2, 0.6],
         value=[1, 1],
     )
@@ -119,8 +119,8 @@ def test_csv_stream_and_string_io():
     ann = create(
         bopp_version="1.0",
         media_id="track:csv_stream_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1, 0.4],
         value=[1, 1],
         sandbox={"user_note": "csv_stream"},
@@ -182,8 +182,8 @@ def test_msgpack_roundtrip(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:msgpack_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.3, 0.7],
         value=[1, 1],
         sandbox={"user_note": "msgpack_test", "flag": False},
@@ -216,8 +216,8 @@ def test_csv_roundtrip(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:csv_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1, 0.4],
         value=[1, 1],
         sandbox={"user_note": "csv_test", "count": 10},
@@ -283,7 +283,7 @@ def test_csv_roundtrip_object_payload(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:csv_obj_test",
-        payload_kind="object",
+        payload_type="object",
         value=[{"color": "brown"}, {"color": "white"}],
     )
     file_path = tmp_path / "test_obj.csv"
@@ -300,8 +300,8 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:csv_extent_polars",
-        extent_kind="score_interval",
-        payload_kind="chord",
+        extent_type="score_interval",
+        payload_type="chord",
         quarter=[(0, 1), (1, 2)],
         duration=[(1, 2), (1, 4)],
         value=["C:maj", "G:maj"],
@@ -325,8 +325,8 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
         lambda: create(
             bopp_version="1.0",
             media_id="track:score_quarter_polars",
-            extent_kind="score_quarter",
-            payload_kind="chord",
+            extent_type="score_quarter",
+            payload_type="chord",
             quarter=[(0, 1), (3, 4)],
             value=["C:maj", "G:7"],
         ),
@@ -334,8 +334,8 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
         lambda: create(
             bopp_version="1.0",
             media_id="track:object_polars",
-            extent_kind="time",
-            payload_kind="object",
+            extent_type="time",
+            payload_type="object",
             time=[0.0, 0.01],
             value=[
                 {"index": 0, "frequency": 440.0, "voicing": 1.0},
@@ -347,8 +347,8 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
         lambda: create(
             bopp_version="1.0",
             media_id="track:ext_polars",
-            extent_kind="time",
-            payload_kind="ext",
+            extent_type="time",
+            payload_type="ext",
             ext_schema="https://example.com/schema.json",
             time=[0.1, 0.5],
             value=[
@@ -385,41 +385,41 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
     "kwargs",
     [
         {
-            "payload_kind": "marker",
-            "extent_kind": "time",
+            "payload_type": "marker",
+            "extent_type": "time",
             "time": [0, 1.5],
             "description": "marker_events",
         },
         {
-            "payload_kind": "tag",
-            "extent_kind": "time_interval",
+            "payload_type": "tag",
+            "extent_type": "time_interval",
             "time": [0.0, 1.0],
             "duration": [1, 1.5],
             "value": ["a", "b"],
         },
         {
-            "payload_kind": "tempo",
-            "extent_kind": "time",
+            "payload_type": "tempo",
+            "extent_type": "time",
             "time": [0.0, 1.0],
             "value": [120, 90.5],
         },
         {
-            "payload_kind": "frequency_hz",
-            "extent_kind": "time_interval",
+            "payload_type": "frequency_hz",
+            "extent_type": "time_interval",
             "time": [0.0, 1.0],
             "duration": [1.0, 1.0],
             "value": [440, 220.5],
         },
         {
-            "payload_kind": "note_midi",
-            "extent_kind": "midi_interval",
+            "payload_type": "note_midi",
+            "extent_type": "midi_interval",
             "tick": [0, 480.5],
             "duration": [240, 240.5],
             "value": [60, 61.5],
         },
         {
-            "payload_kind": "tag",
-            "extent_kind": "time_frequency_box",
+            "payload_type": "tag",
+            "extent_type": "time_frequency_box",
             "time": [0.0, 1.0],
             "duration": [1, 0.5],
             "freq_min": [100, 200.5],
@@ -427,8 +427,8 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
             "value": ["a", "b"],
         },
         {
-            "payload_kind": "tag",
-            "extent_kind": "pixel_box",
+            "payload_type": "tag",
+            "extent_type": "pixel_box",
             "x": [0, 1.5],
             "width": [10, 2.5],
             "y": [0, 1],
@@ -436,9 +436,9 @@ def test_csv_roundtrip_complex_types_polars(tmp_path, ann_factory):
             "value": ["a", "b"],
         },
         {
-            "payload_kind": "tag",
-            "extent_kind": "time",
-            "confidence_kind": "likelihood",
+            "payload_type": "tag",
+            "extent_type": "time",
+            "confidence_type": "likelihood",
             "time": [0.0, 1.0],
             "value": ["a", "b"],
             "confidence": [1, 0.5],
@@ -478,7 +478,7 @@ def test_load_bopp_csv_string_with_brackets(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:bracket_str_test",
-        payload_kind="tag",
+        payload_type="tag",
         value=["[intro]", "(chorus)", "{verse}"],
     )
     file_path = tmp_path / "test_bracket_str.csv"
@@ -495,7 +495,7 @@ def test_csv_roundtrip_numeric_string_tags(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:numeric_str_test",
-        payload_kind="tag",
+        payload_type="tag",
         value=["1", "2", "007"],
     )
     file_path = tmp_path / "test_numeric_str.csv"
@@ -564,8 +564,8 @@ def test_save_and_load_with_validate_id_false(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:no_id_val",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
         generate_id=False,
@@ -592,8 +592,8 @@ def test_save_bopp_csv_pandas(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:pandas_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
     )
@@ -620,8 +620,8 @@ def test_load_bopp_csv_non_string_columns(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:numeric_cols",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1, 0.2],
         value=[1, 2],
     )
@@ -714,8 +714,8 @@ def test_prepare_annotation_for_save_id_variations():
     ann = create(
         bopp_version="1.0",
         media_id="track:save_id_test",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.1],
         value=[1],
         generate_id=False,
@@ -735,8 +735,8 @@ def test_prepare_annotation_for_save_id_variations():
     ann_no_id = create(
         bopp_version="1.0",
         media_id="track:save_id_test2",
-        payload_kind="beat",
-        extent_kind="time",
+        payload_type="beat",
+        extent_type="time",
         time=[0.2],
         value=[2],
         generate_id=False,
@@ -870,8 +870,8 @@ def test_csv_roundtrip_marker_payload(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:marker_csv",
-        payload_kind="marker",
-        extent_kind="time",
+        payload_type="marker",
+        extent_type="time",
         time=[0.1, 0.5, 1.2],
         description="cues",
         sandbox={"note": "marker_roundtrip"},
@@ -890,7 +890,7 @@ def test_csv_roundtrip_marker_payload_without_extent(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:marker_no_extent",
-        payload_kind="marker",
+        payload_type="marker",
         description="global_label",
     )
     for backend in ("polars", "pandas"):
@@ -907,8 +907,8 @@ def test_csv_roundtrip_lyrics_payload(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:lyrics_csv",
-        payload_kind="lyrics",
-        extent_kind="time",
+        payload_type="lyrics",
+        extent_type="time",
         time=[0.1, 0.5],
         value=["hello", "world"],
         language="en-US",
@@ -926,8 +926,8 @@ def test_csv_roundtrip_frequency_hz_with_voiced(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:freq_voiced_csv",
-        payload_kind="frequency_hz",
-        extent_kind="time",
+        payload_type="frequency_hz",
+        extent_type="time",
         time=[0.0, 0.5, 1.0],
         value=[440.0, 0.0, 880.0],
         voiced=[True, False, True],
@@ -945,8 +945,8 @@ def test_csv_roundtrip_object_with_description(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:object_desc_csv",
-        payload_kind="object",
-        extent_kind="time",
+        payload_type="object",
+        extent_type="time",
         time=[0.1, 0.5],
         value=[{"k1": "v1"}, {"k2": 2}],
         description="test structured objects",
@@ -964,8 +964,8 @@ def test_csv_roundtrip_note_spn_payload(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:note_spn_csv",
-        payload_kind="note",
-        extent_kind="time",
+        payload_type="note",
+        extent_type="time",
         time=[0.0, 1.0, 2.0],
         value=["C4", "C♯4", "E♭3"],
     )
@@ -981,8 +981,8 @@ def test_csv_roundtrip_chord_unicode_accidentals(tmp_path):
     ann = create(
         bopp_version="1.0",
         media_id="track:chord_unicode_csv",
-        payload_kind="chord",
-        extent_kind="time_interval",
+        payload_type="chord",
+        extent_type="time_interval",
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=["C♯:maj", "D♭:min7"],

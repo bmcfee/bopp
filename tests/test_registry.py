@@ -111,8 +111,8 @@ def test_score_interval_csv_roundtrip(tmp_path):
     """CSV loading restores both score interval fraction columns."""
     ann = bopp.create(
         media_id="test:reg",
-        payload_kind="tag",
-        extent_kind="score_interval",
+        payload_type="tag",
+        extent_type="score_interval",
         quarter=[[1, 2], [3, 4]],
         duration=[[1, 4], [7, 8]],
         value=["a", "b"],

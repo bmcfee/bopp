@@ -39,8 +39,8 @@ BOPP annotations include automatic identification and provenance tracking:
 >>> # Create a parent annotation
 >>> parent_ann = bopp.create(
 ...     media_id="track:123",
-...     payload_kind="marker",
-...     extent_kind="time",
+...     payload_type="marker",
+...     extent_type="time",
 ...     time=[0.1, 0.5, 0.9],
 ...     description="onset",
 ... )
@@ -200,8 +200,8 @@ import bopp
 
 ann = bopp.create(
     media_id="musicxml:score_001",
-    payload_kind="tag",
-    extent_kind="score_interval_float",
+    payload_type="tag",
+    extent_type="score_interval_float",
     quarter=[-0.5, 0.0, 1.25],
     duration=[0.5, 1.25, 0.75],
     value=["pickup", "start", "later"],
