@@ -4,11 +4,11 @@
   "title": "Any Extent",
   "description": "A discriminated union of all supported columnar extent types.",
   "oneOf": [
-    { "$ref": "extent/times.json" },
+    { "$ref": "extent/time.json" },
     { "$ref": "extent/time_interval.json" },
     { "$ref": "extent/time_frequency_box.json" },
     { "$ref": "extent/time_uniform.json" },
-    { "$ref": "extent/pixels.json" },
+    { "$ref": "extent/pixel.json" },
     { "$ref": "extent/pixel_box.json" },
     { "$ref": "extent/text.json" },
     { "$ref": "extent/text_interval.json" },

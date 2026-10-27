@@ -49,7 +49,7 @@ def test_build_schema_site(tmp_path: Path):
         core_data = json.loads(core_file.read_text(encoding="utf-8"))
         assert core_data["$id"] == "core.json"
 
-        extent_file = output_dir / version / "extent" / "times.json"
+        extent_file = output_dir / version / "extent" / "time.json"
         assert extent_file.is_file()
 
     # 3. Verify no broken references

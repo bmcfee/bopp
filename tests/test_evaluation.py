@@ -15,7 +15,7 @@ from bopp.evaluation import (
 )
 from bopp.exceptions import BoppArgumentError
 from bopp.models.v1.annotation import Annotation
-from bopp.models.v1.extent.times import Times
+from bopp.models.v1.extent.time import Time
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
 from bopp.models.v1.payload.tag import TagPayload
 from bopp.models.v1.payload.tempo import TempoPayload
@@ -402,7 +402,7 @@ def test_evaluate_transcription_spn_notes():
 #         media_id="audio",
 #         bopp_version="1.0.0",
 #         metadata=metadata,
-#         extent=Times(time=[0.0, 0.1, 0.2]),
+#         extent=Time(time=[0.0, 0.1, 0.2]),
 #         payload=PitchContourPayload(
 #             value=[
 #                 {"frequency": 440.0, "voicing": True},
@@ -415,7 +415,7 @@ def test_evaluate_transcription_spn_notes():
 #         media_id="audio",
 #         bopp_version="1.0.0",
 #         metadata=metadata,
-#         extent=Times(time=[0.0, 0.1, 0.2]),
+#         extent=Time(time=[0.0, 0.1, 0.2]),
 #         payload=PitchContourPayload(
 #             value=[
 #                 {"frequency": 440.0, "voicing": True},
@@ -503,7 +503,7 @@ def test_extract_helpers_validation_errors():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Times(time=[1.0]),
+        extent=Time(time=[1.0]),
         payload=msgspec.UNSET,  # type: ignore[arg-type]
     )
     with pytest.raises(BoppArgumentError, match="requires a payload to extract labels"):

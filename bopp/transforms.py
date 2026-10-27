@@ -12,7 +12,7 @@ import msgspec
 from .base import BoppBase
 from .core import ensure_annotation_id
 from .exceptions import BoppArgumentError, BoppValidationError
-from .models.v1.extent.times import Times
+from .models.v1.extent.time import Time
 from .models.v1.metadata.derived import DerivedAnnotationMetadata
 from .registries import get_registry
 from .util import _get_tag
@@ -46,8 +46,8 @@ AXIS_CONFIGS: dict[tuple[str, str], tuple[str, str, str | None]] = {
     ("time_frequency_box", "frequency"): ("min_max", "freq_min", "freq_max"),
     ("pixel_box", "x"): ("origin_span", "x", "width"),
     ("pixel_box", "y"): ("origin_span", "y", "height"),
-    ("pixels", "x"): ("point", "x", None),
-    ("pixels", "y"): ("point", "y", None),
+    ("pixel", "x"): ("point", "x", None),
+    ("pixel", "y"): ("point", "y", None),
     ("midi_tick", "tick"): ("point", "tick", None),
     ("midi_interval", "tick"): ("origin_span", "tick", "duration"),
     ("score_quarter", "quarter"): ("point", "quarter", None),
@@ -1114,7 +1114,7 @@ def to_times(
     Returns
     -------
     BoppBase
-        A new Annotation instance with extent type `times` (`Times` struct).
+        A new Annotation instance with extent type `time` (`Time` struct).
 
     Raises
     ------
@@ -1324,7 +1324,7 @@ def to_times(
 
     # If target_times is empty, return empty times extent
     if not target_times:
-        new_extent = Times(time=[])
+        new_extent = Time(time=[])
         new_payload = _subset_struct_lists(payload, [])
         new_confidence = _subset_struct_lists(confidence, [])
         new_groupings = _subset_groupings(groupings, [])
@@ -1424,7 +1424,7 @@ def to_times(
         confidence, confidence_cols, matched_indices, confidence_fill_map
     )
     new_groupings = _resample_groupings(groupings, matched_indices, grouping_fill_map)
-    new_extent = Times(time=out_times)
+    new_extent = Time(time=out_times)
 
     return _rebuild_annotation(
         annotation,

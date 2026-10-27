@@ -11,7 +11,7 @@ from bopp.util import from_dataframe, to_dataframe
 
 NEW_EXTENT_FIXTURES = [
     (
-        "pixels",
+        "pixel",
         {"x": [10.5, 20.0, 35.2], "y": [5.0, 15.5, 40.0]},
     ),
     (
@@ -95,12 +95,12 @@ def test_create_and_validate_new_extents(extent_kind, extent_kwargs):
     assert isinstance(ann.extent, cls)
 
 
-def test_pixels_validation():
-    # Valid pixels
+def test_pixel_validation():
+    # Valid pixel
     ann = create(
-        media_id="audio:pixels",
+        media_id="audio:pixel",
         payload_kind="tag",
-        extent_kind="pixels",
+        extent_kind="pixel",
         x=[1.0, 2.0],
         y=[3.0, 4.0],
         value=["p1", "p2"],
@@ -110,9 +110,9 @@ def test_pixels_validation():
     # Missing y raises TypeError at construction
     with pytest.raises(TypeError):
         create(
-            media_id="audio:pixels",
+            media_id="audio:pixel",
             payload_kind="tag",
-            extent_kind="pixels",
+            extent_kind="pixel",
             x=[1.0],
             value=["p1"],
         )
@@ -282,12 +282,12 @@ def test_time_uniform_constraints():
 
 
 def test_array_length_mismatch_raises():
-    # pixels mismatch
+    # pixel mismatch
     with pytest.raises(BoppArrayError):
         create(
             media_id="audio:err",
             payload_kind="tag",
-            extent_kind="pixels",
+            extent_kind="pixel",
             x=[1.0, 2.0],
             y=[1.0],
             value=["a", "b"],
@@ -372,22 +372,22 @@ def test_csv_roundtrip_new_extents(tmp_path, extent_kind, extent_kwargs):
 
 
 def test_trim_new_extents():
-    # Trim pixels along x and y
-    ann_pixels = create(
-        media_id="track:pixels_trim",
+    # Trim pixel along x and y
+    ann_pixel = create(
+        media_id="track:pixel_trim",
         payload_kind="tag",
-        extent_kind="pixels",
+        extent_kind="pixel",
         x=[10.0, 20.0, 30.0, 40.0],
         y=[5.0, 15.0, 25.0, 35.0],
         value=["a", "b", "c", "d"],
     )
-    trimmed_x = trim(ann_pixels, start=15.0, end=35.0, target_field="x")
+    trimmed_x = trim(ann_pixel, start=15.0, end=35.0, target_field="x")
     assert trimmed_x.extent.x == [20.0, 30.0]
     assert trimmed_x.extent.y == [15.0, 25.0]
     assert trimmed_x.payload.value == ["b", "c"]
 
     trimmed_y_reset = trim(
-        ann_pixels, start=15.0, end=35.0, target_field="y", reset=True
+        ann_pixel, start=15.0, end=35.0, target_field="y", reset=True
     )
     assert trimmed_y_reset.extent.y == [0.0, 10.0, 20.0]
     assert trimmed_y_reset.payload.value == ["b", "c", "d"]
@@ -578,7 +578,7 @@ def test_filter_by_and_errors_new_extents():
     assert filtered.extent.x == [5.0, 10.0]
     assert filtered.payload.value == ["c1", "c2"]
 
-    # Trim pixels without specifying target_field raises BoppArgumentError
+    # Trim cartesian without specifying target_field raises BoppArgumentError
     with pytest.raises(BoppArgumentError, match="does not have a default target field"):
         trim(ann_cart, start=1.0)
 

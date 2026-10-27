@@ -12,8 +12,8 @@ from bopp.core import create
 from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
+from bopp.models.v1.extent.time import Time
 from bopp.models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
-from bopp.models.v1.extent.times import Times
 from bopp.models.v1.grouping import Grouping
 from bopp.models.v1.metadata.derived import DerivedAnnotationMetadata
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
@@ -159,7 +159,7 @@ def test_rebuild_annotation_helper():
         media_id="test_media",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Times(time=[1.0]),
+        extent=Time(time=[1.0]),
         payload=TagPayload(value=["test"]),
         groupings=[g],
     )
@@ -168,7 +168,7 @@ def test_rebuild_annotation_helper():
         parents=["old_id"],
         sandbox={"foo": "bar"},
         payload=TagPayload(value=["new_test"]),
-        extent=Times(time=[2.0]),
+        extent=Time(time=[2.0]),
         groupings=[Grouping(name="layer", ids=[2])],
     )
     assert rebuilt.id != "old_id"
@@ -325,7 +325,7 @@ def test_trim_with_groupings():
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
-        extent=Times(time=[1.0, 3.0, 5.0, 8.0]),
+        extent=Time(time=[1.0, 3.0, 5.0, 8.0]),
         payload=TagPayload(value=["a", "b", "c", "d"]),
         confidence=LikelihoodConfidence(confidence=[0.1, 0.3, 0.5, 0.8]),
         groupings=[g1, g2],
@@ -769,7 +769,7 @@ def test_filter_by_groupings_facet():
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
+        extent=Time(time=[1.0, 2.0, 3.0, 4.0]),
         payload=TagPayload(value=["a", "b", "c", "d"]),
         groupings=[g1, g2],
     )
@@ -797,7 +797,7 @@ def test_filter_by_groupings_facet():
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Times(time=[1.0, 2.0]),
+        extent=Time(time=[1.0, 2.0]),
         payload=TagPayload(value=["a", "b"]),
         groupings=[g_single],
     )
@@ -835,7 +835,7 @@ def test_filter_by_facet_all():
         media_id="test_media",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Times(time=[1.0, 2.0, 3.0, 4.0]),
+        extent=Time(time=[1.0, 2.0, 3.0, 4.0]),
         payload=TagPayload(value=["intro", "verse", "chorus", "verse"]),
         confidence=LikelihoodConfidence(confidence=[0.9, 0.4, 0.95, 0.85]),
         groupings=[g],
@@ -925,7 +925,7 @@ def test_filter_by_invalid_arguments():
         media_id="test_media",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Times(time=[1.0]),
+        extent=Time(time=[1.0]),
         payload=TagPayload(value=["a"]),
         groupings=[Grouping(name="valid_layer", ids=[0])],
     )
@@ -1099,7 +1099,7 @@ def test_to_times_with_groupings():
         media_id="audio:track_1",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Times(time=[1.0, 3.0]),
+        extent=Time(time=[1.0, 3.0]),
         payload=TagPayload(value=["a", "b"]),
         confidence=LikelihoodConfidence(confidence=[0.7, 0.9]),
         groupings=[g1, g2],
@@ -1275,7 +1275,7 @@ def test_to_times_fill_value_dict_missing_required_key():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Times(time=[1.0]),
+        extent=Time(time=[1.0]),
         payload=MoodThayerPayload(valence=[0.5], arousal=[0.2]),
     )
     bopp.ensure_annotation_id(ann)
@@ -1331,7 +1331,7 @@ def test_to_times_multi_column_payload_none_fill_value():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Times(time=[1.0]),
+        extent=Time(time=[1.0]),
         payload=OptionalFieldPayload(label=["test"], comment=["note"]),
     )
     bopp.ensure_annotation_id(ann)
@@ -1398,7 +1398,7 @@ def test_to_times_empty_annotation_with_confidence_and_fill():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Times(time=[]),
+        extent=Time(time=[]),
         payload=TagPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )
@@ -1417,7 +1417,7 @@ def test_to_times_empty_annotation_confidence_fill_validation_failure():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Times(time=[]),
+        extent=Time(time=[]),
         payload=TagPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )

@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "extent/pixels.json",
-  "title": "Pixels",
+  "$id": "extent/pixel.json",
+  "title": "Pixel",
   "description": "2D point coordinates (x, y) in pixel space.",
   "type": "object",
   "properties": {
     "extent_type": {
-      "const": "pixels"
+      "const": "pixel"
     },
     "x": {
       "$ref": "../core.json#/$defs/Array",

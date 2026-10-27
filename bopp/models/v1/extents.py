@@ -13,8 +13,8 @@ from .extent import (
     cartesian_time_interval,
     midi_interval,
     midi_tick,
+    pixel,
     pixel_box,
-    pixels,
     score_interval,
     score_interval_float,
     score_quarter,
@@ -24,18 +24,18 @@ from .extent import (
     spherical_time_interval,
     text,
     text_interval,
+    time,
     time_frequency_box,
     time_interval,
     time_uniform,
-    times,
 )
 
 type AnyExtent = Annotated[
-    times.Times
+    time.Time
     | time_interval.TimeIntervalExtent
     | time_frequency_box.TimeFrequencyBoxExtent
     | time_uniform.UniformTimeExtent
-    | pixels.Pixels
+    | pixel.Pixel
     | pixel_box.PixelBoxExtent
     | text.Text
     | text_interval.TextInterval

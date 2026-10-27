@@ -18,7 +18,7 @@ from bopp.io import _type_to_polars_dtype
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.confidence.likelihood import LikelihoodConfidence
 from bopp.models.v1.extent.score_interval import ScoreInterval
-from bopp.models.v1.extent.times import Times
+from bopp.models.v1.extent.time import Time
 from bopp.models.v1.grouping import Grouping
 from bopp.models.v1.payload.beat import BeatPositionPayload
 from bopp.models.v1.payload.marker import MarkerPayload
@@ -191,7 +191,7 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
         media_id="track:skip_test",
         bopp_version="1.0",
         metadata=msgspec.UNSET,
-        extent=Times(time=[0.1, 0.2]),
+        extent=Time(time=[0.1, 0.2]),
         payload=BeatPositionPayload(value=[1, 1]),
         confidence=LikelihoodConfidence(confidence=[0.8, 0.9]),
     )
@@ -234,7 +234,7 @@ def test_groupings_to_and_from_dataframe_pandas():
         media_id="track:grouping_pandas",
         bopp_version="1.0",
         payload=BeatPositionPayload(value=[1, 2, 3]),
-        extent=Times(time=[0.1, 0.2, 0.3]),
+        extent=Time(time=[0.1, 0.2, 0.3]),
         groupings=[
             Grouping(name="voices", ids=[0, 1, 0], labels={"soprano": 0, "alto": 1}),
             Grouping(name="measures", ids=[1, 1, 2]),

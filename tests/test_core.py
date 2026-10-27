@@ -637,3 +637,65 @@ def test_create_tag_payload():
     )
     assert ann.payload.value == ["rock", "guitar"]
     assert validate(ann) is True
+
+
+def test_create_agreement_confidence():
+    ann = create(
+        media_id="audio:agreement",
+        payload_kind="tag",
+        extent_kind="time",
+        time=[0.1, 0.5],
+        value=["vocal", "speech"],
+        confidence_kind="agreement",
+        confidence=[0.8, 1.0],
+        num_annotators=[5, 5],
+        num_annotators_common=5,
+    )
+    assert ann.confidence is not None
+    assert ann.confidence.__struct_config__.tag == "agreement"
+    assert ann.confidence.confidence == [0.8, 1.0]
+    assert ann.confidence.num_annotators == [5, 5]
+    assert ann.confidence.num_annotators_common == 5
+    assert validate(ann) is True
+
+    # Array length mismatch between confidence and num_annotators
+    with pytest.raises(BoppArrayError):
+        create(
+            media_id="audio:agreement_err",
+            payload_kind="tag",
+            extent_kind="time",
+            time=[0.1, 0.5],
+            value=["vocal", "speech"],
+            confidence_kind="agreement",
+            confidence=[0.8, 1.0],
+            num_annotators=[5],
+        )
+
+
+def test_create_relation_payload():
+    ann = create(
+        media_id="audio:relation",
+        payload_kind="relation",
+        performance_id="perf:100",
+        value=["work:1", "work:2"],
+        relation=["cover", "quote"],
+        extent_kind="time",
+        time=[0.0, 10.0],
+    )
+    assert ann.payload.__struct_config__.tag == "relation"
+    assert ann.payload.performance_id == "perf:100"
+    assert ann.payload.value == ["work:1", "work:2"]
+    assert ann.payload.relation == ["cover", "quote"]
+    assert validate(ann) is True
+
+    # Array length mismatch between value and relation
+    with pytest.raises(BoppArrayError):
+        create(
+            media_id="audio:relation_err",
+            payload_kind="relation",
+            performance_id="perf:100",
+            value=["work:1", "work:2"],
+            relation=["cover"],
+            extent_kind="time",
+            time=[0.0, 10.0],
+        )

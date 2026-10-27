@@ -26,7 +26,7 @@ from bopp.io import (
     save_bopp_msgpack,
 )
 from bopp.models.v1.annotation import Annotation
-from bopp.models.v1.extent.times import Times
+from bopp.models.v1.extent.time import Time
 from bopp.models.v1.grouping import Grouping
 from bopp.models.v1.payload.beat import BeatPositionPayload
 from bopp.util import _get_tag, from_dataframe
@@ -237,7 +237,7 @@ def test_csv_roundtrip_with_groupings(tmp_path):
     ann = Annotation(
         media_id="track:csv_groupings",
         bopp_version="1.0",
-        extent=Times(time=[0.1, 0.4]),
+        extent=Time(time=[0.1, 0.4]),
         payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
             Grouping(name="voices", ids=[0, 1], labels={"v1": 0, "v2": 1}),
@@ -262,7 +262,7 @@ def test_csv_roundtrip_with_groupings_pandas(tmp_path):
     ann = Annotation(
         media_id="track:csv_groupings_pd",
         bopp_version="1.0",
-        extent=Times(time=[0.1, 0.4]),
+        extent=Time(time=[0.1, 0.4]),
         payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
             Grouping(name="voices", ids=[0, 1]),

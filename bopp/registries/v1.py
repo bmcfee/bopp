@@ -9,8 +9,8 @@ from ..models.v1.extent.cartesian_time import CartesianTimeExtent
 from ..models.v1.extent.cartesian_time_interval import CartesianTimeIntervalExtent
 from ..models.v1.extent.midi_interval import MidiInterval
 from ..models.v1.extent.midi_tick import MidiTicks
+from ..models.v1.extent.pixel import Pixel
 from ..models.v1.extent.pixel_box import PixelBoxExtent
-from ..models.v1.extent.pixels import Pixels
 from ..models.v1.extent.score_interval import ScoreInterval
 from ..models.v1.extent.score_interval_float import ScoreIntervalFloat
 from ..models.v1.extent.score_quarter import ScoreQuarterNotes
@@ -20,10 +20,10 @@ from ..models.v1.extent.spherical_time import SphericalTimeExtent
 from ..models.v1.extent.spherical_time_interval import SphericalTimeIntervalExtent
 from ..models.v1.extent.text import Text
 from ..models.v1.extent.text_interval import TextInterval
+from ..models.v1.extent.time import Time
 from ..models.v1.extent.time_frequency_box import TimeFrequencyBoxExtent
 from ..models.v1.extent.time_interval import TimeIntervalExtent
 from ..models.v1.extent.time_uniform import UniformTimeExtent
-from ..models.v1.extent.times import Times
 from ..models.v1.grouping import Grouping
 from ..models.v1.metadata.algorithm import AlgorithmAnnotationMetadata
 from ..models.v1.metadata.crowd import CrowdSourcedAnnotationMetadata
@@ -62,8 +62,8 @@ EXTENT_TYPE_REGISTRY = {
     "cartesian_time_interval": CartesianTimeIntervalExtent,
     "midi_interval": MidiInterval,
     "midi_tick": MidiTicks,
+    "pixel": Pixel,
     "pixel_box": PixelBoxExtent,
-    "pixels": Pixels,
     "score_interval": ScoreInterval,
     "score_interval_float": ScoreIntervalFloat,
     "score_quarter": ScoreQuarterNotes,
@@ -73,7 +73,7 @@ EXTENT_TYPE_REGISTRY = {
     "spherical_time_interval": SphericalTimeIntervalExtent,
     "text": Text,
     "text_interval": TextInterval,
-    "time": Times,
+    "time": Time,
     "time_frequency_box": TimeFrequencyBoxExtent,
     "time_interval": TimeIntervalExtent,
     "time_uniform": UniformTimeExtent,
