@@ -44,6 +44,9 @@ path = "bopp/_version.py"
 addopts = "--cov=bopp --cov-report=term-missing --cov-branch --cov-report=xml"
 testpaths = ["tests"]
 
+[tool.codespell]
+skip = "*.msgpack,*.msgpack.gz,*.gz,./docs/_build,./docs/_static,./_site,./.git,./build,./dist,./examples"
+
 [tool.numpydoc_validation]
 checks = [
     "all",

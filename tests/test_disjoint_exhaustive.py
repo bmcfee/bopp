@@ -18,7 +18,7 @@ from bopp.util import (
 )
 
 # =====================================================================
-# 1. Disjointness Tests
+# 1. Disjointedness Tests
 # =====================================================================
 
 
@@ -905,7 +905,7 @@ def test_is_disjoint_edge_cases():
     )
     assert is_disjoint(ann_cart) is False
 
-    # 2D Box: time_frequency_box disjointness
+    # 2D Box: time_frequency_box disjointedness
     ann_tf_disj = create(
         media_id="audio:1",
         payload_type="tag",
@@ -947,7 +947,7 @@ def test_is_disjoint_edge_cases():
             disjoint=True,
         )
 
-    # spherical_time_interval disjointness
+    # spherical_time_interval disjointedness
     ann_sph = create(
         media_id="audio:1",
         payload_type="tag",

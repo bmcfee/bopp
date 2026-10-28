@@ -1227,7 +1227,7 @@ def _union_area_2d(
 
 
 def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> bool:
-    """Check disjointness of an extent over a subset of observation indices."""
+    """Check disjointedness of an extent over a subset of observation indices."""
     tag = _get_tag(extent)
     if tag == "time_uniform":
         return True
@@ -1390,7 +1390,7 @@ def is_disjoint(
     extent_or_annotation : msgspec.Struct or BoppBase
         An extent struct or parent annotation instance.
     grouping : Grouping or None, optional
-        Grouping instance to evaluate disjointness within groups.
+        Grouping instance to evaluate disjointedness within groups.
     group_id : int or None, optional
         Specific group ID to evaluate. If None and grouping is provided, verifies
         that every non-negative group ID (>= 0) is disjoint.
