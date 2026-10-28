@@ -364,6 +364,19 @@ def test_exhaustive_time_intervals_inferred_bounds():
             exhaustive=True,
         )
 
+    # Inferred bounds with a gap in the middle: [2.0, 5.0) and [6.0, 9.0)
+    # Inferred bounds are (2.0, 9.0) matching data min and max, but [5.0, 6.0) is missing.
+    with pytest.raises(BoppValidationError, match="marked exhaustive=True"):
+        create(
+            media_id="audio:1",
+            payload_type="tag",
+            extent_type="time_interval",
+            time=[2.0, 6.0],
+            duration=[3.0, 3.0],
+            value=["a", "b"],
+            exhaustive=True,
+        )
+
 
 def test_exhaustive_overlapping_intervals():
     # Intervals overlap [0, 6) and [4, 10), but completely cover [0, 10]
@@ -382,6 +395,22 @@ def test_exhaustive_overlapping_intervals():
     assert is_disjoint(ann) is False
     assert is_exhaustive(ann) is True
     assert validate(ann) is True
+
+    # Overlapping clusters with a gap in the middle:
+    # Cluster 1: [0, 3) and [1, 4) -> covers [0, 4)
+    # Cluster 2: [6, 8) and [7, 10) -> covers [6, 10)
+    # Inferred bounds are (0, 10), matching endpoints, but missing [4, 6) in the middle.
+    with pytest.raises(BoppValidationError, match="marked exhaustive=True"):
+        create(
+            media_id="audio:1",
+            payload_type="tag",
+            extent_type="time_interval",
+            time=[0.0, 1.0, 6.0, 7.0],
+            duration=[3.0, 3.0, 2.0, 3.0],
+            value=["a", "b", "c", "d"],
+            disjoint=False,
+            exhaustive=True,
+        )
 
 
 def test_exhaustive_empty_extents():
@@ -521,6 +550,45 @@ def test_exhaustive_2d_boxes():
             max_x=10.0,
             min_y=0.0,
             max_y=10.0,
+            exhaustive=True,
+        )
+
+    # Inferred bounds with an interior hole in the center:
+    # 4 boxes surrounding a hole at [1, 2] x [1, 2]:
+    # Bottom: [0, 3] x [0, 1]
+    # Top:    [0, 3] x [2, 3]
+    # Left:   [0, 1] x [1, 2]
+    # Right:  [2, 3] x [1, 2]
+    # Inferred bounds are x=(0, 3), y=(0, 3). The outer min and max are fully met,
+    # but the interior center [1, 2] x [1, 2] is a gap/hole!
+    with pytest.raises(BoppValidationError, match="marked exhaustive=True"):
+        create(
+            media_id="img:1",
+            payload_type="tag",
+            extent_type="pixel_box",
+            x=[0.0, 0.0, 0.0, 2.0],
+            width=[3.0, 3.0, 1.0, 1.0],
+            y=[0.0, 2.0, 1.0, 1.0],
+            height=[1.0, 1.0, 1.0, 1.0],
+            value=["bot", "top", "left", "right"],
+            exhaustive=True,
+        )
+
+    # Time-frequency box with frequency gap between boxes:
+    # Box 1: time [0, 2], freq [100, 300]
+    # Box 2: time [0, 2], freq [400, 600]
+    # Inferred bounds are time=(0, 2), freq=(100, 600).
+    # Missing frequency band in the middle: [300, 400]
+    with pytest.raises(BoppValidationError, match="marked exhaustive=True"):
+        create(
+            media_id="audio:1",
+            payload_type="tag",
+            extent_type="time_frequency_box",
+            time=[0.0, 0.0],
+            duration=[2.0, 2.0],
+            freq_min=[100.0, 400.0],
+            freq_max=[300.0, 600.0],
+            value=["low", "high"],
             exhaustive=True,
         )
 
