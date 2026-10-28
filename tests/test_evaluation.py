@@ -164,6 +164,7 @@ def test_evaluate_chord():
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=ref_labels,
+        disjoint=True,
     )
     est = create(
         media_id="audio",
@@ -172,6 +173,7 @@ def test_evaluate_chord():
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=est_labels,
+        disjoint=True,
     )
 
     actual = evaluate(ref, est)
@@ -187,6 +189,7 @@ def test_evaluate_chord_from_point_times():
         extent_type="time",
         time=[0.0, 2.0, 4.0],
         value=["C:maj", "G:maj", "C:maj"],
+        disjoint=True,
     )
     est = create(
         media_id="audio",
@@ -195,6 +198,7 @@ def test_evaluate_chord_from_point_times():
         time=[0.0, 2.0],
         duration=[2.0, 2.0],
         value=["C:maj", "G:maj"],
+        disjoint=True,
     )
 
     expected = mir_eval.chord.evaluate(
@@ -218,6 +222,7 @@ def test_evaluate_chord_unicode_accidentals():
         time=[0.0, 2.0, 4.0],
         duration=[2.0, 2.0, 2.0],
         value=["C♯:maj", "D♭:min", "F𝄪:7"],
+        disjoint=True,
     )
     est = create(
         media_id="audio",
@@ -226,6 +231,7 @@ def test_evaluate_chord_unicode_accidentals():
         time=[0.0, 2.0, 4.0],
         duration=[2.0, 2.0, 2.0],
         value=["C#:maj", "Db:min", "F##:7"],
+        disjoint=True,
     )
 
     expected = mir_eval.chord.evaluate(
@@ -238,6 +244,71 @@ def test_evaluate_chord_unicode_accidentals():
     actual = evaluate(ref, est)
     assert actual == expected
     assert actual["mirex"] == 1.0
+
+
+def test_evaluate_chord_validation_errors():
+    valid_chord = create(
+        media_id="audio",
+        payload_type="chord",
+        extent_type="time_interval",
+        time=[0.0, 2.0],
+        duration=[2.0, 2.0],
+        value=["C:maj", "G:maj"],
+        disjoint=True,
+    )
+
+    # 1. Non-chord payload
+    bad_payload = create(
+        media_id="audio",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 2.0],
+        duration=[2.0, 2.0],
+        value=["C:maj", "G:maj"],
+        disjoint=True,
+    )
+    with pytest.raises(BoppArgumentError, match="requires 'chord' payload"):
+        evaluate(bad_payload, valid_chord, task="chord")
+
+    # 2. Non-temporal extent
+    bad_extent = create(
+        media_id="txt:1",
+        payload_type="chord",
+        extent_type="text",
+        offset=[0, 5],
+        value=["C:maj", "G:maj"],
+        disjoint=True,
+    )
+    with pytest.raises(BoppArgumentError, match="requires temporal extent"):
+        evaluate(bad_extent, valid_chord, task="chord")
+
+    # 3. disjoint=False
+    non_disjoint = create(
+        media_id="audio",
+        payload_type="chord",
+        extent_type="time_interval",
+        time=[0.0, 2.0],
+        duration=[2.0, 2.0],
+        value=["C:maj", "G:maj"],
+        disjoint=False,
+    )
+    with pytest.raises(BoppArgumentError, match="requires extent disjoint=True"):
+        evaluate(non_disjoint, valid_chord, task="chord")
+    with pytest.raises(BoppArgumentError, match="requires extent disjoint=True"):
+        evaluate(valid_chord, non_disjoint, task="chord")
+
+    # 4. Empty intervals
+    empty_chord = create(
+        media_id="audio",
+        payload_type="chord",
+        extent_type="time_interval",
+        time=[],
+        duration=[],
+        value=[],
+        disjoint=True,
+    )
+    with pytest.raises(BoppArgumentError, match="requires non-empty intervals"):
+        evaluate(empty_chord, valid_chord, task="chord")
 
 
 def test_evaluate_segment():

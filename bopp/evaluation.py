@@ -197,15 +197,58 @@ def _eval_tempo(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
     return mir_eval.tempo.evaluate(ref_tempi, ref_weight, est_tempi, **kwargs)
 
 
+def _validate_chord_annotation(ann: BoppBase, role: str) -> None:
+    """Validate that an annotation satisfies chord evaluation requirements."""
+    payload = getattr(ann, "payload", None)
+    payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
+    if payload_tag != "chord":
+        raise BoppArgumentError(
+            f"Chord evaluation requires 'chord' payload for {role}, found '{payload_tag}'."
+        )
+
+    extent = getattr(ann, "extent", None)
+    extent_tag = _get_tag(extent) if extent not in (None, msgspec.UNSET) else None
+    if extent_tag not in (
+        "time_interval",
+        "spherical_time_interval",
+        "cartesian_time_interval",
+        "time",
+        "spherical_time",
+        "cartesian_time",
+        "time_uniform",
+    ):
+        raise BoppArgumentError(
+            f"Chord evaluation requires temporal extent for {role}, found '{extent_tag}'."
+        )
+
+    if not getattr(extent, "disjoint", False):
+        raise BoppArgumentError(
+            f"Chord evaluation requires extent disjoint=True for {role}, found disjoint={getattr(extent, 'disjoint', False)}."
+        )
+
+
+def _extract_chord_intervals_and_labels(
+    ann: BoppBase, role: str
+) -> tuple[Any, list[str]]:
+    """Extract, sort, and normalize intervals and labels for chord evaluation."""
+    _validate_chord_annotation(ann, role)
+    raw_intervals = _extract_intervals(ann)
+    if len(raw_intervals) == 0:
+        raise BoppArgumentError(
+            f"Chord evaluation requires non-empty intervals for {role}."
+        )
+    raw_labels = [
+        _normalize_chord_accidentals(lbl) for lbl in _extract_labels(ann, "value")
+    ]
+    order = np.argsort(raw_intervals[:, 0])
+    sorted_intervals = raw_intervals[order]
+    sorted_labels = [raw_labels[i] for i in order]
+    return sorted_intervals, sorted_labels
+
+
 def _eval_chord(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    ref_intervals = _extract_intervals(ref)
-    est_intervals = _extract_intervals(est)
-    ref_labels = [
-        _normalize_chord_accidentals(lbl) for lbl in _extract_labels(ref, "value")
-    ]
-    est_labels = [
-        _normalize_chord_accidentals(lbl) for lbl in _extract_labels(est, "value")
-    ]
+    ref_intervals, ref_labels = _extract_chord_intervals_and_labels(ref, "reference")
+    est_intervals, est_labels = _extract_chord_intervals_and_labels(est, "estimate")
     return mir_eval.chord.evaluate(
         ref_intervals, ref_labels, est_intervals, est_labels, **kwargs
     )
