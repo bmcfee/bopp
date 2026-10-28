@@ -23,7 +23,33 @@
         "type": "integer",
         "minimum": 0
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all text intervals in the extent are non-overlapping.",
+      "default": false
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether character intervals fully cover the text range without gaps.",
+      "default": false
+    },
+    "min_offset": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Lower bound character offset."
+    },
+    "max_offset": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Upper bound character offset."
     }
   },
-  "required": ["extent_type", "offset", "length"]
+  "required": [
+    "extent_type",
+    "offset",
+    "length",
+    "disjoint",
+    "exhaustive"
+  ]
 }

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 from .. import core
 
@@ -19,3 +19,23 @@ class ScoreInterval(Struct, tag_field="extent_type", tag="score_interval"):
         list[core.FractionNonnegative],
         Meta(description="Array of interval durations in fractional quarter notes."),
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all quarter intervals in the extent are non-overlapping."
+        ),
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether quarter intervals fully cover the range without gaps."
+        ),
+    ] = False
+    min_quarter: (
+        Annotated[core.Fraction, Meta(description="Lower bound in quarter notes.")]
+        | UnsetType
+    ) = UNSET
+    max_quarter: (
+        Annotated[core.Fraction, Meta(description="Upper bound in quarter notes.")]
+        | UnsetType
+    ) = UNSET

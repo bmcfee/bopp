@@ -112,7 +112,8 @@ datamodel-codegen \\
   --disable-timestamp \\
   --enable-generated-header-marker \\
   --use-schema-description \\
-  --use-annotated
+  --use-annotated \\
+  --use-default
 """
 
 # Registry construction

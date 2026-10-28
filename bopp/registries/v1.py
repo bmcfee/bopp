@@ -107,8 +107,8 @@ PAYLOAD_TYPE_REGISTRY = {
 
 COMPLEX_FIELDS_REGISTRY: dict[str, dict[str, list[str]]] = {
     "extent_type": {
-        "score_interval": ["quarter", "duration"],
-        "score_quarter": ["quarter"],
+        "score_interval": ["quarter", "duration", "min_quarter", "max_quarter"],
+        "score_quarter": ["quarter", "min_quarter", "max_quarter"],
     },
     "metadata_type": {
         "algorithm": ["parameters"],

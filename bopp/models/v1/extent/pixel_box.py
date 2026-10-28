@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type WidthItem = Annotated[float, Meta(ge=0.0)]
 
@@ -22,3 +22,31 @@ class PixelBoxExtent(Struct, tag_field="extent_type", tag="pixel_box"):
     height: Annotated[
         list[HeightItem], Meta(description="Array of box heights in pixels.")
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all pixel boxes in the extent are non-overlapping."
+        ),
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether the pixel boxes fully cover the pixel range without gaps."
+        ),
+    ] = False
+    min_x: (
+        Annotated[float, Meta(description="Lower bound along x-axis in pixels.")]
+        | UnsetType
+    ) = UNSET
+    max_x: (
+        Annotated[float, Meta(description="Upper bound along x-axis in pixels.")]
+        | UnsetType
+    ) = UNSET
+    min_y: (
+        Annotated[float, Meta(description="Lower bound along y-axis in pixels.")]
+        | UnsetType
+    ) = UNSET
+    max_y: (
+        Annotated[float, Meta(description="Upper bound along y-axis in pixels.")]
+        | UnsetType
+    ) = UNSET

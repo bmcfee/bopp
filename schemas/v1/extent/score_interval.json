@@ -20,7 +20,31 @@
       "items": {
         "$ref": "../core.json#/$defs/FractionNonnegative"
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all quarter intervals in the extent are non-overlapping.",
+      "default": false
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether quarter intervals fully cover the range without gaps.",
+      "default": false
+    },
+    "min_quarter": {
+      "$ref": "../core.json#/$defs/Fraction",
+      "description": "Lower bound in quarter notes."
+    },
+    "max_quarter": {
+      "$ref": "../core.json#/$defs/Fraction",
+      "description": "Upper bound in quarter notes."
     }
   },
-  "required": ["extent_type", "quarter", "duration"]
+  "required": [
+    "extent_type",
+    "quarter",
+    "duration",
+    "disjoint",
+    "exhaustive"
+  ]
 }

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type OffsetItem = Annotated[int, Meta(ge=0)]
 
@@ -19,3 +19,20 @@ class Text(Struct, tag_field="extent_type", tag="text"):
         list[OffsetItem],
         Meta(description="Array of 0-based character offsets in text."),
     ]
+    disjoint: Annotated[
+        bool, Meta(description="Indicates whether all character offsets are unique.")
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all character positions in the range are observed."
+        ),
+    ] = False
+    min_offset: (
+        Annotated[int, Meta(description="Lower bound character offset.", ge=0)]
+        | UnsetType
+    ) = UNSET
+    max_offset: (
+        Annotated[int, Meta(description="Upper bound character offset.", ge=0)]
+        | UnsetType
+    ) = UNSET

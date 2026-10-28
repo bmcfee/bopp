@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import types
 import typing
+from collections import defaultdict
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args, get_origin
 
 import msgspec
@@ -475,7 +477,11 @@ def to_dataframe(
             data[col_key] = getattr(g, "ids", [])
             column_types[col_key] = (list[int], False)
 
-            g_dict: dict[str, Any] = {"name": g.name}
+            g_dict: dict[str, Any] = {
+                "name": g.name,
+                "disjoint": getattr(g, "disjoint", False),
+                "exhaustive": getattr(g, "exhaustive", False),
+            }
             labels = getattr(g, "labels", msgspec.UNSET)
             if labels not in (msgspec.UNSET, None):
                 g_dict["labels"] = msgspec.to_builtins(labels)
@@ -656,6 +662,8 @@ def from_dataframe(
             g_dict = {
                 "name": g_meta.get("name", f"group_{g_idx}"),
                 "ids": _get_column_list(col_name),
+                "disjoint": g_meta.get("disjoint", False),
+                "exhaustive": g_meta.get("exhaustive", False),
             }
             if "labels" in g_meta:
                 g_dict["labels"] = g_meta["labels"]
@@ -663,3 +671,1030 @@ def from_dataframe(
         bopp_data["groupings"] = grouping_items
 
     return msgspec.convert(bopp_data, type=annotation_cls)
+
+
+# ==========================================
+# 2. Extent Topology & Bounds Utilities
+# ==========================================
+
+EXTENT_AXES_METADATA: dict[str, list[dict[str, Any]]] = {
+    "time": [
+        {
+            "dim": "time",
+            "kind": "point",
+            "field": "time",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        }
+    ],
+    "time_interval": [
+        {
+            "dim": "time",
+            "kind": "origin_span",
+            "origin": "time",
+            "span": "duration",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        }
+    ],
+    "time_uniform": [
+        {
+            "dim": "time",
+            "kind": "uniform",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        }
+    ],
+    "time_frequency_box": [
+        {
+            "dim": "time",
+            "kind": "origin_span",
+            "origin": "time",
+            "span": "duration",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        },
+        {
+            "dim": "frequency",
+            "kind": "min_max",
+            "min_field": "freq_min",
+            "max_field": "freq_max",
+            "min_attr": "min_freq",
+            "max_attr": "max_freq",
+        },
+    ],
+    "pixel": [
+        {
+            "dim": "x",
+            "kind": "point",
+            "field": "x",
+            "min_attr": "min_x",
+            "max_attr": "max_x",
+        },
+        {
+            "dim": "y",
+            "kind": "point",
+            "field": "y",
+            "min_attr": "min_y",
+            "max_attr": "max_y",
+        },
+    ],
+    "pixel_box": [
+        {
+            "dim": "x",
+            "kind": "origin_span",
+            "origin": "x",
+            "span": "width",
+            "min_attr": "min_x",
+            "max_attr": "max_x",
+        },
+        {
+            "dim": "y",
+            "kind": "origin_span",
+            "origin": "y",
+            "span": "height",
+            "min_attr": "min_y",
+            "max_attr": "max_y",
+        },
+    ],
+    "midi_tick": [
+        {
+            "dim": "tick",
+            "kind": "point",
+            "field": "tick",
+            "min_attr": "min_tick",
+            "max_attr": "max_tick",
+        }
+    ],
+    "midi_interval": [
+        {
+            "dim": "tick",
+            "kind": "origin_span",
+            "origin": "tick",
+            "span": "duration",
+            "min_attr": "min_tick",
+            "max_attr": "max_tick",
+        }
+    ],
+    "score_quarter": [
+        {
+            "dim": "quarter",
+            "kind": "point",
+            "field": "quarter",
+            "min_attr": "min_quarter",
+            "max_attr": "max_quarter",
+        }
+    ],
+    "score_quarter_float": [
+        {
+            "dim": "quarter",
+            "kind": "point",
+            "field": "quarter",
+            "min_attr": "min_quarter",
+            "max_attr": "max_quarter",
+        }
+    ],
+    "score_interval": [
+        {
+            "dim": "quarter",
+            "kind": "origin_span",
+            "origin": "quarter",
+            "span": "duration",
+            "min_attr": "min_quarter",
+            "max_attr": "max_quarter",
+        }
+    ],
+    "score_interval_float": [
+        {
+            "dim": "quarter",
+            "kind": "origin_span",
+            "origin": "quarter",
+            "span": "duration",
+            "min_attr": "min_quarter",
+            "max_attr": "max_quarter",
+        }
+    ],
+    "text": [
+        {
+            "dim": "offset",
+            "kind": "point",
+            "field": "offset",
+            "min_attr": "min_offset",
+            "max_attr": "max_offset",
+        }
+    ],
+    "text_interval": [
+        {
+            "dim": "offset",
+            "kind": "origin_span",
+            "origin": "offset",
+            "span": "length",
+            "min_attr": "min_offset",
+            "max_attr": "max_offset",
+        }
+    ],
+    "cartesian": [
+        {
+            "dim": "x",
+            "kind": "point",
+            "field": "x",
+            "min_attr": "min_x",
+            "max_attr": "max_x",
+        },
+        {
+            "dim": "y",
+            "kind": "point",
+            "field": "y",
+            "min_attr": "min_y",
+            "max_attr": "max_y",
+        },
+        {
+            "dim": "z",
+            "kind": "point",
+            "field": "z",
+            "min_attr": "min_z",
+            "max_attr": "max_z",
+        },
+    ],
+    "cartesian_time": [
+        {
+            "dim": "time",
+            "kind": "point",
+            "field": "time",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        },
+        {
+            "dim": "x",
+            "kind": "point",
+            "field": "x",
+            "min_attr": "min_x",
+            "max_attr": "max_x",
+        },
+        {
+            "dim": "y",
+            "kind": "point",
+            "field": "y",
+            "min_attr": "min_y",
+            "max_attr": "max_y",
+        },
+        {
+            "dim": "z",
+            "kind": "point",
+            "field": "z",
+            "min_attr": "min_z",
+            "max_attr": "max_z",
+        },
+    ],
+    "cartesian_time_interval": [
+        {
+            "dim": "time",
+            "kind": "origin_span",
+            "origin": "time",
+            "span": "duration",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        },
+        {
+            "dim": "x",
+            "kind": "point",
+            "field": "x",
+            "min_attr": "min_x",
+            "max_attr": "max_x",
+        },
+        {
+            "dim": "y",
+            "kind": "point",
+            "field": "y",
+            "min_attr": "min_y",
+            "max_attr": "max_y",
+        },
+        {
+            "dim": "z",
+            "kind": "point",
+            "field": "z",
+            "min_attr": "min_z",
+            "max_attr": "max_z",
+        },
+    ],
+    "spherical": [
+        {
+            "dim": "azimuth",
+            "kind": "point",
+            "field": "azimuth",
+            "min_attr": "min_azimuth",
+            "max_attr": "max_azimuth",
+        },
+        {
+            "dim": "elevation",
+            "kind": "point",
+            "field": "elevation",
+            "min_attr": "min_elevation",
+            "max_attr": "max_elevation",
+        },
+        {
+            "dim": "radius",
+            "kind": "point",
+            "field": "radius",
+            "min_attr": "min_radius",
+            "max_attr": "max_radius",
+        },
+    ],
+    "spherical_time": [
+        {
+            "dim": "time",
+            "kind": "point",
+            "field": "time",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        },
+        {
+            "dim": "azimuth",
+            "kind": "point",
+            "field": "azimuth",
+            "min_attr": "min_azimuth",
+            "max_attr": "max_azimuth",
+        },
+        {
+            "dim": "elevation",
+            "kind": "point",
+            "field": "elevation",
+            "min_attr": "min_elevation",
+            "max_attr": "max_elevation",
+        },
+        {
+            "dim": "radius",
+            "kind": "point",
+            "field": "radius",
+            "min_attr": "min_radius",
+            "max_attr": "max_radius",
+        },
+    ],
+    "spherical_time_interval": [
+        {
+            "dim": "time",
+            "kind": "origin_span",
+            "origin": "time",
+            "span": "duration",
+            "min_attr": "min_time",
+            "max_attr": "max_time",
+        },
+        {
+            "dim": "azimuth",
+            "kind": "point",
+            "field": "azimuth",
+            "min_attr": "min_azimuth",
+            "max_attr": "max_azimuth",
+        },
+        {
+            "dim": "elevation",
+            "kind": "point",
+            "field": "elevation",
+            "min_attr": "min_elevation",
+            "max_attr": "max_elevation",
+        },
+        {
+            "dim": "radius",
+            "kind": "point",
+            "field": "radius",
+            "min_attr": "min_radius",
+            "max_attr": "max_radius",
+        },
+    ],
+}
+
+
+def _to_coord(val: Any) -> Any:
+    """Normalize fractional pairs to Fraction and pass numbers through unchanged."""
+    if (
+        isinstance(val, (list, tuple))
+        and len(val) == 2
+        and isinstance(val[0], int)
+        and isinstance(val[1], int)
+    ):
+        return Fraction(val[0], val[1])
+    return val
+
+
+def _resolve_extent_and_n(
+    extent_or_annotation: Any,
+    N: int | None = None,
+) -> tuple[msgspec.Struct | None, int | None]:
+    """Extract extent struct and observation count from an Extent or Annotation."""
+    if extent_or_annotation is None or extent_or_annotation is msgspec.UNSET:
+        return None, 0
+    if isinstance(extent_or_annotation, BoppBase):
+        extent = getattr(extent_or_annotation, "extent", None)
+        if N is None:
+            lengths = extent_or_annotation._get_all_column_lengths(
+                getattr(extent_or_annotation, "payload", None), "Payload"
+            )
+            N = lengths[0] if lengths else 0
+        return extent, N
+    return extent_or_annotation, N
+
+
+def infer_extent_bounds(
+    extent_or_annotation: Any,
+    *,
+    indices: list[int] | None = None,
+    N: int | None = None,
+) -> dict[str, tuple[Any, Any]]:
+    """
+    Infer the minimum and maximum boundaries along each dimension from extent observations.
+
+    Parameters
+    ----------
+    extent_or_annotation : msgspec.Struct or BoppBase
+        An extent struct or parent annotation instance.
+    indices : list of int or None, optional
+        Subset of observation indices to calculate bounds over (e.g. for grouping evaluation).
+    N : int or None, optional
+        Total number of observations (used for time_uniform extents).
+
+    Returns
+    -------
+    dict of str to tuple of (Any, Any)
+        Mapping from dimension name to (inferred_min, inferred_max).
+    """
+    extent, N = _resolve_extent_and_n(extent_or_annotation, N)
+    if extent is None or extent is msgspec.UNSET:
+        return {}
+
+    tag = _get_tag(extent)
+    specs = EXTENT_AXES_METADATA.get(tag or "", [])
+    bounds: dict[str, tuple[Any, Any]] = {}
+
+    for spec in specs:
+        dim = spec["dim"]
+        kind = spec["kind"]
+
+        if kind == "point":
+            raw_vals = getattr(extent, spec["field"], [])
+            if indices is not None:
+                raw_vals = [raw_vals[i] for i in indices]
+            if not raw_vals:
+                bounds[dim] = (None, None)
+            else:
+                coords = [_to_coord(v) for v in raw_vals]
+                bounds[dim] = (min(coords), max(coords))
+
+        elif kind == "origin_span":
+            raw_starts = getattr(extent, spec["origin"], [])
+            raw_spans = getattr(extent, spec["span"], [])
+            if indices is not None:
+                raw_starts = [raw_starts[i] for i in indices]
+                raw_spans = [raw_spans[i] for i in indices]
+            if not raw_starts:
+                bounds[dim] = (None, None)
+            else:
+                starts = [_to_coord(v) for v in raw_starts]
+                spans = [_to_coord(v) for v in raw_spans]
+                ends = [s + sp for s, sp in zip(starts, spans)]
+                bounds[dim] = (min(starts), max(ends))
+
+        elif kind == "min_max":
+            raw_mins = getattr(extent, spec["min_field"], [])
+            raw_maxs = getattr(extent, spec["max_field"], [])
+            if indices is not None:
+                raw_mins = [raw_mins[i] for i in indices]
+                raw_maxs = [raw_maxs[i] for i in indices]
+            if not raw_mins:
+                bounds[dim] = (None, None)
+            else:
+                mins = [_to_coord(v) for v in raw_mins]
+                maxs = [_to_coord(v) for v in raw_maxs]
+                bounds[dim] = (min(mins), max(maxs))
+
+        elif kind == "uniform":
+            start_time = getattr(extent, "start_time", 0.0)
+            sampling_period = getattr(extent, "sampling_period", 1.0)
+            count = len(indices) if indices is not None else (N if N is not None else 0)
+            if count <= 0:
+                bounds[dim] = (None, None)
+            elif count == 1:
+                bounds[dim] = (start_time, start_time)
+            else:
+                bounds[dim] = (
+                    start_time,
+                    start_time + (count - 1) * sampling_period,
+                )
+
+    return bounds
+
+
+def get_extent_bounds(
+    extent_or_annotation: Any,
+    *,
+    indices: list[int] | None = None,
+    N: int | None = None,
+) -> dict[str, tuple[Any, Any]]:
+    """
+    Retrieve effective boundaries for an extent, combining explicit min/max bounds with inferred bounds.
+
+    Parameters
+    ----------
+    extent_or_annotation : msgspec.Struct or BoppBase
+        An extent struct or parent annotation instance.
+    indices : list of int or None, optional
+        Subset of observation indices.
+    N : int or None, optional
+        Total number of observations.
+
+    Returns
+    -------
+    dict of str to tuple of (Any, Any)
+        Mapping from dimension name to effective (bound_min, bound_max).
+    """
+    extent, N = _resolve_extent_and_n(extent_or_annotation, N)
+    if extent is None or extent is msgspec.UNSET:
+        return {}
+
+    tag = _get_tag(extent)
+    specs = EXTENT_AXES_METADATA.get(tag or "", [])
+    inferred = infer_extent_bounds(extent, indices=indices, N=N)
+    result: dict[str, tuple[Any, Any]] = {}
+
+    for spec in specs:
+        dim = spec["dim"]
+        min_attr = getattr(extent, spec["min_attr"], msgspec.UNSET)
+        max_attr = getattr(extent, spec["max_attr"], msgspec.UNSET)
+        inf_min, inf_max = inferred.get(dim, (None, None))
+
+        final_min = (
+            inf_min
+            if (min_attr is msgspec.UNSET or min_attr is None)
+            else _to_coord(min_attr)
+        )
+        final_max = (
+            inf_max
+            if (max_attr is msgspec.UNSET or max_attr is None)
+            else _to_coord(max_attr)
+        )
+        result[dim] = (final_min, final_max)
+
+    return result
+
+
+def _union_area_2d(
+    rects: list[tuple[float, float, float, float]],
+    bounds: tuple[float, float, float, float],
+) -> float:
+    """Compute the total covered area of 2D axis-aligned rectangles clipped to a bounding box."""
+    xmin, xmax, ymin, ymax = bounds
+    clipped = []
+    for x1, x2, y1, y2 in rects:
+        cx1 = max(xmin, min(xmax, x1))
+        cx2 = max(xmin, min(xmax, x2))
+        cy1 = max(ymin, min(ymax, y1))
+        cy2 = max(ymin, min(ymax, y2))
+        if cx2 > cx1 and cy2 > cy1:
+            clipped.append((cx1, cx2, cy1, cy2))
+    if not clipped:
+        return 0.0
+
+    y_coords = sorted(
+        set([cy1 for _, _, cy1, _ in clipped] + [cy2 for _, _, _, cy2 in clipped])
+    )
+    total_area = 0.0
+
+    for i in range(len(y_coords) - 1):
+        y_bot = y_coords[i]
+        y_top = y_coords[i + 1]
+        x_intervals = []
+        for x1, x2, y1, y2 in clipped:
+            if y1 <= y_bot and y2 >= y_top:
+                x_intervals.append((x1, x2))
+        if not x_intervals:
+            continue
+        x_intervals.sort()
+        cur_start, cur_end = x_intervals[0]
+        x_len = 0.0
+        for s, e in x_intervals[1:]:
+            if s > cur_end:
+                x_len += cur_end - cur_start
+                cur_start, cur_end = s, e
+            else:
+                cur_end = max(cur_end, e)
+        x_len += cur_end - cur_start
+        total_area += (y_top - y_bot) * x_len
+
+    return total_area
+
+
+def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> bool:
+    """Check disjointness of an extent over a subset of observation indices."""
+    tag = _get_tag(extent)
+    if tag == "time_uniform":
+        return True
+
+    specs = EXTENT_AXES_METADATA.get(tag or "", [])
+    if not specs:
+        return True
+
+    # 1D Point extents
+    if len(specs) == 1 and specs[0]["kind"] == "point":
+        vals = getattr(extent, specs[0]["field"], [])
+        if indices is not None:
+            vals = [vals[i] for i in indices]
+        coords = [_to_coord(v) for v in vals]
+        return len(set(coords)) == len(coords)
+
+    # 1D Interval extents
+    if len(specs) == 1 and specs[0]["kind"] == "origin_span":
+        raw_starts = getattr(extent, specs[0]["origin"], [])
+        raw_spans = getattr(extent, specs[0]["span"], [])
+        if indices is not None:
+            raw_starts = [raw_starts[i] for i in indices]
+            raw_spans = [raw_spans[i] for i in indices]
+        if len(raw_starts) <= 1:
+            return True
+        starts = [_to_coord(s) for s in raw_starts]
+        spans = [_to_coord(sp) for sp in raw_spans]
+        intervals = [(s, s + sp) for s, sp in zip(starts, spans)]
+        intervals.sort(key=lambda x: (x[0], x[1]))
+        max_end = intervals[0][1]
+        for i in range(1, len(intervals)):
+            s, e = intervals[i]
+            if s < max_end:
+                return False
+            if (
+                s == max_end
+                and s == e
+                and intervals[i - 1][0] == s
+                and intervals[i - 1][1] == s
+            ):
+                return False
+            max_end = max(max_end, e)
+        return True
+
+    # Multi-dimensional Point extents
+    if all(s["kind"] == "point" for s in specs):
+        col_lists = []
+        for s in specs:
+            arr = getattr(extent, s["field"], [])
+            if indices is not None:
+                arr = [arr[i] for i in indices]
+            col_lists.append([_to_coord(v) for v in arr])
+        tuples = list(zip(*col_lists))
+        return len(set(tuples)) == len(tuples)
+
+    # 2D Box extents (pixel_box, time_frequency_box)
+    if tag in ("pixel_box", "time_frequency_box"):
+        if tag == "pixel_box":
+            xs = getattr(extent, "x", [])
+            ws = getattr(extent, "width", [])
+            ys = getattr(extent, "y", [])
+            hs = getattr(extent, "height", [])
+            if indices is not None:
+                xs = [xs[i] for i in indices]
+                ws = [ws[i] for i in indices]
+                ys = [ys[i] for i in indices]
+                hs = [hs[i] for i in indices]
+            boxes = [
+                (
+                    _to_coord(x),
+                    _to_coord(x) + _to_coord(w),
+                    _to_coord(y),
+                    _to_coord(y) + _to_coord(h),
+                )
+                for x, w, y, h in zip(xs, ws, ys, hs)
+            ]
+        else:
+            ts = getattr(extent, "time", [])
+            ds = getattr(extent, "duration", [])
+            f_mins = getattr(extent, "freq_min", [])
+            f_maxs = getattr(extent, "freq_max", [])
+            if indices is not None:
+                ts = [ts[i] for i in indices]
+                ds = [ds[i] for i in indices]
+                f_mins = [f_mins[i] for i in indices]
+                f_maxs = [f_maxs[i] for i in indices]
+            boxes = [
+                (
+                    _to_coord(t),
+                    _to_coord(t) + _to_coord(d),
+                    _to_coord(f_min),
+                    _to_coord(f_max),
+                )
+                for t, d, f_min, f_max in zip(ts, ds, f_mins, f_maxs)
+            ]
+
+        if len(boxes) <= 1:
+            return True
+        boxes.sort(key=lambda b: (b[0], b[2]))
+        for i in range(len(boxes)):
+            b1 = boxes[i]
+            for j in range(i + 1, len(boxes)):
+                b2 = boxes[j]
+                if b2[0] >= b1[1]:
+                    break
+                if max(b1[0], b2[0]) < min(b1[1], b2[1]) and max(b1[2], b2[2]) < min(
+                    b1[3], b2[3]
+                ):
+                    return False
+        return True
+
+    # Spatiotemporal intervals (cartesian_time_interval, spherical_time_interval)
+    if tag in ("cartesian_time_interval", "spherical_time_interval"):
+        spatial_fields = (
+            ("x", "y", "z")
+            if tag == "cartesian_time_interval"
+            else ("azimuth", "elevation", "radius")
+        )
+        ts = getattr(extent, "time", [])
+        ds = getattr(extent, "duration", [])
+        spat_cols = [getattr(extent, f, []) for f in spatial_fields]
+        if indices is not None:
+            ts = [ts[i] for i in indices]
+            ds = [ds[i] for i in indices]
+            spat_cols = [[c[i] for i in indices] for c in spat_cols]
+
+        spatial_groups: dict[tuple[Any, ...], list[tuple[Any, Any]]] = defaultdict(list)
+        for i in range(len(ts)):
+            pt = tuple(_to_coord(c[i]) for c in spat_cols)
+            spatial_groups[pt].append(
+                (_to_coord(ts[i]), _to_coord(ts[i]) + _to_coord(ds[i]))
+            )
+
+        for intervals in spatial_groups.values():
+            if len(intervals) <= 1:
+                continue
+            intervals.sort(key=lambda x: (x[0], x[1]))
+            max_end = intervals[0][1]
+            for i in range(1, len(intervals)):
+                s, e = intervals[i]
+                if s < max_end:
+                    return False
+                max_end = max(max_end, e)
+        return True
+
+    return True
+
+
+def is_disjoint(
+    extent_or_annotation: Any,
+    *,
+    grouping: Any = None,
+    group_id: int | None = None,
+) -> bool:
+    """
+    Check whether all observations in an extent or grouping are non-overlapping.
+
+    Parameters
+    ----------
+    extent_or_annotation : msgspec.Struct or BoppBase
+        An extent struct or parent annotation instance.
+    grouping : Grouping or None, optional
+        Grouping instance to evaluate disjointness within groups.
+    group_id : int or None, optional
+        Specific group ID to evaluate. If None and grouping is provided, verifies
+        that every non-negative group ID (>= 0) is disjoint.
+
+    Returns
+    -------
+    bool
+        True if all observations are non-overlapping, False otherwise.
+    """
+    extent, _ = _resolve_extent_and_n(extent_or_annotation)
+    if extent is None or extent is msgspec.UNSET:
+        return True
+
+    if grouping is not None:
+        ids = getattr(grouping, "ids", None)
+        if ids is None or ids is msgspec.UNSET:
+            return True
+        if group_id is not None:
+            indices = [i for i, gid in enumerate(ids) if gid == group_id]
+            return _is_disjoint_indices(extent, indices)
+        else:
+            non_neg_gids = sorted({gid for gid in ids if gid >= 0})
+            for gid in non_neg_gids:
+                indices = [i for i, g in enumerate(ids) if g == gid]
+                if not _is_disjoint_indices(extent, indices):
+                    return False
+            return True
+
+    return _is_disjoint_indices(extent, None)
+
+
+def _is_exhaustive_indices(
+    extent: msgspec.Struct,
+    *,
+    indices: list[int] | None,
+    bounds: dict[str, tuple[Any, Any]],
+    N: int | None,
+) -> bool:
+    """Check exhaustiveness of an extent over a subset of observation indices."""
+    tag = _get_tag(extent)
+    specs = EXTENT_AXES_METADATA.get(tag or "", [])
+    if not specs:
+        return True
+
+    if indices is not None:
+        count = len(indices)
+    elif tag == "time_uniform":
+        count = N if N is not None else 0
+    else:
+        first_kind = specs[0]["kind"]
+        first_field = (
+            specs[0]["field"]
+            if first_kind == "point"
+            else (
+                specs[0]["origin"]
+                if first_kind == "origin_span"
+                else specs[0]["min_field"]
+            )
+        )
+        count = len(getattr(extent, first_field, []))
+
+    # Empty extent handling
+    if count == 0:
+        for b_min, b_max in bounds.values():
+            if b_min is not None and b_max is not None and b_min < b_max:
+                return False
+        return True
+
+    if tag == "time_uniform":
+        start_time = getattr(extent, "start_time", 0.0)
+        sampling_period = getattr(extent, "sampling_period", 1.0)
+        b_min, b_max = bounds.get("time", (None, None))
+        first_t = start_time
+        last_t = start_time + (count - 1) * sampling_period
+        if b_min is None:
+            b_min = first_t
+        if b_max is None:
+            b_max = last_t
+        return bool(first_t <= b_min and last_t >= b_max)
+
+    # 1D Interval extents
+    if len(specs) == 1 and specs[0]["kind"] == "origin_span":
+        dim = specs[0]["dim"]
+        b_min, b_max = bounds.get(dim, (None, None))
+        raw_starts = getattr(extent, specs[0]["origin"], [])
+        raw_spans = getattr(extent, specs[0]["span"], [])
+        if indices is not None:
+            raw_starts = [raw_starts[i] for i in indices]
+            raw_spans = [raw_spans[i] for i in indices]
+        starts = [_to_coord(s) for s in raw_starts]
+        spans = [_to_coord(sp) for sp in raw_spans]
+        intervals = [(s, s + sp) for s, sp in zip(starts, spans)]
+
+        if b_min is None:
+            b_min = min(starts)
+        if b_max is None:
+            b_max = max(e for _, e in intervals)
+        if b_min > b_max:
+            return False
+        if b_min == b_max:
+            return True
+
+        intervals.sort(key=lambda x: (x[0], x[1]))
+        if intervals[0][0] > b_min:
+            return False
+
+        covered_until = b_min
+        for s, e in intervals:
+            if s > covered_until:
+                return False
+            covered_until = max(covered_until, e)
+            if covered_until >= b_max:
+                break
+        return bool(covered_until >= b_max)
+
+    # Discrete point extent (text)
+    if tag == "text":
+        b_min, b_max = bounds.get("offset", (None, None))
+        raw_vals = getattr(extent, "offset", [])
+        if indices is not None:
+            raw_vals = [raw_vals[i] for i in indices]
+        if b_min is None:
+            b_min = min(raw_vals)
+        if b_max is None:
+            b_max = max(raw_vals)
+        if b_min > b_max:
+            return False
+        if b_min == b_max:
+            return b_min in raw_vals
+        observed = set(raw_vals)
+        return all(k in observed for k in range(int(b_min), int(b_max) + 1))
+
+    # 2D Box extents (pixel_box, time_frequency_box)
+    if tag in ("pixel_box", "time_frequency_box"):
+        if tag == "pixel_box":
+            b_x = bounds.get("x", (None, None))
+            b_y = bounds.get("y", (None, None))
+            xs = getattr(extent, "x", [])
+            ws = getattr(extent, "width", [])
+            ys = getattr(extent, "y", [])
+            hs = getattr(extent, "height", [])
+            if indices is not None:
+                xs = [xs[i] for i in indices]
+                ws = [ws[i] for i in indices]
+                ys = [ys[i] for i in indices]
+                hs = [hs[i] for i in indices]
+            boxes = [
+                (
+                    _to_coord(x),
+                    _to_coord(x) + _to_coord(w),
+                    _to_coord(y),
+                    _to_coord(y) + _to_coord(h),
+                )
+                for x, w, y, h in zip(xs, ws, ys, hs)
+            ]
+        else:
+            b_x = bounds.get("time", (None, None))
+            b_y = bounds.get("frequency", (None, None))
+            ts = getattr(extent, "time", [])
+            ds = getattr(extent, "duration", [])
+            f_mins = getattr(extent, "freq_min", [])
+            f_maxs = getattr(extent, "freq_max", [])
+            if indices is not None:
+                ts = [ts[i] for i in indices]
+                ds = [ds[i] for i in indices]
+                f_mins = [f_mins[i] for i in indices]
+                f_maxs = [f_maxs[i] for i in indices]
+            boxes = [
+                (
+                    _to_coord(t),
+                    _to_coord(t) + _to_coord(d),
+                    _to_coord(f_min),
+                    _to_coord(f_max),
+                )
+                for t, d, f_min, f_max in zip(ts, ds, f_mins, f_maxs)
+            ]
+
+        x_min = b_x[0] if b_x[0] is not None else min(b[0] for b in boxes)
+        x_max = b_x[1] if b_x[1] is not None else max(b[1] for b in boxes)
+        y_min = b_y[0] if b_y[0] is not None else min(b[2] for b in boxes)
+        y_max = b_y[1] if b_y[1] is not None else max(b[3] for b in boxes)
+
+        if x_min >= x_max or y_min >= y_max:
+            return bool(x_min == x_max and y_min == y_max)
+
+        target_area = float((x_max - x_min) * (y_max - y_min))
+        float_boxes = [
+            (float(b[0]), float(b[1]), float(b[2]), float(b[3])) for b in boxes
+        ]
+        covered_area = _union_area_2d(
+            float_boxes,
+            (float(x_min), float(x_max), float(y_min), float(y_max)),
+        )
+        return abs(covered_area - target_area) < 1e-6
+
+    # Spatiotemporal intervals
+    if tag in ("cartesian_time_interval", "spherical_time_interval"):
+        b_time = bounds.get("time", (None, None))
+        ts = getattr(extent, "time", [])
+        ds = getattr(extent, "duration", [])
+        if indices is not None:
+            ts = [ts[i] for i in indices]
+            ds = [ds[i] for i in indices]
+        starts = [_to_coord(s) for s in ts]
+        spans = [_to_coord(sp) for sp in ds]
+        intervals = [(s, s + sp) for s, sp in zip(starts, spans)]
+        b_min = b_time[0] if b_time[0] is not None else min(starts)
+        b_max = b_time[1] if b_time[1] is not None else max(e for _, e in intervals)
+        if b_min > b_max:
+            return False
+        if b_min == b_max:
+            return True
+        intervals.sort(key=lambda x: (x[0], x[1]))
+        if intervals[0][0] > b_min:
+            return False
+        covered_until = b_min
+        for s, e in intervals:
+            if s > covered_until:
+                return False
+            covered_until = max(covered_until, e)
+            if covered_until >= b_max:
+                break
+        return bool(covered_until >= b_max)
+
+    # Continuous point extents
+    for spec in specs:
+        dim = spec["dim"]
+        b_min, b_max = bounds.get(dim, (None, None))
+        raw_vals = getattr(extent, spec["field"], [])
+        if indices is not None:
+            raw_vals = [raw_vals[i] for i in indices]
+        vals = [_to_coord(v) for v in raw_vals]
+        if b_min is None:
+            b_min = min(vals)
+        if b_max is None:
+            b_max = max(vals)
+        if b_min > b_max:
+            return False
+        if b_min == b_max:
+            continue
+        if min(vals) > b_min or max(vals) < b_max:
+            return False
+
+    return True
+
+
+def is_exhaustive(
+    extent_or_annotation: Any,
+    *,
+    bounds: dict[str, tuple[Any, Any]] | None = None,
+    grouping: Any = None,
+    group_id: int | None = None,
+    N: int | None = None,
+) -> bool:
+    """
+    Check whether observations in an extent or grouping fully cover the space without gaps.
+
+    Parameters
+    ----------
+    extent_or_annotation : msgspec.Struct or BoppBase
+        An extent struct or parent annotation instance.
+    bounds : dict of str to tuple of (Any, Any) or None, optional
+        Target bounds per dimension. If None, derived via get_extent_bounds.
+    grouping : Grouping or None, optional
+        Grouping instance to evaluate exhaustiveness within groups.
+    group_id : int or None, optional
+        Specific group ID to evaluate. If None and grouping is provided, verifies
+        that every non-negative group ID (>= 0) is exhaustive against the extent bounds.
+    N : int or None, optional
+        Total number of observations (used for time_uniform extents).
+
+    Returns
+    -------
+    bool
+        True if the observations fully cover the bounded space without gaps, False otherwise.
+    """
+    extent, N = _resolve_extent_and_n(extent_or_annotation, N)
+    if extent is None or extent is msgspec.UNSET:
+        return False
+
+    effective_bounds = bounds if bounds is not None else get_extent_bounds(extent, N=N)
+
+    if grouping is not None:
+        ids = getattr(grouping, "ids", None)
+        if ids is None or ids is msgspec.UNSET:
+            return _is_exhaustive_indices(
+                extent, indices=[], bounds=effective_bounds, N=0
+            )
+        if group_id is not None:
+            indices = [i for i, gid in enumerate(ids) if gid == group_id]
+            return _is_exhaustive_indices(
+                extent, indices=indices, bounds=effective_bounds, N=len(indices)
+            )
+        else:
+            non_neg_gids = sorted({gid for gid in ids if gid >= 0})
+            if not non_neg_gids:
+                return _is_exhaustive_indices(
+                    extent, indices=[], bounds=effective_bounds, N=0
+                )
+            for gid in non_neg_gids:
+                indices = [i for i, g in enumerate(ids) if g == gid]
+                if not _is_exhaustive_indices(
+                    extent,
+                    indices=indices,
+                    bounds=effective_bounds,
+                    N=len(indices),
+                ):
+                    return False
+            return True
+
+    return _is_exhaustive_indices(extent, indices=None, bounds=effective_bounds, N=N)

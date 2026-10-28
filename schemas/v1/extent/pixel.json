@@ -21,7 +21,39 @@
       "items": {
         "type": "number"
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all pixel coordinates are unique.",
+      "default": false
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether the pixel observations cover the coordinate range without missing observations.",
+      "default": false
+    },
+    "min_x": {
+      "type": "number",
+      "description": "Lower bound along x-axis in pixels."
+    },
+    "max_x": {
+      "type": "number",
+      "description": "Upper bound along x-axis in pixels."
+    },
+    "min_y": {
+      "type": "number",
+      "description": "Lower bound along y-axis in pixels."
+    },
+    "max_y": {
+      "type": "number",
+      "description": "Upper bound along y-axis in pixels."
     }
   },
-  "required": ["extent_type", "x", "y"]
+  "required": [
+    "extent_type",
+    "x",
+    "y",
+    "disjoint",
+    "exhaustive"
+  ]
 }

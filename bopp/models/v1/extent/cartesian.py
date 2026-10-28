@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class CartesianExtent(Struct, tag_field="extent_type", tag="cartesian"):
@@ -16,3 +16,37 @@ class CartesianExtent(Struct, tag_field="extent_type", tag="cartesian"):
     x: Annotated[list[float], Meta(description="Array of x-coordinates in space.")]
     y: Annotated[list[float], Meta(description="Array of y-coordinates in space.")]
     z: Annotated[list[float], Meta(description="Array of z-coordinates in space.")]
+    disjoint: Annotated[
+        bool,
+        Meta(description="Indicates whether all spatial points (x, y, z) are unique."),
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether spatial observations cover the 3D space without missing observations."
+        ),
+    ] = False
+    min_x: (
+        Annotated[float, Meta(description="Lower bound along x-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    max_x: (
+        Annotated[float, Meta(description="Upper bound along x-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    min_y: (
+        Annotated[float, Meta(description="Lower bound along y-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    max_y: (
+        Annotated[float, Meta(description="Upper bound along y-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    min_z: (
+        Annotated[float, Meta(description="Lower bound along z-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    max_z: (
+        Annotated[float, Meta(description="Upper bound along z-axis in space.")]
+        | UnsetType
+    ) = UNSET

@@ -13,7 +13,30 @@
       "items": {
         "type": "number"
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all quarter positions are unique.",
+      "default": false
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether quarter observations cover the range without missing observations.",
+      "default": false
+    },
+    "min_quarter": {
+      "type": "number",
+      "description": "Lower bound in quarter notes."
+    },
+    "max_quarter": {
+      "type": "number",
+      "description": "Upper bound in quarter notes."
     }
   },
-  "required": ["extent_type", "quarter"]
+  "required": [
+    "extent_type",
+    "quarter",
+    "disjoint",
+    "exhaustive"
+  ]
 }

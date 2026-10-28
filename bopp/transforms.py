@@ -339,6 +339,18 @@ def _rebuild_converted_extent(
     version = getattr(annotation, "bopp_version", DEFAULT_SCHEMA_VERSION)
     extent_cls = get_registry(version)["EXTENT_TYPE_REGISTRY"][target_tag]
     parents, sandbox = _derive_parents_and_sandbox(annotation, "Converting")
+    extent_kwargs = dict(columns)
+    if (
+        hasattr(annotation, "extent")
+        and annotation.extent is not None
+        and annotation.extent is not msgspec.UNSET
+    ):
+        extent_kwargs.setdefault(
+            "disjoint", getattr(annotation.extent, "disjoint", False)
+        )
+        extent_kwargs.setdefault(
+            "exhaustive", getattr(annotation.extent, "exhaustive", False)
+        )
     return _rebuild_annotation(
         annotation,
         parents=parents,
@@ -346,7 +358,7 @@ def _rebuild_converted_extent(
         payload=copy.deepcopy(annotation.payload),  # type: ignore[attr-defined]
         confidence=copy.deepcopy(getattr(annotation, "confidence", msgspec.UNSET)),
         groupings=copy.deepcopy(getattr(annotation, "groupings", msgspec.UNSET)),
-        extent=extent_cls(**columns),
+        extent=extent_cls(**extent_kwargs),
         metadata=DerivedAnnotationMetadata(transform=transform, parameters=parameters),
     )
 
@@ -1334,7 +1346,7 @@ def to_times(
 
     # If target_times is empty, return empty times extent
     if not target_times:
-        new_extent = Time(time=[])
+        new_extent = Time(time=[], disjoint=True, exhaustive=False)
         new_payload = _subset_struct_lists(payload, [])
         new_confidence = _subset_struct_lists(confidence, [])
         new_groupings = _subset_groupings(groupings, [])
@@ -1434,7 +1446,8 @@ def to_times(
         confidence, confidence_cols, matched_indices, confidence_fill_map
     )
     new_groupings = _resample_groupings(groupings, matched_indices, grouping_fill_map)
-    new_extent = Time(time=out_times)
+    is_disj = len(set(out_times)) == len(out_times)
+    new_extent = Time(time=out_times, disjoint=is_disj, exhaustive=False)
 
     return _rebuild_annotation(
         annotation,

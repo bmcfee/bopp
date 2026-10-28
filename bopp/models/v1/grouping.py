@@ -27,3 +27,15 @@ class Grouping(GroupingBase):
         ]
         | UnsetType
     ) = UNSET
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether observations within each group (non-negative group ID) are non-overlapping."
+        ),
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether observations within each group (non-negative group ID) cover the extent bounds without gaps."
+        ),
+    ] = False

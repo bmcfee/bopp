@@ -1992,10 +1992,12 @@ def test_score_conversion_values_and_provenance(name, source, target, kwargs, de
         if "interval" in target:
             assert result.extent.duration == [[0, 1], [1, 2], [1, 3], [3, 1], [1, 8]]
         for field in msgspec.structs.fields(result.extent):
-            for pair in getattr(result.extent, field.name):
-                assert type(pair) is list
-                assert pair[1] > 0
-                assert math.gcd(*pair) == 1
+            val = getattr(result.extent, field.name)
+            if isinstance(val, list):
+                for pair in val:
+                    assert type(pair) is list
+                    assert pair[1] > 0
+                    assert math.gcd(*pair) == 1
     assert result.parents == [ann.id]
     assert result.id != ann.id
     assert result.id == bopp.compute_annotation_id(result)

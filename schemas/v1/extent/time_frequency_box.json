@@ -38,7 +38,41 @@
         "type": "number",
         "minimum": 0.0
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all time-frequency boxes in the extent are non-overlapping.",
+      "default": false
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether the boxes fully cover the time-frequency range without gaps.",
+      "default": false
+    },
+    "min_time": {
+      "type": "number",
+      "description": "Lower bound of the time extent in seconds."
+    },
+    "max_time": {
+      "type": "number",
+      "description": "Upper bound of the time extent in seconds."
+    },
+    "min_freq": {
+      "type": "number",
+      "description": "Lower bound of the frequency extent in Hz."
+    },
+    "max_freq": {
+      "type": "number",
+      "description": "Upper bound of the frequency extent in Hz."
     }
   },
-  "required": ["extent_type", "time", "duration", "freq_min", "freq_max"]
+  "required": [
+    "extent_type",
+    "time",
+    "duration",
+    "freq_min",
+    "freq_max",
+    "disjoint",
+    "exhaustive"
+  ]
 }

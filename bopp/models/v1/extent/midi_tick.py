@@ -5,8 +5,23 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class MidiTicks(Struct, tag_field="extent_type", tag="midi_tick"):
     tick: Annotated[list[float], Meta(description="An array of MIDI tick values.")]
+    disjoint: Annotated[
+        bool, Meta(description="Indicates whether all MIDI tick values are unique.")
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether MIDI tick observations cover the range without missing observations."
+        ),
+    ] = False
+    min_tick: (
+        Annotated[float, Meta(description="Lower bound in MIDI ticks.")] | UnsetType
+    ) = UNSET
+    max_tick: (
+        Annotated[float, Meta(description="Upper bound in MIDI ticks.")] | UnsetType
+    ) = UNSET

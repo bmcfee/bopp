@@ -5,8 +5,25 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class Time(Struct, tag_field="extent_type", tag="time"):
     time: Annotated[list[float], Meta(description="An array of time values.")]
+    disjoint: Annotated[
+        bool, Meta(description="Indicates whether all time values are unique.")
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether the observations cover the time range with no missing observations."
+        ),
+    ] = False
+    min_time: (
+        Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    max_time: (
+        Annotated[float, Meta(description="Upper bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET

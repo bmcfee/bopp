@@ -13,7 +13,30 @@
       "items": {
         "type": "number"
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all MIDI tick values are unique.",
+      "default": false
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether MIDI tick observations cover the range without missing observations.",
+      "default": false
+    },
+    "min_tick": {
+      "type": "number",
+      "description": "Lower bound in MIDI ticks."
+    },
+    "max_tick": {
+      "type": "number",
+      "description": "Upper bound in MIDI ticks."
     }
   },
-  "required": ["extent_type", "tick"]
+  "required": [
+    "extent_type",
+    "tick",
+    "disjoint",
+    "exhaustive"
+  ]
 }

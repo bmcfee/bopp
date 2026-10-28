@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class UniformTimeExtent(Struct, tag_field="extent_type", tag="time_uniform"):
@@ -23,3 +23,20 @@ class UniformTimeExtent(Struct, tag_field="extent_type", tag="time_uniform"):
             gt=0.0,
         ),
     ]
+    disjoint: Annotated[
+        bool, Meta(description="Uniformly sampled times are implicitly disjoint.")
+    ] = True
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether the sampled timesteps cover the time range without gaps."
+        ),
+    ] = False
+    min_time: (
+        Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    max_time: (
+        Annotated[float, Meta(description="Upper bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET

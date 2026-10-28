@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type AzimuthItem = Annotated[float, Meta(ge=-180.0, lt=180.0)]
 
@@ -38,3 +38,47 @@ class SphericalTimeExtent(Struct, tag_field="extent_type", tag="spherical_time")
             description="Array of non-negative radial distances (greater than or equal to 0)."
         ),
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all spatiotemporal coordinates are unique."
+        ),
+    ] = False
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether spatiotemporal observations cover the range without missing observations."
+        ),
+    ] = False
+    min_time: (
+        Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    max_time: (
+        Annotated[float, Meta(description="Upper bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    min_azimuth: (
+        Annotated[float, Meta(description="Lower bound of azimuth angle in degrees.")]
+        | UnsetType
+    ) = UNSET
+    max_azimuth: (
+        Annotated[float, Meta(description="Upper bound of azimuth angle in degrees.")]
+        | UnsetType
+    ) = UNSET
+    min_elevation: (
+        Annotated[float, Meta(description="Lower bound of elevation angle in degrees.")]
+        | UnsetType
+    ) = UNSET
+    max_elevation: (
+        Annotated[float, Meta(description="Upper bound of elevation angle in degrees.")]
+        | UnsetType
+    ) = UNSET
+    min_radius: (
+        Annotated[float, Meta(description="Lower bound of radial distance.")]
+        | UnsetType
+    ) = UNSET
+    max_radius: (
+        Annotated[float, Meta(description="Upper bound of radial distance.")]
+        | UnsetType
+    ) = UNSET
