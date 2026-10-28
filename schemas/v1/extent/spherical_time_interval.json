@@ -51,13 +51,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether time intervals at identical spatial coordinates are non-overlapping.",
-      "default": false
+      "description": "Indicates whether time intervals at identical spatial coordinates are non-overlapping."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether time intervals cover the time range without gaps.",
-      "default": false
+      "description": "Indicates whether time intervals cover the time range without gaps."
     },
     "min_time": {
       "type": "number",

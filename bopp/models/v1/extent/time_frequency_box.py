@@ -37,13 +37,13 @@ class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequenc
         Meta(
             description="Indicates whether all time-frequency boxes in the extent are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether the boxes fully cover the time-frequency range without gaps."
         ),
-    ] = False
+    ]
     min_time: (
         Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
         | UnsetType

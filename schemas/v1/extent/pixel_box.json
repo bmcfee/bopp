@@ -39,13 +39,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all pixel boxes in the extent are non-overlapping.",
-      "default": false
+      "description": "Indicates whether all pixel boxes in the extent are non-overlapping."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether the pixel boxes fully cover the pixel range without gaps.",
-      "default": false
+      "description": "Indicates whether the pixel boxes fully cover the pixel range without gaps."
     },
     "min_x": {
       "type": "number",

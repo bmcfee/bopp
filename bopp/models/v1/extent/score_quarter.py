@@ -16,13 +16,13 @@ class ScoreQuarterNotes(Struct, tag_field="extent_type", tag="score_quarter"):
     ]
     disjoint: Annotated[
         bool, Meta(description="Indicates whether all quarter positions are unique.")
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether quarter observations cover the range without missing observations."
         ),
-    ] = False
+    ]
     min_quarter: (
         Annotated[core.Fraction, Meta(description="Lower bound in quarter notes.")]
         | UnsetType

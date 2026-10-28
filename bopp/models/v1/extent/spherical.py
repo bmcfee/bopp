@@ -40,13 +40,13 @@ class SphericalExtent(Struct, tag_field="extent_type", tag="spherical"):
         Meta(
             description="Indicates whether all spherical coordinates (azimuth, elevation, radius) are unique."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether spherical observations cover the space without missing observations."
         ),
-    ] = False
+    ]
     min_azimuth: (
         Annotated[float, Meta(description="Lower bound of azimuth angle in degrees.")]
         | UnsetType

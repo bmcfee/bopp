@@ -96,7 +96,9 @@ def test_to_dataframe_encode_complex():
         media_id="track:complex_test",
         bopp_version="1.0",
         payload=ObjectPayload(value=[{"k": "v"}]),
-        extent=ScoreInterval(quarter=[[0, 1]], duration=[[1, 2]]),
+        extent=ScoreInterval(
+            quarter=[[0, 1]], duration=[[1, 2]], disjoint=False, exhaustive=False
+        ),
     )
 
     # With encode_complex=False, columns contain raw Python lists/dicts
@@ -191,7 +193,7 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
         media_id="track:skip_test",
         bopp_version="1.0",
         metadata=msgspec.UNSET,
-        extent=Time(time=[0.1, 0.2]),
+        extent=Time(time=[0.1, 0.2], disjoint=True, exhaustive=False),
         payload=BeatPositionPayload(value=[1, 1]),
         confidence=LikelihoodConfidence(confidence=[0.8, 0.9]),
     )
@@ -234,10 +236,16 @@ def test_groupings_to_and_from_dataframe_pandas():
         media_id="track:grouping_pandas",
         bopp_version="1.0",
         payload=BeatPositionPayload(value=[1, 2, 3]),
-        extent=Time(time=[0.1, 0.2, 0.3]),
+        extent=Time(time=[0.1, 0.2, 0.3], disjoint=True, exhaustive=False),
         groupings=[
-            Grouping(name="voices", ids=[0, 1, 0], labels={"soprano": 0, "alto": 1}),
-            Grouping(name="measures", ids=[1, 1, 2]),
+            Grouping(
+                name="voices",
+                ids=[0, 1, 0],
+                labels={"soprano": 0, "alto": 1},
+                disjoint=True,
+                exhaustive=False,
+            ),
+            Grouping(name="measures", ids=[1, 1, 2], disjoint=True, exhaustive=False),
         ],
     )
 
@@ -271,7 +279,7 @@ def test_groupings_to_and_from_dataframe_polars():
         bopp_version="1.0",
         payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
-            Grouping(name="section", ids=[0, 1]),
+            Grouping(name="section", ids=[0, 1], disjoint=False, exhaustive=False),
         ],
     )
 
@@ -292,7 +300,9 @@ def test_groupings_mismatched_length_raises():
             bopp_version="1.0",
             payload=BeatPositionPayload(value=[1, 2]),
             groupings=[
-                Grouping(name="voices", ids=[0]),  # length 1 vs 2
+                Grouping(
+                    name="voices", ids=[0], disjoint=True, exhaustive=False
+                ),  # length 1 vs 2
             ],
         )
 

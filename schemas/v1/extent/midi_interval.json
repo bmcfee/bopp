@@ -24,13 +24,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all MIDI intervals in the extent are non-overlapping.",
-      "default": false
+      "description": "Indicates whether all MIDI intervals in the extent are non-overlapping."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether MIDI intervals fully cover the tick range without gaps.",
-      "default": false
+      "description": "Indicates whether MIDI intervals fully cover the tick range without gaps."
     },
     "min_tick": {
       "type": "number",

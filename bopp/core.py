@@ -232,6 +232,8 @@ def create(
             raise BoppRegistryError(f"Unrecognized extent type: {e}") from e
 
         extent_args = _extract_kwargs(extent_cls, kwargs)
+        extent_args.setdefault("disjoint", extent_type == "time_uniform")
+        extent_args.setdefault("exhaustive", False)
         extent_obj = extent_cls(**extent_args)
 
     confidence_obj = msgspec.UNSET
@@ -265,10 +267,16 @@ def create(
         and groupings is not None
         and Grouping is not None
     ):
-        groupings_obj = [
-            msgspec.convert(g, Grouping) if isinstance(g, dict) else g
-            for g in groupings
-        ]
+        groupings_list = []
+        for g in groupings:
+            if isinstance(g, dict):
+                g_copy = dict(g)
+                g_copy.setdefault("disjoint", False)
+                g_copy.setdefault("exhaustive", False)
+                groupings_list.append(msgspec.convert(g_copy, Grouping))
+            else:
+                groupings_list.append(g)
+        groupings_obj = groupings_list
 
     # Any remaining kwargs indicate a user typo or a schema mismatch
     if kwargs:

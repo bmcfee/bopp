@@ -16,13 +16,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all time values are unique.",
-      "default": false
+      "description": "Indicates whether all time values are unique."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether the observations cover the time range with no missing observations.",
-      "default": false
+      "description": "Indicates whether the observations cover the time range with no missing observations."
     },
     "min_time": {
       "type": "number",

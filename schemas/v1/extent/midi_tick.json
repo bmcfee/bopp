@@ -16,13 +16,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all MIDI tick values are unique.",
-      "default": false
+      "description": "Indicates whether all MIDI tick values are unique."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether MIDI tick observations cover the range without missing observations.",
-      "default": false
+      "description": "Indicates whether MIDI tick observations cover the range without missing observations."
     },
     "min_tick": {
       "type": "number",

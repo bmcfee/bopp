@@ -21,13 +21,13 @@ class Pixel(Struct, tag_field="extent_type", tag="pixel"):
     ]
     disjoint: Annotated[
         bool, Meta(description="Indicates whether all pixel coordinates are unique.")
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether the pixel observations cover the coordinate range without missing observations."
         ),
-    ] = False
+    ]
     min_x: (
         Annotated[float, Meta(description="Lower bound along x-axis in pixels.")]
         | UnsetType

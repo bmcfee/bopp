@@ -31,13 +31,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all spatial points (x, y, z) are unique.",
-      "default": false
+      "description": "Indicates whether all spatial points (x, y, z) are unique."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether spatial observations cover the 3D space without missing observations.",
-      "default": false
+      "description": "Indicates whether spatial observations cover the 3D space without missing observations."
     },
     "min_x": {
       "type": "number",

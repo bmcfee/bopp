@@ -41,13 +41,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all time-frequency boxes in the extent are non-overlapping.",
-      "default": false
+      "description": "Indicates whether all time-frequency boxes in the extent are non-overlapping."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether the boxes fully cover the time-frequency range without gaps.",
-      "default": false
+      "description": "Indicates whether the boxes fully cover the time-frequency range without gaps."
     },
     "min_time": {
       "type": "number",

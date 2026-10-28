@@ -36,13 +36,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all spherical coordinates (azimuth, elevation, radius) are unique.",
-      "default": false
+      "description": "Indicates whether all spherical coordinates (azimuth, elevation, radius) are unique."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether spherical observations cover the space without missing observations.",
-      "default": false
+      "description": "Indicates whether spherical observations cover the space without missing observations."
     },
     "min_azimuth": {
       "type": "number",

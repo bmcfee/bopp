@@ -18,13 +18,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all character offsets are unique.",
-      "default": false
+      "description": "Indicates whether all character offsets are unique."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether all character positions in the range are observed.",
-      "default": false
+      "description": "Indicates whether all character positions in the range are observed."
     },
     "min_offset": {
       "type": "integer",

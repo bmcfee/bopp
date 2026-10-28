@@ -23,13 +23,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all quarter intervals in the extent are non-overlapping.",
-      "default": false
+      "description": "Indicates whether all quarter intervals in the extent are non-overlapping."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether quarter intervals fully cover the range without gaps.",
-      "default": false
+      "description": "Indicates whether quarter intervals fully cover the range without gaps."
     },
     "min_quarter": {
       "$ref": "../core.json#/$defs/Fraction",

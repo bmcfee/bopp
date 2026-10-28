@@ -116,8 +116,14 @@ def test_subset_groupings_helper():
     assert _subset_groupings(None, [0, 1]) is None
     assert _subset_groupings(msgspec.UNSET, [0, 1]) is msgspec.UNSET
 
-    g1 = Grouping(name="pattern", ids=[1, 2, 3, 2], labels={"A": 1, "B": 2, "C": 3})
-    g2 = Grouping(name="source", ids=[0, 1, 0, 1])
+    g1 = Grouping(
+        name="pattern",
+        ids=[1, 2, 3, 2],
+        labels={"A": 1, "B": 2, "C": 3},
+        disjoint=False,
+        exhaustive=False,
+    )
+    g2 = Grouping(name="source", ids=[0, 1, 0, 1], disjoint=False, exhaustive=False)
     subsetted = _subset_groupings([g1, g2], [1, 3])
     assert len(subsetted) == 2
     assert subsetted[0].name == "pattern"
@@ -143,7 +149,13 @@ def test_resample_groupings_helper():
     assert _resample_groupings(None, [], {}) is None
     assert _resample_groupings(msgspec.UNSET, [], {}) is msgspec.UNSET
 
-    g = Grouping(name="section", ids=[0, 1], labels={"intro": 0, "verse": 1})
+    g = Grouping(
+        name="section",
+        ids=[0, 1],
+        labels={"intro": 0, "verse": 1},
+        disjoint=False,
+        exhaustive=False,
+    )
     resampled = _resample_groupings([g], [0, None, 1], fill_map={"section": -1})
     assert len(resampled) == 1
     assert resampled[0].ids == [0, -1, 1]
@@ -153,13 +165,13 @@ def test_resample_groupings_helper():
 
 def test_rebuild_annotation_helper():
     metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
-    g = Grouping(name="layer", ids=[1])
+    g = Grouping(name="layer", ids=[1], disjoint=False, exhaustive=False)
     ann = Annotation(
         id="old_id",
         media_id="test_media",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Time(time=[1.0]),
+        extent=Time(time=[1.0], disjoint=False, exhaustive=False),
         payload=TagPayload(value=["test"]),
         groupings=[g],
     )
@@ -168,8 +180,8 @@ def test_rebuild_annotation_helper():
         parents=["old_id"],
         sandbox={"foo": "bar"},
         payload=TagPayload(value=["new_test"]),
-        extent=Time(time=[2.0]),
-        groupings=[Grouping(name="layer", ids=[2])],
+        extent=Time(time=[2.0], disjoint=False, exhaustive=False),
+        groupings=[Grouping(name="layer", ids=[2], disjoint=False, exhaustive=False)],
     )
     assert rebuilt.id != "old_id"
     assert rebuilt.parents == ["old_id"]
@@ -318,14 +330,18 @@ def test_trim_time_extent():
 
 def test_trim_with_groupings():
     g1 = Grouping(
-        name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2}
+        name="pattern",
+        ids=[0, 1, 1, 2],
+        labels={"intro": 0, "verse": 1, "outro": 2},
+        disjoint=False,
+        exhaustive=False,
     )
-    g2 = Grouping(name="stream", ids=[10, 11, 12, 13])
+    g2 = Grouping(name="stream", ids=[10, 11, 12, 13], disjoint=False, exhaustive=False)
     ann = Annotation(
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
-        extent=Time(time=[1.0, 3.0, 5.0, 8.0]),
+        extent=Time(time=[1.0, 3.0, 5.0, 8.0], disjoint=False, exhaustive=False),
         payload=TagPayload(value=["a", "b", "c", "d"]),
         confidence=LikelihoodConfidence(confidence=[0.1, 0.3, 0.5, 0.8]),
         groupings=[g1, g2],
@@ -463,6 +479,8 @@ def test_trim_time_frequency_box():
             duration=[3.0, 5.0],
             freq_min=[100.0, 200.0],
             freq_max=[500.0, 800.0],
+            disjoint=False,
+            exhaustive=False,
         ),
         payload=TagPayload(value=["low", "high"]),
     )
@@ -482,6 +500,8 @@ def test_trim_time_frequency_box_along_frequency():
         duration=[1.0, 1.0, 1.0, 1.0],
         freq_min=[100.0, 200.0, 500.0, 900.0],
         freq_max=[300.0, 400.0, 800.0, 1000.0],
+        disjoint=False,
+        exhaustive=False,
     )
     ann = Annotation(
         media_id="audio",
@@ -515,6 +535,8 @@ def test_trim_min_max_strict_and_non_strict():
         duration=[1.0, 1.0, 1.0, 1.0],
         freq_min=[50.0, 200.0, 500.0, 700.0],
         freq_max=[100.0, 400.0, 800.0, 900.0],
+        disjoint=False,
+        exhaustive=False,
     )
     ann = Annotation(
         media_id="audio",
@@ -572,6 +594,8 @@ def test_trim_empty_and_out_of_bounds_extents():
         duration=[],
         freq_min=[],
         freq_max=[],
+        disjoint=False,
+        exhaustive=False,
     )
     ann_empty = Annotation(
         media_id="audio",
@@ -596,6 +620,8 @@ def test_trim_empty_and_out_of_bounds_extents():
         duration=[1.0, 1.0],
         freq_min=[10.0, 20.0],
         freq_max=[50.0, 60.0],
+        disjoint=False,
+        exhaustive=False,
     )
     ann_oob = Annotation(
         media_id="audio",
@@ -762,14 +788,18 @@ def test_filter_by_confidence_facet():
 
 def test_filter_by_groupings_facet():
     g1 = Grouping(
-        name="pattern", ids=[0, 1, 1, 2], labels={"intro": 0, "verse": 1, "outro": 2}
+        name="pattern",
+        ids=[0, 1, 1, 2],
+        labels={"intro": 0, "verse": 1, "outro": 2},
+        disjoint=False,
+        exhaustive=False,
     )
-    g2 = Grouping(name="track", ids=[10, 20, 20, 30])
+    g2 = Grouping(name="track", ids=[10, 20, 20, 30], disjoint=False, exhaustive=False)
     ann = Annotation(
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Time(time=[1.0, 2.0, 3.0, 4.0]),
+        extent=Time(time=[1.0, 2.0, 3.0, 4.0], disjoint=False, exhaustive=False),
         payload=TagPayload(value=["a", "b", "c", "d"]),
         groupings=[g1, g2],
     )
@@ -792,12 +822,18 @@ def test_filter_by_groupings_facet():
     assert res_rec.payload.value == ["b", "c"]
 
     # Filter when only 1 grouping is present and target is None
-    g_single = Grouping(name="pattern", ids=[0, 1], labels={"intro": 0, "verse": 1})
+    g_single = Grouping(
+        name="pattern",
+        ids=[0, 1],
+        labels={"intro": 0, "verse": 1},
+        disjoint=False,
+        exhaustive=False,
+    )
     ann_single_g = Annotation(
         media_id="track:test_media",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Time(time=[1.0, 2.0]),
+        extent=Time(time=[1.0, 2.0], disjoint=False, exhaustive=False),
         payload=TagPayload(value=["a", "b"]),
         groupings=[g_single],
     )
@@ -830,12 +866,12 @@ def test_filter_by_multi_column_payload():
 
 
 def test_filter_by_facet_all():
-    g = Grouping(name="pattern", ids=[1, 1, 2, 1])
+    g = Grouping(name="pattern", ids=[1, 1, 2, 1], disjoint=False, exhaustive=False)
     ann = Annotation(
         media_id="test_media",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Time(time=[1.0, 2.0, 3.0, 4.0]),
+        extent=Time(time=[1.0, 2.0, 3.0, 4.0], disjoint=False, exhaustive=False),
         payload=TagPayload(value=["intro", "verse", "chorus", "verse"]),
         confidence=LikelihoodConfidence(confidence=[0.9, 0.4, 0.95, 0.85]),
         groupings=[g],
@@ -925,9 +961,11 @@ def test_filter_by_invalid_arguments():
         media_id="test_media",
         bopp_version="1.0.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Time(time=[1.0]),
+        extent=Time(time=[1.0], disjoint=True, exhaustive=False),
         payload=TagPayload(value=["a"]),
-        groupings=[Grouping(name="valid_layer", ids=[0])],
+        groupings=[
+            Grouping(name="valid_layer", ids=[0], disjoint=True, exhaustive=False)
+        ],
     )
     bopp.ensure_annotation_id(ann_with_g)
     with pytest.raises(
@@ -1093,13 +1131,19 @@ def test_to_times_from_time_interval_with_sample_rate():
 
 
 def test_to_times_with_groupings():
-    g1 = Grouping(name="pattern", ids=[1, 2], labels={"A": 1, "B": 2})
-    g2 = Grouping(name="source", ids=[10, 20])
+    g1 = Grouping(
+        name="pattern",
+        ids=[1, 2],
+        labels={"A": 1, "B": 2},
+        disjoint=False,
+        exhaustive=False,
+    )
+    g2 = Grouping(name="source", ids=[10, 20], disjoint=False, exhaustive=False)
     ann = Annotation(
         media_id="audio:track_1",
         bopp_version="1.0",
         metadata=HumanAnnotationMetadata(annotator_id="u1", tool="manual"),
-        extent=Time(time=[1.0, 3.0]),
+        extent=Time(time=[1.0, 3.0], disjoint=False, exhaustive=False),
         payload=TagPayload(value=["a", "b"]),
         confidence=LikelihoodConfidence(confidence=[0.7, 0.9]),
         groupings=[g1, g2],
@@ -1236,6 +1280,8 @@ def test_to_times_time_frequency_box():
             duration=[2.0, 2.0],
             freq_min=[100.0, 200.0],
             freq_max=[500.0, 600.0],
+            disjoint=False,
+            exhaustive=False,
         ),
         payload=TagPayload(value=["low", "high"]),
     )
@@ -1275,7 +1321,7 @@ def test_to_times_fill_value_dict_missing_required_key():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Time(time=[1.0]),
+        extent=Time(time=[1.0], disjoint=False, exhaustive=False),
         payload=MoodThayerPayload(valence=[0.5], arousal=[0.2]),
     )
     bopp.ensure_annotation_id(ann)
@@ -1295,6 +1341,8 @@ def test_to_times_multi_column_payload_dict_fill():
             duration=[1.0],
             freq_min=[100.0],
             freq_max=[200.0],
+            disjoint=False,
+            exhaustive=False,
         ),
         payload=MoodThayerPayload(valence=[0.5], arousal=[0.8]),
     )
@@ -1331,7 +1379,7 @@ def test_to_times_multi_column_payload_none_fill_value():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Time(time=[1.0]),
+        extent=Time(time=[1.0], disjoint=False, exhaustive=False),
         payload=OptionalFieldPayload(label=["test"], comment=["note"]),
     )
     bopp.ensure_annotation_id(ann)
@@ -1398,7 +1446,7 @@ def test_to_times_empty_annotation_with_confidence_and_fill():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Time(time=[]),
+        extent=Time(time=[], disjoint=False, exhaustive=False),
         payload=TagPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )
@@ -1417,7 +1465,7 @@ def test_to_times_empty_annotation_confidence_fill_validation_failure():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Time(time=[]),
+        extent=Time(time=[], disjoint=False, exhaustive=False),
         payload=TagPayload(value=[]),
         confidence=LikelihoodConfidence(confidence=[]),
     )
@@ -1912,7 +1960,7 @@ def test_filter_by_all_name_collision():
         extent_type="time",
         time=[0.0, 1.0],
         value=[1, 1],
-        groupings=[Grouping(name="time", ids=[0, 1])],
+        groupings=[Grouping(name="time", ids=[0, 1], disjoint=False, exhaustive=False)],
     )
     with pytest.raises(
         BoppArgumentError,
@@ -2210,7 +2258,7 @@ def test_score_conversion_empty_columns(name, source, target, kwargs):
 
 @pytest.mark.parametrize("name, source, target, kwargs", SCORE_CONVERSIONS)
 def test_score_conversion_preserves_groupings(name, source, target, kwargs):
-    g = Grouping(name="layer", ids=[0, 1, 0, 1, 2])
+    g = Grouping(name="layer", ids=[0, 1, 0, 1, 2], disjoint=False, exhaustive=False)
     ann = _score_annotation(source, groupings=[g])
     result = getattr(bopp, name)(ann, **kwargs)
     assert result.groupings is not None

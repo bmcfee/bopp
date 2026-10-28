@@ -23,13 +23,13 @@ class MidiInterval(Struct, tag_field="extent_type", tag="midi_interval"):
         Meta(
             description="Indicates whether all MIDI intervals in the extent are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether MIDI intervals fully cover the tick range without gaps."
         ),
-    ] = False
+    ]
     min_tick: (
         Annotated[float, Meta(description="Lower bound in MIDI ticks.")] | UnsetType
     ) = UNSET

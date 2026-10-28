@@ -21,13 +21,13 @@ class Text(Struct, tag_field="extent_type", tag="text"):
     ]
     disjoint: Annotated[
         bool, Meta(description="Indicates whether all character offsets are unique.")
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether all character positions in the range are observed."
         ),
-    ] = False
+    ]
     min_offset: (
         Annotated[int, Meta(description="Lower bound character offset.", ge=0)]
         | UnsetType

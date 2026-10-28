@@ -781,10 +781,10 @@ def test_infer_and_get_bounds_edge_cases():
     assert infer_extent_bounds(ann_with_p) == {"time": (0.0, 1.0)}
 
     # Empty point extent
-    empty_time = Time(time=[])
+    empty_time = Time(time=[], disjoint=True, exhaustive=False)
     assert infer_extent_bounds(empty_time) == {"time": (None, None)}
     # Point extent with subset indices
-    time_pts = Time(time=[1.0, 5.0])
+    time_pts = Time(time=[1.0, 5.0], disjoint=True, exhaustive=False)
     assert infer_extent_bounds(time_pts, indices=[0]) == {"time": (1.0, 1.0)}
 
     # time_frequency_box
@@ -793,6 +793,8 @@ def test_infer_and_get_bounds_edge_cases():
         duration=[2.0, 1.0],
         freq_min=[100.0, 200.0],
         freq_max=[500.0, 800.0],
+        disjoint=True,
+        exhaustive=False,
     )
     assert infer_extent_bounds(tf_box) == {
         "time": (1.0, 4.0),
@@ -803,14 +805,18 @@ def test_infer_and_get_bounds_edge_cases():
         "frequency": (100.0, 500.0),
     }
 
-    empty_tf = TimeFrequencyBoxExtent(time=[], duration=[], freq_min=[], freq_max=[])
+    empty_tf = TimeFrequencyBoxExtent(
+        time=[], duration=[], freq_min=[], freq_max=[], disjoint=True, exhaustive=False
+    )
     assert infer_extent_bounds(empty_tf) == {
         "time": (None, None),
         "frequency": (None, None),
     }
 
     # time_uniform
-    uni = UniformTimeExtent(start_time=10.0, sampling_period=2.0)
+    uni = UniformTimeExtent(
+        start_time=10.0, sampling_period=2.0, disjoint=True, exhaustive=False
+    )
     assert infer_extent_bounds(uni, N=0) == {"time": (None, None)}
     assert infer_extent_bounds(uni, N=1) == {"time": (10.0, 10.0)}
     assert infer_extent_bounds(uni, N=4) == {"time": (10.0, 16.0)}
@@ -876,7 +882,13 @@ def test_is_disjoint_edge_cases():
     )
     assert is_disjoint(ann_pt) is False
     assert (
-        is_disjoint(ann_pt, grouping=Grouping(name="g", ids=[0, 1, 2]), group_id=0)
+        is_disjoint(
+            ann_pt,
+            grouping=Grouping(
+                name="g", ids=[0, 1, 2], disjoint=False, exhaustive=False
+            ),
+            group_id=0,
+        )
         is True
     )
 
@@ -966,11 +978,11 @@ def test_is_disjoint_edge_cases():
         )
 
     # Grouping with ids=None
-    g_none = Grouping(name="g", ids=None)
+    g_none = Grouping(name="g", ids=None, disjoint=False, exhaustive=False)
     assert is_disjoint(ann_tf_disj, grouping=g_none) is True
 
     # Specific group_id evaluation
-    g_multi = Grouping(name="g", ids=[0, 1, 0])
+    g_multi = Grouping(name="g", ids=[0, 1, 0], disjoint=False, exhaustive=False)
     ann_multi = create(
         media_id="audio:1",
         payload_type="tag",
@@ -984,7 +996,13 @@ def test_is_disjoint_edge_cases():
 
     # cartesian with indices
     assert (
-        is_disjoint(ann_cart, grouping=Grouping(name="g", ids=[0, 1, 2]), group_id=0)
+        is_disjoint(
+            ann_cart,
+            grouping=Grouping(
+                name="g", ids=[0, 1, 2], disjoint=False, exhaustive=False
+            ),
+            group_id=0,
+        )
         is True
     )
 
@@ -1001,7 +1019,11 @@ def test_is_disjoint_edge_cases():
         disjoint=False,
     )
     assert (
-        is_disjoint(ann_pb_multi, grouping=Grouping(name="g", ids=[0, 1]), group_id=0)
+        is_disjoint(
+            ann_pb_multi,
+            grouping=Grouping(name="g", ids=[0, 1], disjoint=False, exhaustive=False),
+            group_id=0,
+        )
         is True
     )
 
@@ -1018,7 +1040,11 @@ def test_is_disjoint_edge_cases():
         disjoint=False,
     )
     assert (
-        is_disjoint(ann_tf_multi, grouping=Grouping(name="g", ids=[0, 1]), group_id=0)
+        is_disjoint(
+            ann_tf_multi,
+            grouping=Grouping(name="g", ids=[0, 1], disjoint=False, exhaustive=False),
+            group_id=0,
+        )
         is True
     )
 
@@ -1036,7 +1062,11 @@ def test_is_disjoint_edge_cases():
         disjoint=False,
     )
     assert (
-        is_disjoint(ann_spt_multi, grouping=Grouping(name="g", ids=[0, 1]), group_id=0)
+        is_disjoint(
+            ann_spt_multi,
+            grouping=Grouping(name="g", ids=[0, 1], disjoint=False, exhaustive=False),
+            group_id=0,
+        )
         is True
     )
 
@@ -1199,13 +1229,13 @@ def test_is_exhaustive_edge_cases():
     )
 
     # Grouping exhaustiveness edge cases: ids is None, group_id, negative only
-    g_none = Grouping(name="g", ids=None)
+    g_none = Grouping(name="g", ids=None, disjoint=False, exhaustive=False)
     assert is_exhaustive(ann_ti, grouping=g_none) is False
 
-    g_neg = Grouping(name="g", ids=[-1, -1])
+    g_neg = Grouping(name="g", ids=[-1, -1], disjoint=False, exhaustive=False)
     assert is_exhaustive(ann_ti, grouping=g_neg) is False
 
-    g_spec = Grouping(name="g", ids=[0, 1])
+    g_spec = Grouping(name="g", ids=[0, 1], disjoint=False, exhaustive=False)
     ann_g_spec = create(
         media_id="audio:1",
         payload_type="tag",
@@ -1233,7 +1263,7 @@ def test_is_exhaustive_edge_cases():
     assert (
         is_exhaustive(
             ann_pb_multi,
-            grouping=Grouping(name="g", ids=[0, 1]),
+            grouping=Grouping(name="g", ids=[0, 1], disjoint=False, exhaustive=False),
             group_id=0,
             bounds={"x": (0.0, 2.0), "y": (0.0, 2.0)},
         )
@@ -1254,7 +1284,7 @@ def test_is_exhaustive_edge_cases():
     assert (
         is_exhaustive(
             ann_tf_multi,
-            grouping=Grouping(name="g", ids=[0, 1]),
+            grouping=Grouping(name="g", ids=[0, 1], disjoint=False, exhaustive=False),
             group_id=0,
             bounds={"time": (0.0, 2.0), "frequency": (100.0, 500.0)},
         )
@@ -1276,7 +1306,7 @@ def test_is_exhaustive_edge_cases():
     assert (
         is_exhaustive(
             ann_spt_multi,
-            grouping=Grouping(name="g", ids=[0, 1]),
+            grouping=Grouping(name="g", ids=[0, 1], disjoint=False, exhaustive=False),
             group_id=0,
             bounds={"time": (0.0, 2.0)},
         )
@@ -1311,7 +1341,9 @@ def test_is_exhaustive_edge_cases():
     assert (
         is_exhaustive(
             ann_cart,
-            grouping=Grouping(name="g", ids=[0, 1, 2]),
+            grouping=Grouping(
+                name="g", ids=[0, 1, 2], disjoint=False, exhaustive=False
+            ),
             group_id=0,
             bounds={"x": (0.0, 0.0), "y": (0.0, 0.0), "z": (0.0, 0.0)},
         )
@@ -1322,7 +1354,9 @@ def test_is_exhaustive_edge_cases():
     assert (
         is_exhaustive(
             ann_txt,
-            grouping=Grouping(name="g", ids=[0, 1, 2]),
+            grouping=Grouping(
+                name="g", ids=[0, 1, 2], disjoint=False, exhaustive=False
+            ),
             group_id=0,
             bounds={"offset": (0, 0)},
         )

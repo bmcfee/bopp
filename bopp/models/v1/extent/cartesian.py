@@ -19,13 +19,13 @@ class CartesianExtent(Struct, tag_field="extent_type", tag="cartesian"):
     disjoint: Annotated[
         bool,
         Meta(description="Indicates whether all spatial points (x, y, z) are unique."),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether spatial observations cover the 3D space without missing observations."
         ),
-    ] = False
+    ]
     min_x: (
         Annotated[float, Meta(description="Lower bound along x-axis in space.")]
         | UnsetType

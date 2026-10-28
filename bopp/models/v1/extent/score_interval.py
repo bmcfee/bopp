@@ -24,13 +24,13 @@ class ScoreInterval(Struct, tag_field="extent_type", tag="score_interval"):
         Meta(
             description="Indicates whether all quarter intervals in the extent are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether quarter intervals fully cover the range without gaps."
         ),
-    ] = False
+    ]
     min_quarter: (
         Annotated[core.Fraction, Meta(description="Lower bound in quarter notes.")]
         | UnsetType

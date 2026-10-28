@@ -24,13 +24,13 @@ class CartesianTimeExtent(Struct, tag_field="extent_type", tag="cartesian_time")
         Meta(
             description="Indicates whether all spatiotemporal points (time, x, y, z) are unique."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether spatiotemporal observations cover the range without missing observations."
         ),
-    ] = False
+    ]
     min_time: (
         Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
         | UnsetType

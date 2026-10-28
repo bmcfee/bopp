@@ -28,13 +28,13 @@ class ScoreIntervalFloat(Struct, tag_field="extent_type", tag="score_interval_fl
         Meta(
             description="Indicates whether all quarter intervals in the extent are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether quarter intervals fully cover the range without gaps."
         ),
-    ] = False
+    ]
     min_quarter: (
         Annotated[float, Meta(description="Lower bound in quarter notes.")] | UnsetType
     ) = UNSET

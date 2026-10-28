@@ -503,7 +503,7 @@ def test_extract_helpers_validation_errors():
         media_id="audio",
         bopp_version="1.0.0",
         metadata=metadata,
-        extent=Time(time=[1.0]),
+        extent=Time(time=[1.0], disjoint=True, exhaustive=False),
         payload=msgspec.UNSET,  # type: ignore[arg-type]
     )
     with pytest.raises(BoppArgumentError, match="requires a payload to extract labels"):

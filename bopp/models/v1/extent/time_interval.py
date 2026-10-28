@@ -22,13 +22,13 @@ class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
         Meta(
             description="Indicates whether all intervals in the extent are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether the intervals fully cover the time range without gaps."
         ),
-    ] = False
+    ]
     min_time: (
         Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
         | UnsetType

@@ -648,6 +648,10 @@ def from_dataframe(
         for _, field_name, full_col_name in cols:
             facet_dict[field_name] = _get_column_list(full_col_name)
 
+        if facet == "extent":
+            facet_dict.setdefault("disjoint", facet_type == "time_uniform")
+            facet_dict.setdefault("exhaustive", False)
+
         bopp_data[facet] = facet_dict
 
     if grouping_cols:

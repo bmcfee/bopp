@@ -27,13 +27,13 @@ class PixelBoxExtent(Struct, tag_field="extent_type", tag="pixel_box"):
         Meta(
             description="Indicates whether all pixel boxes in the extent are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether the pixel boxes fully cover the pixel range without gaps."
         ),
-    ] = False
+    ]
     min_x: (
         Annotated[float, Meta(description="Lower bound along x-axis in pixels.")]
         | UnsetType

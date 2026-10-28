@@ -34,7 +34,10 @@ EXTENTS = [
 def test_decode_valid_score_float(tag, cls, columns):
     """Signed positions and nonnegative durations decode and validate."""
     decoded = msgspec.json.decode(
-        msgspec.json.encode({"extent_type": tag, **columns}), type=cls
+        msgspec.json.encode(
+            {"extent_type": tag, "disjoint": False, "exhaustive": False, **columns}
+        ),
+        type=cls,
     )
     for name, expected in columns.items():
         assert getattr(decoded, name) == expected

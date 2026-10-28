@@ -20,13 +20,11 @@
     "disjoint": {
       "type": "boolean",
       "const": true,
-      "default": true,
       "description": "Uniformly sampled times are implicitly disjoint."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether the sampled timesteps cover the time range without gaps.",
-      "default": false
+      "description": "Indicates whether the sampled timesteps cover the time range without gaps."
     },
     "min_time": {
       "type": "number",

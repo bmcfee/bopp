@@ -43,13 +43,13 @@ class SphericalTimeExtent(Struct, tag_field="extent_type", tag="spherical_time")
         Meta(
             description="Indicates whether all spatiotemporal coordinates are unique."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether spatiotemporal observations cover the range without missing observations."
         ),
-    ] = False
+    ]
     min_time: (
         Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
         | UnsetType

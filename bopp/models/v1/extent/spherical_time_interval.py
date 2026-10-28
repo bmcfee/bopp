@@ -51,13 +51,13 @@ class SphericalTimeIntervalExtent(
         Meta(
             description="Indicates whether time intervals at identical spatial coordinates are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether time intervals cover the time range without gaps."
         ),
-    ] = False
+    ]
     min_time: (
         Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
         | UnsetType

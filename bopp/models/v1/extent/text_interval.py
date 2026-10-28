@@ -31,13 +31,13 @@ class TextInterval(Struct, tag_field="extent_type", tag="text_interval"):
         Meta(
             description="Indicates whether all text intervals in the extent are non-overlapping."
         ),
-    ] = False
+    ]
     exhaustive: Annotated[
         bool,
         Meta(
             description="Indicates whether character intervals fully cover the text range without gaps."
         ),
-    ] = False
+    ]
     min_offset: (
         Annotated[int, Meta(description="Lower bound character offset.", ge=0)]
         | UnsetType

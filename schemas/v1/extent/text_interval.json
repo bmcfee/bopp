@@ -26,13 +26,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all text intervals in the extent are non-overlapping.",
-      "default": false
+      "description": "Indicates whether all text intervals in the extent are non-overlapping."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether character intervals fully cover the text range without gaps.",
-      "default": false
+      "description": "Indicates whether character intervals fully cover the text range without gaps."
     },
     "min_offset": {
       "type": "integer",

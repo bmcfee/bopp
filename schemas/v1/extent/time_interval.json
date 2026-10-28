@@ -24,13 +24,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all intervals in the extent are non-overlapping.",
-      "default": false
+      "description": "Indicates whether all intervals in the extent are non-overlapping."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether the intervals fully cover the time range without gaps.",
-      "default": false
+      "description": "Indicates whether the intervals fully cover the time range without gaps."
     },
     "min_time": {
       "type": "number",

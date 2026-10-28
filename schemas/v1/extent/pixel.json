@@ -24,13 +24,11 @@
     },
     "disjoint": {
       "type": "boolean",
-      "description": "Indicates whether all pixel coordinates are unique.",
-      "default": false
+      "description": "Indicates whether all pixel coordinates are unique."
     },
     "exhaustive": {
       "type": "boolean",
-      "description": "Indicates whether the pixel observations cover the coordinate range without missing observations.",
-      "default": false
+      "description": "Indicates whether the pixel observations cover the coordinate range without missing observations."
     },
     "min_x": {
       "type": "number",
