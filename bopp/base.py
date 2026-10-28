@@ -109,12 +109,14 @@ class BoppBase(msgspec.Struct):
 
     @staticmethod
     def _get_all_column_lengths(
-        facet_struct: msgspec.Struct, facet_name: str
+        facet_struct: msgspec.Struct | None, facet_name: str
     ) -> list[int]:
         """
         Dynamically scans a msgspec struct for all list/array fields
         and returns a list of their lengths.
         """
+        if facet_struct is None or facet_struct is msgspec.UNSET:
+            return []
         lengths = []
         for field in msgspec.structs.fields(type(facet_struct)):
             val = getattr(facet_struct, field.name)

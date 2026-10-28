@@ -211,12 +211,164 @@ def _eval_chord(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
     )
 
 
+def _validate_segmentation_annotation(ann: BoppBase, role: str) -> None:
+    """Validate that an annotation satisfies segmentation requirements."""
+    payload = getattr(ann, "payload", None)
+    payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
+    if payload_tag != "tag":
+        raise BoppArgumentError(
+            f"Segmentation evaluation requires 'tag' payload for {role}, found '{payload_tag}'."
+        )
+
+    extent = getattr(ann, "extent", None)
+    extent_tag = _get_tag(extent) if extent not in (None, msgspec.UNSET) else None
+    if extent_tag != "time_interval":
+        raise BoppArgumentError(
+            f"Segmentation evaluation requires 'time_interval' extent for {role}, found '{extent_tag}'."
+        )
+
+    if not getattr(extent, "disjoint", False):
+        raise BoppArgumentError(
+            f"Segmentation evaluation requires extent disjoint=True for {role}, found disjoint={getattr(extent, 'disjoint', False)}."
+        )
+
+    if not getattr(extent, "exhaustive", False):
+        raise BoppArgumentError(
+            f"Segmentation evaluation requires extent exhaustive=True for {role}, found exhaustive={getattr(extent, 'exhaustive', False)}."
+        )
+
+
+def _extract_segmentation_intervals_and_labels(
+    ann: BoppBase, role: str
+) -> tuple[Any, list[str]]:
+    """Extract and sort intervals and labels for segmentation evaluation."""
+    _validate_segmentation_annotation(ann, role)
+    extent = ann.extent  # type: ignore[attr-defined]
+    payload = ann.payload  # type: ignore[attr-defined]
+
+    starts = np.asarray(extent.time, dtype=np.float64)
+    durations = np.asarray(extent.duration, dtype=np.float64)
+    labels = [str(x) for x in getattr(payload, "value", [])]
+
+    if len(starts) == 0:
+        raise BoppArgumentError(
+            f"Segmentation evaluation requires non-empty intervals for {role}."
+        )
+
+    order = np.argsort(starts)
+    intervals = np.column_stack([starts[order], starts[order] + durations[order]])
+    sorted_labels = [labels[i] for i in order]
+    return intervals, sorted_labels
+
+
 def _eval_segment(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-    ref_intervals = _extract_intervals(ref)
-    est_intervals = _extract_intervals(est)
-    ref_labels = _extract_labels(ref, "value")
-    est_labels = _extract_labels(est, "value")
+    ref_intervals, ref_labels = _extract_segmentation_intervals_and_labels(
+        ref, "reference"
+    )
+    est_intervals, est_labels = _extract_segmentation_intervals_and_labels(
+        est, "estimate"
+    )
     return mir_eval.segment.evaluate(
+        ref_intervals, ref_labels, est_intervals, est_labels, **kwargs
+    )
+
+
+def _extract_multilevel_intervals_and_labels(
+    ann: BoppBase, role: str
+) -> tuple[list[Any], list[list[str]]]:
+    """Extract multi-level intervals and labels for hierarchy evaluation."""
+    payload = getattr(ann, "payload", None)
+    payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
+    if payload_tag != "tag":
+        raise BoppArgumentError(
+            f"Hierarchy evaluation requires 'tag' payload for {role}, found '{payload_tag}'."
+        )
+
+    extent = getattr(ann, "extent", None)
+    extent_tag = _get_tag(extent) if extent not in (None, msgspec.UNSET) else None
+    if extent_tag != "time_interval":
+        raise BoppArgumentError(
+            f"Hierarchy evaluation requires 'time_interval' extent for {role}, found '{extent_tag}'."
+        )
+
+    groupings = getattr(ann, "groupings", None)
+    if groupings is None or groupings is msgspec.UNSET or len(groupings) == 0:
+        # Single-level segmentation upcast to hierarchy
+        if not getattr(extent, "disjoint", False):
+            raise BoppArgumentError(
+                f"Hierarchy evaluation without groupings requires extent disjoint=True for {role}, found disjoint=False."
+            )
+        if not getattr(extent, "exhaustive", False):
+            raise BoppArgumentError(
+                f"Hierarchy evaluation without groupings requires extent exhaustive=True for {role}, found exhaustive=False."
+            )
+        intervals, labels = _extract_segmentation_intervals_and_labels(ann, role)
+        return [intervals], [labels]
+
+    if len(groupings) > 1:
+        raise BoppArgumentError(
+            f"Hierarchy evaluation requires at most one grouping on {role} annotation, found {len(groupings)}."
+        )
+
+    g = groupings[0]
+    if not getattr(g, "disjoint", False):
+        raise BoppArgumentError(
+            f"Hierarchy evaluation requires grouping disjoint=True for {role}, found disjoint=False on grouping '{g.name}'."
+        )
+    if not getattr(g, "exhaustive", False):
+        raise BoppArgumentError(
+            f"Hierarchy evaluation requires grouping exhaustive=True for {role}, found exhaustive=False on grouping '{g.name}'."
+        )
+
+    assert extent is not None and extent is not msgspec.UNSET
+    raw_starts = np.asarray(extent.time, dtype=np.float64)
+    raw_durs = np.asarray(extent.duration, dtype=np.float64)
+    raw_labels = [str(x) for x in getattr(payload, "value", [])]
+
+    if len(raw_starts) == 0:
+        raise BoppArgumentError(
+            f"Hierarchy evaluation requires non-empty intervals for {role}."
+        )
+
+    levels = sorted({gid for gid in g.ids if gid >= 0})
+    if not levels:
+        raise BoppArgumentError(
+            f"Hierarchy grouping '{g.name}' on {role} contains no non-negative group IDs."
+        )
+    if 0 not in levels:
+        raise BoppArgumentError(
+            f"Hierarchy grouping '{g.name}' on {role} requires root level 0, found levels {levels}."
+        )
+
+    multilevel_intervals: list[Any] = []
+    multilevel_labels: list[list[str]] = []
+
+    for lvl in levels:
+        idx = [i for i, gid in enumerate(g.ids) if gid == lvl]
+        lvl_starts = raw_starts[idx]
+        lvl_durs = raw_durs[idx]
+        lvl_labs = [raw_labels[i] for i in idx]
+
+        order = np.argsort(lvl_starts)
+        lvl_intervals = np.column_stack(
+            [lvl_starts[order], lvl_starts[order] + lvl_durs[order]]
+        )
+        lvl_labs = [lvl_labs[j] for j in order]
+
+        multilevel_intervals.append(lvl_intervals)
+        multilevel_labels.append(lvl_labs)
+
+    return multilevel_intervals, multilevel_labels
+
+
+def _eval_hierarchy(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
+    ref_intervals, ref_labels = _extract_multilevel_intervals_and_labels(
+        ref, "reference"
+    )
+    est_intervals, est_labels = _extract_multilevel_intervals_and_labels(
+        est, "estimate"
+    )
+    return mir_eval.hierarchy.evaluate(
         ref_intervals, ref_labels, est_intervals, est_labels, **kwargs
     )
 
@@ -231,84 +383,6 @@ def _eval_transcription(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str
     )
 
 
-# Note: Melody and hierarchy evaluation tasks are temporarily disabled pending
-# reimplementation using group identifiers to encode contour number or hierarchy
-# level once grouping schema extensions are implemented.
-#
-# def _eval_melody(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-#     def _extract_times_and_freqs(ann: BoppBase) -> tuple[Any, Any]:
-#         extent = getattr(ann, "extent", None)
-#         payload = getattr(ann, "payload", None)
-#
-#         if extent is not None and extent is not msgspec.UNSET:
-#             extent_tag = _get_tag(extent)
-#             if extent_tag == "time":
-#                 times = np.asarray(extent.time, dtype=np.float64)
-#             else:
-#                 raise BoppArgumentError(
-#                     f"Melody evaluation requires 'time' extent, found '{extent_tag}'."
-#                 )
-#         else:
-#             raise BoppArgumentError("Melody evaluation requires an explicit 'time' extent.")
-#
-#         raw_vals = getattr(payload, "value", [])
-#         if raw_vals and isinstance(raw_vals[0], dict):
-#             freqs = []
-#             for entry in raw_vals:
-#                 f = float(entry.get("frequency", 0.0))
-#                 voicing = entry.get("voicing", True)
-#                 if not voicing or f <= 0.0:
-#                     freqs.append(-abs(f) if f != 0.0 else 0.0)
-#                 else:
-#                     freqs.append(f)
-#             freq_arr = np.asarray(freqs, dtype=np.float64)
-#         else:
-#             freq_arr = np.asarray(raw_vals, dtype=np.float64)
-#
-#         return times, freq_arr
-#
-#     ref_times, ref_freqs = _extract_times_and_freqs(ref)
-#     est_times, est_freqs = _extract_times_and_freqs(est)
-#     return mir_eval.melody.evaluate(ref_times, ref_freqs, est_times, est_freqs, **kwargs)
-#
-#
-# def _eval_hierarchy(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
-#     def _extract_multilevel(ann: BoppBase) -> tuple[list[Any], list[list[str]]]:
-#         extent = getattr(ann, "extent", None)
-#         payload = getattr(ann, "payload", None)
-#         extent_tag = _get_tag(extent) if extent not in (None, msgspec.UNSET) else None
-#         if extent_tag != "time_interval":
-#             raise BoppArgumentError(
-#                 f"Hierarchy evaluation requires 'time_interval' extent, found '{extent_tag}'."
-#             )
-#
-#         times = np.asarray(extent.time, dtype=np.float64)
-#         durations = np.asarray(extent.duration, dtype=np.float64)
-#         labels = getattr(payload, "label", [])
-#         levels = getattr(payload, "level", [])
-#
-#         unique_levels = sorted(set(levels))
-#         multilevel_intervals: list[Any] = []
-#         multilevel_labels: list[list[str]] = []
-#
-#         for lvl in unique_levels:
-#             idx = [i for i, v in enumerate(levels) if v == lvl]
-#             lvl_times = times[idx]
-#             lvl_durs = durations[idx]
-#             lvl_intervals = np.column_stack([lvl_times, lvl_times + lvl_durs])
-#             lvl_labels = [str(labels[i]) for i in idx]
-#             multilevel_intervals.append(lvl_intervals)
-#             multilevel_labels.append(lvl_labels)
-#
-#         return multilevel_intervals, multilevel_labels
-#
-#     ref_intervals, ref_labels = _extract_multilevel(ref)
-#     est_intervals, est_labels = _extract_multilevel(est)
-#     return mir_eval.hierarchy.evaluate(
-#         ref_intervals, ref_labels, est_intervals, est_labels, **kwargs
-#     )
-
-
 # Task dispatch lookup
 TASK_DISPATCH = {
     "onset": _eval_onset,
@@ -316,9 +390,9 @@ TASK_DISPATCH = {
     "tempo": _eval_tempo,
     "chord": _eval_chord,
     "segment": _eval_segment,
+    "segmentation": _eval_segment,
     "transcription": _eval_transcription,
-    # "melody": _eval_melody,
-    # "hierarchy": _eval_hierarchy,
+    "hierarchy": _eval_hierarchy,
 }
 
 # Payload tag to task mapping
@@ -351,7 +425,8 @@ def evaluate(
         The estimated annotation to evaluate.
     task : str or None, optional
         Target evaluation task (e.g. 'onset', 'beat', 'tempo', 'chord', 'segment',
-        'transcription'). If None, the task is inferred from the payload type of `ref`.
+        'segmentation', 'transcription', 'hierarchy'). If None, the task is inferred from
+        the payload type and extent/grouping attributes of `ref`.
     **kwargs : Any
         Additional keyword arguments forwarded directly to the corresponding
         `mir_eval.<task>.evaluate` function.
@@ -377,11 +452,28 @@ def evaluate(
             raise BoppArgumentError(
                 "Could not infer task from reference annotation; no payload tag found."
             )
-        resolved_task = PAYLOAD_TASK_MAP.get(ref_tag)
-        if resolved_task is None:
-            raise BoppArgumentError(
-                f"No default evaluation task registered for payload tag '{ref_tag}'."
-            )
+        if ref_tag == "tag":
+            ref_groupings = getattr(ref, "groupings", None)
+            if (
+                ref_groupings is not None
+                and ref_groupings is not msgspec.UNSET
+                and len(ref_groupings) == 1
+                and getattr(ref_groupings[0], "disjoint", False)
+                and getattr(ref_groupings[0], "exhaustive", False)
+                and not (
+                    getattr(getattr(ref, "extent", None), "disjoint", False)
+                    and getattr(getattr(ref, "extent", None), "exhaustive", False)
+                )
+            ):
+                resolved_task = "hierarchy"
+            else:
+                resolved_task = "segment"
+        else:
+            resolved_task = PAYLOAD_TASK_MAP.get(ref_tag)
+            if resolved_task is None:
+                raise BoppArgumentError(
+                    f"No default evaluation task registered for payload tag '{ref_tag}'."
+                )
 
     evaluator = TASK_DISPATCH.get(resolved_task)
     if evaluator is None:

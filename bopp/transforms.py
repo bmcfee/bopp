@@ -339,7 +339,7 @@ def _rebuild_converted_extent(
     version = getattr(annotation, "bopp_version", DEFAULT_SCHEMA_VERSION)
     extent_cls = get_registry(version)["EXTENT_TYPE_REGISTRY"][target_tag]
     parents, sandbox = _derive_parents_and_sandbox(annotation, "Converting")
-    extent_kwargs = dict(columns)
+    extent_kwargs: dict[str, Any] = dict(columns)
     if (
         hasattr(annotation, "extent")
         and annotation.extent is not None

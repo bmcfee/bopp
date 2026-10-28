@@ -13,7 +13,7 @@ from bopp.evaluation import (
     _spn_to_hz,
     evaluate,
 )
-from bopp.exceptions import BoppArgumentError
+from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.models.v1.annotation import Annotation
 from bopp.models.v1.extent.time import Time
 from bopp.models.v1.metadata.human import HumanAnnotationMetadata
@@ -260,6 +260,8 @@ def test_evaluate_segment():
         time=[0.0, 4.0],
         duration=[4.0, 6.0],
         value=ref_labels,
+        disjoint=True,
+        exhaustive=True,
     )
     est = create(
         media_id="audio",
@@ -268,11 +270,105 @@ def test_evaluate_segment():
         time=[0.0, 4.0],
         duration=[4.0, 6.0],
         value=est_labels,
+        disjoint=True,
+        exhaustive=True,
     )
 
     actual = evaluate(ref, est)
     assert actual == expected
     assert actual["Pairwise F-measure"] == 1.0
+
+    actual_explicit = evaluate(ref, est, task="segment")
+    assert actual_explicit == expected
+
+    actual_alias = evaluate(ref, est, task="segmentation")
+    assert actual_alias == expected
+
+
+def test_evaluate_segment_validation_errors():
+    valid_ann = create(
+        media_id="audio",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 5.0],
+        duration=[5.0, 5.0],
+        value=["a", "b"],
+        disjoint=True,
+        exhaustive=True,
+    )
+
+    # 1. Non-tag payload
+    bad_payload = create(
+        media_id="audio",
+        payload_type="chord",
+        extent_type="time_interval",
+        time=[0.0, 5.0],
+        duration=[5.0, 5.0],
+        value=["C:maj", "G:maj"],
+        disjoint=True,
+        exhaustive=True,
+    )
+    with pytest.raises(BoppArgumentError, match="requires 'tag' payload"):
+        evaluate(bad_payload, valid_ann, task="segment")
+    with pytest.raises(BoppArgumentError, match="requires 'tag' payload"):
+        evaluate(valid_ann, bad_payload, task="segment")
+
+    # 2. Non-time_interval extent
+    bad_extent = create(
+        media_id="audio",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0, 5.0],
+        value=["a", "b"],
+        disjoint=True,
+        exhaustive=False,
+    )
+    with pytest.raises(BoppArgumentError, match="requires 'time_interval' extent"):
+        evaluate(bad_extent, valid_ann, task="segment")
+
+    # 3. disjoint=False
+    non_disjoint = create(
+        media_id="audio",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 4.0],
+        duration=[5.0, 5.0],
+        value=["a", "b"],
+        disjoint=False,
+        exhaustive=True,
+    )
+    with pytest.raises(BoppArgumentError, match="requires extent disjoint=True"):
+        evaluate(non_disjoint, valid_ann, task="segment")
+
+    # 4. exhaustive=False
+    non_exhaustive = create(
+        media_id="audio",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 6.0],
+        duration=[4.0, 4.0],
+        value=["a", "b"],
+        disjoint=True,
+        exhaustive=False,
+    )
+    with pytest.raises(BoppArgumentError, match="requires extent exhaustive=True"):
+        evaluate(non_exhaustive, valid_ann, task="segment")
+
+    # 5. Empty intervals
+    empty_ann = create(
+        media_id="audio",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[],
+        duration=[],
+        value=[],
+        disjoint=True,
+        exhaustive=True,
+        min_time=0.0,
+        max_time=0.0,
+    )
+    with pytest.raises(BoppArgumentError, match="requires non-empty intervals"):
+        evaluate(empty_ann, empty_ann, task="segment")
 
 
 def test_evaluate_transcription():
@@ -432,48 +528,341 @@ def test_evaluate_transcription_spn_notes():
 #     assert actual["Overall Accuracy"] == 1.0
 #
 #
-# def test_evaluate_hierarchy():
-#     ref_intervals = [
-#         np.array([[0.0, 5.0], [5.0, 10.0]]),
-#         np.array([[0.0, 10.0]]),
-#     ]
-#     ref_labels = [["A", "B"], ["full"]]
-#     est_intervals = [
-#         np.array([[0.0, 5.0], [5.0, 10.0]]),
-#         np.array([[0.0, 10.0]]),
-#     ]
-#     est_labels = [["A", "B"], ["full"]]
-#
-#     with pytest.warns(UserWarning, match="Segment hierarchy is inconsistent"):
-#         expected = mir_eval.hierarchy.evaluate(
-#             ref_intervals,
-#             ref_labels,
-#             est_intervals,
-#             est_labels,
-#         )
-#
-#     metadata = HumanAnnotationMetadata(annotator_id="u1", tool="manual")
-#     ref = Annotation(
-#         media_id="audio",
-#         bopp_version="1.0.0",
-#         metadata=metadata,
-#         extent=TimeIntervalExtent(time=[0.0, 5.0, 0.0], duration=[5.0, 5.0, 10.0]),
-#         payload=MultiSegmentPayload(label=["A", "B", "full"], level=[0, 0, 1]),
-#     )
-#     est = Annotation(
-#         media_id="audio",
-#         bopp_version="1.0.0",
-#         metadata=metadata,
-#         extent=TimeIntervalExtent(time=[0.0, 5.0, 0.0], duration=[5.0, 5.0, 10.0]),
-#         payload=MultiSegmentPayload(label=["A", "B", "full"], level=[0, 0, 1]),
-#     )
-#     bopp.ensure_annotation_id(ref)
-#     bopp.ensure_annotation_id(est)
-#
-#     with pytest.warns(UserWarning, match="Segment hierarchy is inconsistent"):
-#         actual = evaluate(ref, est)
-#     assert actual == expected
-#     assert "T-Precision reduced" in actual
+def test_evaluate_hierarchy_valid_multilevel():
+    ref_i = [
+        np.array([[0.0, 30.0], [30.0, 60.0]]),
+        np.array([[0.0, 15.0], [15.0, 30.0], [30.0, 45.0], [45.0, 60.0]]),
+    ]
+    ref_l = [["A", "B"], ["a", "b", "a", "c"]]
+
+    est_i = [
+        np.array([[0.0, 45.0], [45.0, 60.0]]),
+        np.array([[0.0, 15.0], [15.0, 30.0], [30.0, 45.0], [45.0, 60.0]]),
+    ]
+    est_l = [["A", "B"], ["a", "a", "b", "b"]]
+
+    expected = mir_eval.hierarchy.evaluate(ref_i, ref_l, est_i, est_l)
+
+    ref = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0, 0.0, 15.0, 30.0, 45.0],
+        duration=[30.0, 30.0, 15.0, 15.0, 15.0, 15.0],
+        value=["A", "B", "a", "b", "a", "c"],
+        disjoint=False,
+        exhaustive=False,
+        groupings=[
+            {
+                "name": "hierarchy",
+                "ids": [0, 0, 1, 1, 1, 1],
+                "disjoint": True,
+                "exhaustive": True,
+            }
+        ],
+    )
+
+    est = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 45.0, 0.0, 15.0, 30.0, 45.0],
+        duration=[45.0, 15.0, 15.0, 15.0, 15.0, 15.0],
+        value=["A", "B", "a", "a", "b", "b"],
+        disjoint=False,
+        exhaustive=False,
+        groupings=[
+            {
+                "name": "hierarchy",
+                "ids": [0, 0, 1, 1, 1, 1],
+                "disjoint": True,
+                "exhaustive": True,
+            }
+        ],
+    )
+
+    actual_explicit = evaluate(ref, est, task="hierarchy")
+    assert actual_explicit == expected
+    assert actual_explicit["T-Measure full"] > 0.9
+
+    # Inferred task: extent is non-disjoint, but single grouping is disjoint+exhaustive
+    actual_inferred = evaluate(ref, est)
+    assert actual_inferred == expected
+
+
+def test_evaluate_hierarchy_upcast_single_level():
+    ref_i = [
+        np.array([[0.0, 30.0], [30.0, 60.0]]),
+        np.array([[0.0, 15.0], [15.0, 30.0], [30.0, 45.0], [45.0, 60.0]]),
+    ]
+    ref_l = [["A", "B"], ["a", "b", "a", "c"]]
+    est_i = [np.array([[0.0, 30.0], [30.0, 60.0]])]
+    est_l = [["A", "B"]]
+
+    expected = mir_eval.hierarchy.evaluate(ref_i, ref_l, est_i, est_l)
+
+    ref = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0, 0.0, 15.0, 30.0, 45.0],
+        duration=[30.0, 30.0, 15.0, 15.0, 15.0, 15.0],
+        value=["A", "B", "a", "b", "a", "c"],
+        disjoint=False,
+        exhaustive=False,
+        groupings=[
+            {
+                "name": "hierarchy",
+                "ids": [0, 0, 1, 1, 1, 1],
+                "disjoint": True,
+                "exhaustive": True,
+            }
+        ],
+    )
+
+    # Estimate has NO groupings, but is disjoint & exhaustive flat segmentation
+    est = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=True,
+    )
+
+    actual = evaluate(ref, est, task="hierarchy")
+    assert actual == expected
+
+
+def test_evaluate_hierarchy_both_single_level():
+    ref = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=True,
+    )
+    est = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=True,
+    )
+    actual = evaluate(ref, est, task="hierarchy")
+    assert "T-Measure full" in actual
+    assert actual["T-Measure full"] == 1.0
+
+
+def test_evaluate_hierarchy_validation_errors():
+    valid_hier = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0, 0.0, 30.0],
+        duration=[30.0, 30.0, 30.0, 30.0],
+        value=["A", "B", "a", "b"],
+        disjoint=False,
+        exhaustive=False,
+        groupings=[
+            {
+                "name": "hierarchy",
+                "ids": [0, 0, 1, 1],
+                "disjoint": True,
+                "exhaustive": True,
+            }
+        ],
+    )
+
+    # 1. Non-tag payload
+    bad_payload = create(
+        media_id="audio:1",
+        payload_type="chord",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["C:maj", "G:maj"],
+        disjoint=True,
+        exhaustive=True,
+    )
+    with pytest.raises(BoppArgumentError, match="requires 'tag' payload"):
+        evaluate(bad_payload, valid_hier, task="hierarchy")
+
+    # 2. Non-time_interval extent
+    bad_extent = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=False,
+    )
+    with pytest.raises(BoppArgumentError, match="requires 'time_interval' extent"):
+        evaluate(bad_extent, valid_hier, task="hierarchy")
+
+    # 3. No groupings and non-disjoint/non-exhaustive extent
+    bad_single_level = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=False,
+        exhaustive=True,
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="Hierarchy evaluation without groupings requires extent disjoint=True",
+    ):
+        evaluate(bad_single_level, valid_hier, task="hierarchy")
+
+    bad_single_level_exh = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 20.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=False,
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="Hierarchy evaluation without groupings requires extent exhaustive=True",
+    ):
+        evaluate(bad_single_level_exh, valid_hier, task="hierarchy")
+
+    # 4. More than one grouping
+    multi_groupings = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=True,
+        groupings=[
+            {"name": "g1", "ids": [0, 0], "disjoint": True, "exhaustive": True},
+            {"name": "g2", "ids": [1, 1], "disjoint": True, "exhaustive": True},
+        ],
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="Hierarchy evaluation requires at most one grouping",
+    ):
+        evaluate(multi_groupings, valid_hier, task="hierarchy")
+
+    # 5. Grouping with disjoint=False
+    g_non_disjoint = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=True,
+        groupings=[{"name": "h", "ids": [0, 0], "disjoint": False, "exhaustive": True}],
+    )
+    with pytest.raises(BoppArgumentError, match="requires grouping disjoint=True"):
+        evaluate(g_non_disjoint, valid_hier, task="hierarchy")
+
+    # 6. Grouping with exhaustive=False
+    g_non_exhaustive = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=True,
+        groupings=[{"name": "h", "ids": [0, 0], "disjoint": True, "exhaustive": False}],
+    )
+    with pytest.raises(BoppArgumentError, match="requires grouping exhaustive=True"):
+        evaluate(g_non_exhaustive, valid_hier, task="hierarchy")
+
+    # 7. Grouping missing root level 0 (e.g. only level 1)
+    g_no_root = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 30.0],
+        duration=[30.0, 30.0],
+        value=["A", "B"],
+        disjoint=True,
+        exhaustive=True,
+        groupings=[{"name": "h", "ids": [1, 1], "disjoint": True, "exhaustive": True}],
+    )
+    with pytest.raises(BoppArgumentError, match="requires root level 0"):
+        evaluate(g_no_root, valid_hier, task="hierarchy")
+
+    # 8. Grouping with only negative IDs (e.g. unassigned) rejected by validation
+    with pytest.raises(BoppValidationError):
+        create(
+            media_id="audio:1",
+            payload_type="tag",
+            extent_type="time_interval",
+            time=[0.0, 30.0],
+            duration=[30.0, 30.0],
+            value=["A", "B"],
+            disjoint=True,
+            exhaustive=True,
+            groupings=[
+                {"name": "h", "ids": [-1, -1], "disjoint": True, "exhaustive": True}
+            ],
+        )
+
+    # 9. Empty intervals for hierarchy (without groupings and with groupings)
+    empty_hier = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[],
+        duration=[],
+        value=[],
+        disjoint=True,
+        exhaustive=True,
+        min_time=0.0,
+        max_time=0.0,
+    )
+    with pytest.raises(BoppArgumentError, match="requires non-empty intervals"):
+        evaluate(empty_hier, valid_hier, task="hierarchy")
+
+    empty_hier_with_grouping = create(
+        media_id="audio:1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[],
+        duration=[],
+        value=[],
+        disjoint=True,
+        exhaustive=True,
+        min_time=0.0,
+        max_time=0.0,
+        groupings=[{"name": "h", "ids": [], "disjoint": True, "exhaustive": True}],
+    )
+    with pytest.raises(BoppArgumentError, match="requires non-empty intervals"):
+        evaluate(empty_hier_with_grouping, valid_hier, task="hierarchy")
+
+    # 10. Grouping with only negative IDs bypassed to evaluation
+    import copy
+
+    bad_hier_neg = copy.deepcopy(valid_hier)
+    object.__setattr__(bad_hier_neg.groupings[0], "ids", [-1, -1])
+    with pytest.raises(BoppArgumentError, match="contains no non-negative group IDs"):
+        evaluate(bad_hier_neg, valid_hier, task="hierarchy")
 
 
 def test_extract_helpers_validation_errors():
