@@ -67,26 +67,60 @@ class SphericalTimeIntervalExtent(
         | UnsetType
     ) = UNSET
     min_azimuth: (
-        Annotated[float, Meta(description="Lower bound of azimuth angle in degrees.")]
+        Annotated[
+            float,
+            Meta(
+                description="Lower bound of azimuth angle in degrees in [-180, +180).",
+                ge=-180.0,
+                lt=180.0,
+            ),
+        ]
         | UnsetType
     ) = UNSET
     max_azimuth: (
-        Annotated[float, Meta(description="Upper bound of azimuth angle in degrees.")]
+        Annotated[
+            float,
+            Meta(
+                description="Upper bound of azimuth angle in degrees in [-180, +180).",
+                ge=-180.0,
+                lt=180.0,
+            ),
+        ]
         | UnsetType
     ) = UNSET
     min_elevation: (
-        Annotated[float, Meta(description="Lower bound of elevation angle in degrees.")]
+        Annotated[
+            float,
+            Meta(
+                description="Lower bound of elevation angle in degrees in [-90, +90].",
+                ge=-90.0,
+                le=90.0,
+            ),
+        ]
         | UnsetType
     ) = UNSET
     max_elevation: (
-        Annotated[float, Meta(description="Upper bound of elevation angle in degrees.")]
+        Annotated[
+            float,
+            Meta(
+                description="Upper bound of elevation angle in degrees in [-90, +90].",
+                ge=-90.0,
+                le=90.0,
+            ),
+        ]
         | UnsetType
     ) = UNSET
     min_radius: (
-        Annotated[float, Meta(description="Lower bound of radial distance.")]
+        Annotated[
+            float,
+            Meta(description="Lower bound of non-negative radial distance.", ge=0.0),
+        ]
         | UnsetType
     ) = UNSET
     max_radius: (
-        Annotated[float, Meta(description="Upper bound of radial distance.")]
+        Annotated[
+            float,
+            Meta(description="Upper bound of non-negative radial distance.", ge=0.0),
+        ]
         | UnsetType
     ) = UNSET

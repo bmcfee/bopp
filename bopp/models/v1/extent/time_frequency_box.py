@@ -45,18 +45,30 @@ class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequenc
         ),
     ]
     min_time: (
-        Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
+        Annotated[
+            float,
+            Meta(description="Lower bound of the time extent in seconds.", ge=0.0),
+        ]
         | UnsetType
     ) = UNSET
     max_time: (
-        Annotated[float, Meta(description="Upper bound of the time extent in seconds.")]
+        Annotated[
+            float,
+            Meta(description="Upper bound of the time extent in seconds.", ge=0.0),
+        ]
         | UnsetType
     ) = UNSET
     min_freq: (
-        Annotated[float, Meta(description="Lower bound of the frequency extent in Hz.")]
+        Annotated[
+            float,
+            Meta(description="Lower bound of the frequency extent in Hz.", ge=0.0),
+        ]
         | UnsetType
     ) = UNSET
     max_freq: (
-        Annotated[float, Meta(description="Upper bound of the frequency extent in Hz.")]
+        Annotated[
+            float,
+            Meta(description="Upper bound of the frequency extent in Hz.", ge=0.0),
+        ]
         | UnsetType
     ) = UNSET

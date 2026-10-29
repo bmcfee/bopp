@@ -49,18 +49,22 @@
     },
     "min_time": {
       "type": "number",
+      "minimum": 0.0,
       "description": "Lower bound of the time extent in seconds."
     },
     "max_time": {
       "type": "number",
+      "minimum": 0.0,
       "description": "Upper bound of the time extent in seconds."
     },
     "min_freq": {
       "type": "number",
+      "minimum": 0.0,
       "description": "Lower bound of the frequency extent in Hz."
     },
     "max_freq": {
       "type": "number",
+      "minimum": 0.0,
       "description": "Upper bound of the frequency extent in Hz."
     }
   },
