@@ -426,6 +426,251 @@ def _eval_transcription(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str
     )
 
 
+def _extract_melody_series(
+    ann: BoppBase, role: str, contour: int | None = None
+) -> tuple[Any, Any, Any]:
+    """
+    Extract timestamps, frequencies, and voicing for melody evaluation.
+
+    Parameters
+    ----------
+    ann : BoppBase
+        The annotation to extract from.
+    role : str
+        The role of the annotation ('reference' or 'estimate').
+    contour : int or None, optional
+        Target contour ID to extract if groupings are present.
+        If None, defaults to 0 if present, else the lowest non-negative group ID.
+
+    Returns
+    -------
+    times : np.ndarray
+        1D array of timestamps sorted chronologically.
+    freqs : np.ndarray
+        1D array of frequencies in Hz (with unvoiced frames set to 0.0).
+    voicing : np.ndarray
+        1D array of voicing indicators (1.0 for voiced, 0.0 for unvoiced).
+    """
+    payload = getattr(ann, "payload", None)
+    payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
+    if payload_tag != "frequency_hz":
+        raise BoppArgumentError(
+            f"Melody evaluation requires 'frequency_hz' payload for {role}, found '{payload_tag}'."
+        )
+
+    extent = getattr(ann, "extent", None)
+    extent_tag = _get_tag(extent) if extent not in (None, msgspec.UNSET) else None
+    if extent_tag not in (
+        "time",
+        "time_uniform",
+        "time_interval",
+        "spherical_time",
+        "spherical_time_interval",
+        "cartesian_time",
+        "cartesian_time_interval",
+    ):
+        raise BoppArgumentError(
+            f"Melody evaluation requires temporal extent for {role}, found '{extent_tag}'."
+        )
+
+    raw_times = _extract_events(ann)
+    raw_freqs = np.asarray(getattr(payload, "value", []), dtype=np.float64)
+    if len(raw_times) == 0 or len(raw_freqs) == 0:
+        raise BoppArgumentError(
+            f"Melody evaluation requires non-empty observations for {role}."
+        )
+    if len(raw_times) != len(raw_freqs):
+        raise BoppArgumentError(
+            f"Observation times length ({len(raw_times)}) does not match frequencies length ({len(raw_freqs)}) for {role}."
+        )
+
+    raw_voiced = getattr(payload, "voiced", None)
+    if raw_voiced is None or raw_voiced is msgspec.UNSET:
+        voiced_flags = np.ones(len(raw_freqs), dtype=bool)
+    else:
+        voiced_flags = np.asarray(raw_voiced, dtype=bool)
+    if len(voiced_flags) != len(raw_freqs):
+        raise BoppArgumentError(
+            f"Voicing array length ({len(voiced_flags)}) does not match frequencies length ({len(raw_freqs)}) for {role}."
+        )
+
+    groupings = getattr(ann, "groupings", None)
+    if groupings is not None and groupings is not msgspec.UNSET and len(groupings) > 0:
+        if len(groupings) > 1:
+            raise BoppArgumentError(
+                f"Melody evaluation requires at most one grouping on {role} annotation, found {len(groupings)}."
+            )
+        g = groupings[0]
+        valid_contours = sorted({gid for gid in g.ids if gid >= 0})
+        if not valid_contours:
+            raise BoppArgumentError(
+                f"Grouping '{g.name}' on {role} contains no non-negative group IDs."
+            )
+        if contour is None:
+            target_contour = 0 if 0 in valid_contours else valid_contours[0]
+        else:
+            target_contour = contour
+            if target_contour not in valid_contours:
+                raise BoppArgumentError(
+                    f"Contour '{target_contour}' not found in grouping '{g.name}' on {role}; available contours: {valid_contours}."
+                )
+
+        idx = [i for i, gid in enumerate(g.ids) if gid == target_contour]
+        times = raw_times[idx]
+        freqs = raw_freqs[idx]
+        voiced = voiced_flags[idx]
+        if len(np.unique(times)) != len(times):
+            raise BoppArgumentError(
+                f"Melody contour '{target_contour}' on {role} contains duplicate timestamps and is not disjoint."
+            )
+    else:
+        if contour is not None and contour != 0:
+            raise BoppArgumentError(
+                f"Contour '{contour}' requested for {role}, but annotation has no groupings."
+            )
+        if not getattr(extent, "disjoint", False):
+            raise BoppArgumentError(
+                f"Melody evaluation without groupings requires extent disjoint=True for {role}, found disjoint=False."
+            )
+        times = raw_times
+        freqs = raw_freqs
+        voiced = voiced_flags
+
+    order = np.argsort(times)
+    times = times[order]
+    freqs = freqs[order]
+    voiced = voiced[order]
+
+    effective_voiced = voiced & (freqs > 0)
+    freqs_out = np.where(effective_voiced, freqs, 0.0)
+    voicing_out = effective_voiced.astype(np.float64)
+    return times, freqs_out, voicing_out
+
+
+def _eval_melody(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
+    ref_contour = kwargs.pop("ref_contour", kwargs.pop("contour", None))
+    est_contour = kwargs.pop("est_contour", kwargs.pop("contour", None))
+    ref_time, ref_freq, ref_voicing = _extract_melody_series(
+        ref, "reference", contour=ref_contour
+    )
+    est_time, est_freq, est_voicing = _extract_melody_series(
+        est, "estimate", contour=est_contour
+    )
+    return mir_eval.melody.evaluate(
+        ref_time,
+        ref_freq,
+        est_time,
+        est_freq,
+        est_voicing=est_voicing,
+        ref_reward=ref_voicing,
+        **kwargs,
+    )
+
+
+def _extract_multipitch_series(ann: BoppBase, role: str) -> tuple[Any, list[Any]]:
+    """
+    Extract timestamps and active frequencies list for multipitch evaluation.
+
+    Parameters
+    ----------
+    ann : BoppBase
+        The annotation to extract from.
+    role : str
+        The role of the annotation ('reference' or 'estimate').
+
+    Returns
+    -------
+    times : np.ndarray
+        1D array of unique timestamps sorted chronologically.
+    freqs : list of np.ndarray
+        List of 1D arrays of active (voiced, positive) frequencies in Hz at each timestamp.
+    """
+    payload = getattr(ann, "payload", None)
+    payload_tag = _get_tag(payload) if payload not in (None, msgspec.UNSET) else None
+    if payload_tag != "frequency_hz":
+        raise BoppArgumentError(
+            f"Multipitch evaluation requires 'frequency_hz' payload for {role}, found '{payload_tag}'."
+        )
+
+    extent = getattr(ann, "extent", None)
+    extent_tag = _get_tag(extent) if extent not in (None, msgspec.UNSET) else None
+    if extent_tag not in (
+        "time",
+        "time_uniform",
+        "time_interval",
+        "spherical_time",
+        "spherical_time_interval",
+        "cartesian_time",
+        "cartesian_time_interval",
+    ):
+        raise BoppArgumentError(
+            f"Multipitch evaluation requires temporal extent for {role}, found '{extent_tag}'."
+        )
+
+    raw_times = _extract_events(ann)
+    raw_freqs = np.asarray(getattr(payload, "value", []), dtype=np.float64)
+    if len(raw_times) == 0 or len(raw_freqs) == 0:
+        raise BoppArgumentError(
+            f"Multipitch evaluation requires non-empty observations for {role}."
+        )
+    if len(raw_times) != len(raw_freqs):
+        raise BoppArgumentError(
+            f"Observation times length ({len(raw_times)}) does not match frequencies length ({len(raw_freqs)}) for {role}."
+        )
+
+    raw_voiced = getattr(payload, "voiced", None)
+    if raw_voiced is None or raw_voiced is msgspec.UNSET:
+        voiced_flags = np.ones(len(raw_freqs), dtype=bool)
+    else:
+        voiced_flags = np.asarray(raw_voiced, dtype=bool)
+    if len(voiced_flags) != len(raw_freqs):
+        raise BoppArgumentError(
+            f"Voicing array length ({len(voiced_flags)}) does not match frequencies length ({len(raw_freqs)}) for {role}."
+        )
+
+    groupings = getattr(ann, "groupings", None)
+    if groupings is not None and groupings is not msgspec.UNSET and len(groupings) > 0:
+        if len(groupings) > 1:
+            raise BoppArgumentError(
+                f"Multipitch evaluation requires at most one grouping on {role} annotation, found {len(groupings)}."
+            )
+        g = groupings[0]
+        idx = [i for i, gid in enumerate(g.ids) if gid >= 0]
+        if not idx:
+            raise BoppArgumentError(
+                f"Grouping '{g.name}' on {role} contains no non-negative group IDs."
+            )
+        times = raw_times[idx]
+        freqs = raw_freqs[idx]
+        voiced = voiced_flags[idx]
+    else:
+        times = raw_times
+        freqs = raw_freqs
+        voiced = voiced_flags
+
+    unique_times = np.unique(times)
+    active_mask = voiced & (freqs > 0)
+
+    freqs_list: list[Any] = []
+    for t in unique_times:
+        t_mask = (times == t) & active_mask
+        t_freqs = freqs[t_mask]
+        if len(t_freqs) == 0:
+            freqs_list.append(np.empty(0, dtype=np.float64))
+        else:
+            freqs_list.append(np.sort(np.unique(t_freqs)))
+
+    return unique_times, freqs_list
+
+
+def _eval_multipitch(ref: BoppBase, est: BoppBase, **kwargs: Any) -> dict[str, Any]:
+    ref_time, ref_freqs = _extract_multipitch_series(ref, "reference")
+    est_time, est_freqs = _extract_multipitch_series(est, "estimate")
+    return mir_eval.multipitch.evaluate(
+        ref_time, ref_freqs, est_time, est_freqs, **kwargs
+    )
+
+
 # Task dispatch lookup
 TASK_DISPATCH = {
     "onset": _eval_onset,
@@ -436,6 +681,9 @@ TASK_DISPATCH = {
     "segmentation": _eval_segment,
     "transcription": _eval_transcription,
     "hierarchy": _eval_hierarchy,
+    "melody": _eval_melody,
+    "multipitch": _eval_multipitch,
+    "multi_pitch": _eval_multipitch,
 }
 
 # Payload tag to task mapping
@@ -445,7 +693,6 @@ PAYLOAD_TASK_MAP = {
     "tempo": "tempo",
     "chord": "chord",
     "tag": "segment",
-    "frequency_hz": "transcription",
     "note_midi": "transcription",
     "note": "transcription",
 }
@@ -468,8 +715,8 @@ def evaluate(
         The estimated annotation to evaluate.
     task : str or None, optional
         Target evaluation task (e.g. 'onset', 'beat', 'tempo', 'chord', 'segment',
-        'segmentation', 'transcription', 'hierarchy'). If None, the task is inferred from
-        the payload type and extent/grouping attributes of `ref`.
+        'segmentation', 'transcription', 'hierarchy', 'melody', 'multipitch').
+        If None, the task is inferred from the payload type and extent/grouping attributes of `ref`.
     **kwargs : Any
         Additional keyword arguments forwarded directly to the corresponding
         `mir_eval.<task>.evaluate` function.
@@ -511,6 +758,32 @@ def evaluate(
                 resolved_task = "hierarchy"
             else:
                 resolved_task = "segment"
+        elif ref_tag == "frequency_hz":
+            ref_extent = getattr(ref, "extent", None)
+            ref_extent_tag = (
+                _get_tag(ref_extent)
+                if ref_extent not in (None, msgspec.UNSET)
+                else None
+            )
+            if ref_extent_tag in (
+                "time_interval",
+                "spherical_time_interval",
+                "cartesian_time_interval",
+            ):
+                resolved_task = "transcription"
+            else:
+                ref_groupings = getattr(ref, "groupings", None)
+                has_multi_contours = (
+                    ref_groupings is not None
+                    and ref_groupings is not msgspec.UNSET
+                    and len(ref_groupings) == 1
+                    and len({gid for gid in ref_groupings[0].ids if gid >= 0}) > 1
+                )
+                is_disjoint = getattr(ref_extent, "disjoint", False)
+                if not is_disjoint or has_multi_contours:
+                    resolved_task = "multipitch"
+                else:
+                    resolved_task = "melody"
         else:
             resolved_task = PAYLOAD_TASK_MAP.get(ref_tag)
             if resolved_task is None:
