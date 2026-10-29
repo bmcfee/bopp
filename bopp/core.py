@@ -337,7 +337,6 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
             raise BoppArgumentError(
                 "target_type must be provided if obj is not a msgspec.Struct."
             )
-    assert target_type is not None
 
     # 1. Handle Struct instances: convert to builtins to strip UNSET keys recursively
     if isinstance(obj, msgspec.Struct):

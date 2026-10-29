@@ -363,7 +363,8 @@ def _extract_multilevel_intervals_and_labels(
             f"Hierarchy evaluation requires grouping exhaustive=True for {role}, found exhaustive=False on grouping '{g.name}'."
         )
 
-    assert extent is not None and extent is not msgspec.UNSET
+    if extent is None or extent is msgspec.UNSET:
+        raise BoppArgumentError(f"Hierarchy evaluation requires an extent for {role}.")
     raw_starts = np.asarray(extent.time, dtype=np.float64)
     raw_durs = np.asarray(extent.duration, dtype=np.float64)
     raw_labels = [str(x) for x in getattr(payload, "value", [])]
@@ -377,10 +378,6 @@ def _extract_multilevel_intervals_and_labels(
     if not levels:
         raise BoppArgumentError(
             f"Hierarchy grouping '{g.name}' on {role} contains no non-negative group IDs."
-        )
-    if 0 not in levels:
-        raise BoppArgumentError(
-            f"Hierarchy grouping '{g.name}' on {role} requires root level 0, found levels {levels}."
         )
 
     multilevel_intervals: list[Any] = []
@@ -683,7 +680,6 @@ TASK_DISPATCH = {
     "hierarchy": _eval_hierarchy,
     "melody": _eval_melody,
     "multipitch": _eval_multipitch,
-    "multi_pitch": _eval_multipitch,
 }
 
 # Payload tag to task mapping

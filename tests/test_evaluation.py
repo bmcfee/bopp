@@ -864,20 +864,23 @@ def test_evaluate_hierarchy_validation_errors():
     with pytest.raises(BoppArgumentError, match="requires grouping exhaustive=True"):
         evaluate(g_non_exhaustive, valid_hier, task="hierarchy")
 
-    # 7. Grouping missing root level 0 (e.g. only level 1)
-    g_no_root = create(
+    # 7. Grouping with non-zero group IDs (e.g. levels 5 and 10 without 0) is valid and sorted numerically
+    g_nonzero_levels = create(
         media_id="audio:1",
         payload_type="tag",
         extent_type="time_interval",
-        time=[0.0, 30.0],
-        duration=[30.0, 30.0],
-        value=["A", "B"],
-        disjoint=True,
-        exhaustive=True,
-        groupings=[{"name": "h", "ids": [1, 1], "disjoint": True, "exhaustive": True}],
+        time=[0.0, 0.0, 30.0],
+        duration=[60.0, 30.0, 30.0],
+        value=["Root", "SubA", "SubB"],
+        disjoint=False,
+        exhaustive=False,
+        groupings=[
+            {"name": "h", "ids": [5, 10, 10], "disjoint": True, "exhaustive": True}
+        ],
     )
-    with pytest.raises(BoppArgumentError, match="requires root level 0"):
-        evaluate(g_no_root, valid_hier, task="hierarchy")
+    res_nonzero = evaluate(g_nonzero_levels, valid_hier, task="hierarchy")
+    assert "T-Measure full" in res_nonzero
+    assert res_nonzero["T-Measure full"] == 1.0
 
     # 8. Grouping with only negative IDs (e.g. unassigned) rejected by validation
     with pytest.raises(BoppValidationError):
@@ -1334,10 +1337,11 @@ def test_evaluate_multipitch_basic_and_grouping():
         assert np.isclose(actual[k], expected[k])
     assert actual["Accuracy"] == 1.0
 
-    # Multi_pitch alias
-    actual_alias = evaluate(ref, est, task="multi_pitch")
-    for k in expected:
-        assert np.isclose(actual_alias[k], expected[k])
+    # multi_pitch is not an alias; task='multi_pitch' is rejected
+    with pytest.raises(
+        BoppArgumentError, match="Unsupported evaluation task 'multi_pitch'"
+    ):
+        evaluate(ref, est, task="multi_pitch")
 
     # Inferred task: ref has multiple contours, so task infers multipitch
     actual_inferred = evaluate(ref, est)
