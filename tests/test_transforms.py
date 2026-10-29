@@ -2360,3 +2360,310 @@ def test_note_payload_transforms():
     trimmed = trim(ann, start=0.5, end=1.5)
     assert trimmed.extent.time == [1.0]
     assert trimmed.payload.value == ["C♯4"]
+
+
+def test_trim_exhaustive_time_interval():
+    ann = create(
+        media_id="trim_ti_ex",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 10.0, 20.0],
+        duration=[10.0, 10.0, 10.0],
+        value=["a", "b", "c"],
+        exhaustive=True,
+        min_time=0.0,
+        max_time=30.0,
+    )
+    # reset=True narrows and shifts bounds
+    t_reset = trim(ann, start=5.0, end=25.0, reset=True)
+    assert t_reset.extent.time == [0.0, 5.0, 15.0]
+    assert t_reset.extent.duration == [5.0, 10.0, 5.0]
+    assert t_reset.extent.min_time == 0.0
+    assert t_reset.extent.max_time == 20.0
+    assert t_reset.extent.exhaustive is True
+
+    # reset=False narrows bounds without shifting
+    t_no_reset = trim(ann, start=5.0, end=25.0, reset=False)
+    assert t_no_reset.extent.time == [5.0, 10.0, 20.0]
+    assert t_no_reset.extent.duration == [5.0, 10.0, 5.0]
+    assert t_no_reset.extent.min_time == 5.0
+    assert t_no_reset.extent.max_time == 25.0
+    assert t_no_reset.extent.exhaustive is True
+
+    # strict=True discards boundary-overlapping observations, sets exhaustive=False
+    t_strict = trim(ann, start=5.0, end=25.0, strict=True)
+    assert t_strict.extent.time == [10.0]
+    assert t_strict.extent.duration == [10.0]
+    assert t_strict.extent.min_time == 5.0
+    assert t_strict.extent.max_time == 25.0
+    assert t_strict.extent.exhaustive is False
+
+    # Trimming with only min_time set
+    ann_min_only = create(
+        media_id="trim_min_only",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 10.0, 20.0],
+        duration=[10.0, 10.0, 10.0],
+        value=["a", "b", "c"],
+        exhaustive=True,
+        min_time=0.0,
+    )
+    t_min = trim(ann_min_only, start=5.0, reset=True)
+    assert t_min.extent.min_time == 0.0
+    assert t_min.extent.max_time is msgspec.UNSET
+
+    # Trimming with only max_time set
+    ann_max_only = create(
+        media_id="trim_max_only",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 10.0, 20.0],
+        duration=[10.0, 10.0, 10.0],
+        value=["a", "b", "c"],
+        exhaustive=True,
+        max_time=30.0,
+    )
+    t_max = trim(ann_max_only, end=25.0, reset=False)
+    assert t_max.extent.min_time is msgspec.UNSET
+    assert t_max.extent.max_time == 25.0
+
+    # Trimming out of bounds (empty intersection: coord_min > coord_max clamps)
+    t_oob = trim(ann, start=35.0, end=40.0, reset=False)
+    assert t_oob.extent.time == []
+    assert t_oob.extent.min_time == 35.0
+    assert t_oob.extent.max_time == 35.0
+    assert t_oob.extent.exhaustive is False
+
+    # Trimming without explicit bounds (min_time=UNSET, max_time=UNSET)
+    ann_no_bounds = create(
+        media_id="trim_no_bounds",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 10.0, 20.0],
+        duration=[10.0, 10.0, 10.0],
+        value=["a", "b", "c"],
+        exhaustive=True,
+    )
+    t_nb = trim(ann_no_bounds, start=5.0, end=25.0, reset=True)
+    assert t_nb.extent.min_time is msgspec.UNSET
+    assert t_nb.extent.max_time is msgspec.UNSET
+    assert t_nb.extent.exhaustive is True
+
+
+def test_trim_exhaustive_time_uniform():
+    ann = create(
+        media_id="tu_ex",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        value=["a", "b", "c", "d", "e"],
+        exhaustive=True,
+        min_time=0.0,
+        max_time=4.0,
+        groupings=[{"name": "layer", "ids": [0, 0, 0, 0, 0], "exhaustive": True}],
+    )
+    # reset=True shifts start_time and bounds
+    t_reset = trim(ann, start=1.0, end=3.0, reset=True)
+    assert t_reset.extent.start_time == 0.0
+    assert t_reset.extent.min_time == 0.0
+    assert t_reset.extent.max_time == 2.0
+    assert t_reset.extent.exhaustive is True
+    assert t_reset.payload.value == ["b", "c", "d"]
+    assert t_reset.groupings[0].exhaustive is True
+
+    # reset=False preserves absolute coordinates
+    t_no_reset = trim(ann, start=1.0, end=3.0, reset=False)
+    assert t_no_reset.extent.start_time == 1.0
+    assert t_no_reset.extent.min_time == 1.0
+    assert t_no_reset.extent.max_time == 3.0
+    assert t_no_reset.extent.exhaustive is True
+    assert t_no_reset.groupings[0].exhaustive is True
+
+    # strict=True forces exhaustive=False
+    t_strict = trim(ann, start=1.0, end=3.0, strict=True)
+    assert t_strict.extent.exhaustive is False
+    assert t_strict.groupings[0].exhaustive is False
+
+    # Gap beyond samples: start=0.2 < first sample (1.0) fails exhaustiveness check
+    t_gap = trim(ann, start=0.2, end=3.0, reset=False)
+    assert t_gap.extent.exhaustive is False
+
+    # Trimming time_uniform with only min_time set
+    ann_min_only = create(
+        media_id="tu_min_only",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        value=["a", "b", "c", "d", "e"],
+        exhaustive=True,
+        min_time=0.0,
+    )
+    t_tu_min = trim(ann_min_only, start=1.0, reset=True)
+    assert t_tu_min.extent.min_time == 0.0
+    assert t_tu_min.extent.max_time is msgspec.UNSET
+
+    # Trimming time_uniform with only max_time set
+    ann_max_only = create(
+        media_id="tu_max_only",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        value=["a", "b", "c", "d", "e"],
+        exhaustive=True,
+        max_time=4.0,
+    )
+    t_tu_max = trim(ann_max_only, end=3.0, reset=False)
+    assert t_tu_max.extent.min_time is msgspec.UNSET
+    assert t_tu_max.extent.max_time == 3.0
+
+    # Trimming time_uniform out of bounds (coord_min > coord_max clamps)
+    t_tu_oob = trim(ann, start=10.0, end=20.0, reset=False)
+    assert t_tu_oob.payload.value == []
+    assert t_tu_oob.extent.min_time == 10.0
+    assert t_tu_oob.extent.max_time == 10.0
+    assert t_tu_oob.extent.exhaustive is False
+
+
+def test_trim_exhaustive_with_groupings():
+    ann = create(
+        media_id="g_ex",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 10.0, 20.0],
+        duration=[10.0, 10.0, 10.0],
+        value=["a", "b", "c"],
+        exhaustive=True,
+        min_time=0.0,
+        max_time=30.0,
+        groupings=[
+            {"name": "full", "ids": [0, 0, 0], "exhaustive": True},
+            {"name": "partial", "ids": [-1, 0, 0], "exhaustive": False},
+        ],
+    )
+    trimmed = trim(ann, start=5.0, end=25.0, reset=True)
+    assert trimmed.groupings[0].exhaustive is True
+    assert trimmed.groupings[1].exhaustive is False
+
+    trimmed_strict = trim(ann, start=5.0, end=25.0, strict=True)
+    assert trimmed_strict.groupings[0].exhaustive is False
+    assert trimmed_strict.groupings[1].exhaustive is False
+
+
+def test_trim_exhaustive_fraction_and_integer_axes():
+    # Fraction axis (score_interval)
+    ann_score = create(
+        media_id="score_ex",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[0, 1], [1, 1], [2, 1]],
+        duration=[[1, 1], [1, 1], [1, 1]],
+        value=["a", "b", "c"],
+        exhaustive=True,
+        min_quarter=[0, 1],
+        max_quarter=[3, 1],
+    )
+    t_score_reset = trim(ann_score, start=[1, 2], end=[5, 2], reset=True)
+    assert t_score_reset.extent.min_quarter == [0, 1]
+    assert t_score_reset.extent.max_quarter == [2, 1]
+    assert t_score_reset.extent.exhaustive is True
+
+    t_score_no_reset = trim(ann_score, start=[1, 2], end=[5, 2], reset=False)
+    assert t_score_no_reset.extent.min_quarter == [1, 2]
+    assert t_score_no_reset.extent.max_quarter == [5, 2]
+    assert t_score_no_reset.extent.exhaustive is True
+
+    # Integer axis (text_interval)
+    ann_text = create(
+        media_id="text_ex",
+        payload_type="tag",
+        extent_type="text_interval",
+        offset=[0, 5, 10],
+        length=[5, 5, 5],
+        value=["a", "b", "c"],
+        exhaustive=True,
+        min_offset=0,
+        max_offset=15,
+    )
+    t_text_reset = trim(ann_text, start=2, end=12, reset=True)
+    assert t_text_reset.extent.min_offset == 0
+    assert t_text_reset.extent.max_offset == 10
+    assert t_text_reset.extent.offset == [0, 3, 8]
+    assert t_text_reset.extent.length == [3, 5, 2]
+    assert t_text_reset.extent.exhaustive is True
+
+    t_text_no_reset = trim(ann_text, start=2, end=12, reset=False)
+    assert t_text_no_reset.extent.min_offset == 2
+    assert t_text_no_reset.extent.max_offset == 12
+    assert t_text_no_reset.extent.offset == [2, 5, 10]
+    assert t_text_no_reset.extent.length == [3, 5, 2]
+    assert t_text_no_reset.extent.exhaustive is True
+
+
+def test_filter_by_exhaustive_extent_and_groupings():
+    ann = create(
+        media_id="filter_ex",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 10.0, 20.0],
+        duration=[10.0, 10.0, 10.0],
+        value=["keep1", "drop", "keep2"],
+        exhaustive=True,
+        min_time=0.0,
+        max_time=30.0,
+        groupings=[{"name": "layer", "ids": [0, 0, 0], "exhaustive": True}],
+    )
+    # Dropping observations sets exhaustive=False
+    filtered_dropped = filter_by(ann, lambda v: v != "drop")
+    assert filtered_dropped.extent.exhaustive is False
+    assert filtered_dropped.groupings[0].exhaustive is False
+    assert filtered_dropped.extent.min_time == 0.0
+    assert filtered_dropped.extent.max_time == 30.0
+
+    # Keeping all observations preserves exhaustive=True
+    filtered_all = filter_by(ann, lambda v: True)
+    assert filtered_all.extent.exhaustive is True
+    assert filtered_all.groupings[0].exhaustive is True
+
+
+def test_format_bound_value_and_metadata_helpers():
+    from bopp.transforms import _format_bound_value, _get_extent_axis_bound_attrs
+
+    # Fraction formatting
+    assert _format_bound_value([1, 2], fraction_axis=True, integer_axis=False) == [1, 2]
+    assert _format_bound_value(
+        Fraction(3, 4), fraction_axis=True, integer_axis=False
+    ) == [3, 4]
+    assert _format_bound_value(2, fraction_axis=True, integer_axis=False) == [2, 1]
+
+    # Integer formatting
+    assert _format_bound_value(5.0, fraction_axis=False, integer_axis=True) == 5
+    assert _format_bound_value(7, fraction_axis=False, integer_axis=True) == 7
+
+    # Float formatting
+    assert _format_bound_value(3, fraction_axis=False, integer_axis=False) == 3.0
+    assert _format_bound_value(4.5, fraction_axis=False, integer_axis=False) == 4.5
+
+    # Unsupported axis metadata returns None
+    assert _get_extent_axis_bound_attrs("time", "nonexistent_field") is None
+    assert _get_extent_axis_bound_attrs("nonexistent_tag", "time") is None
+
+
+def test_to_times_resamples_groupings_exhaustive_false():
+    from bopp.transforms import to_times
+
+    ann = create(
+        media_id="to_times_ex",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 10.0],
+        duration=[10.0, 10.0],
+        value=["a", "b"],
+        groupings=[{"name": "layer", "ids": [0, 0], "exhaustive": True}],
+    )
+    res = to_times(ann, times=[0.0, 5.0, 15.0])
+    assert res.extent.exhaustive is False
+    assert res.groupings[0].exhaustive is False

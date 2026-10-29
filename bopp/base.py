@@ -119,6 +119,11 @@ class BoppBase(msgspec.Struct):
             return []
         lengths = []
         for field in msgspec.structs.fields(type(facet_struct)):
+            if field.name.startswith(("min_", "max_")) or field.name in (
+                "disjoint",
+                "exhaustive",
+            ):
+                continue
             val = getattr(facet_struct, field.name)
 
             if isinstance(val, list):

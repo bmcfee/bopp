@@ -336,6 +336,13 @@ def _extract_facet_data(
         if val is None or val is msgspec.UNSET:
             continue
 
+        if field.name.startswith(("min_", "max_")) or field.name in (
+            "disjoint",
+            "exhaustive",
+        ):
+            facet_attrs[field.name] = msgspec.to_builtins(val)
+            continue
+
         if isinstance(val, list):
             has_list_fields = True
             col_key = f"{facet_name}:{tag}:{field.name}"

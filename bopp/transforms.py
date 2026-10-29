@@ -16,7 +16,7 @@ from .exceptions import BoppArgumentError, BoppValidationError
 from .models.v1.extent.time import Time
 from .models.v1.metadata.derived import DerivedAnnotationMetadata
 from .registries import get_registry
-from .util import _get_tag
+from .util import EXTENT_AXES_METADATA, _get_tag, _to_coord, is_exhaustive
 
 # Mapping default target_field when target_field is None
 DEFAULT_TARGET_FIELDS: dict[str, str] = {
@@ -88,6 +88,13 @@ FRACTION_AXES: frozenset[tuple[str, str]] = frozenset(
     }
 )
 
+INTEGER_AXES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("text", "offset"),
+        ("text_interval", "offset"),
+    }
+)
+
 
 _SCORE_EXTENT_CONVERSIONS: dict[str, tuple[str, str]] = {
     "to_score_quarter": ("score_quarter_float", "score_quarter"),
@@ -123,6 +130,11 @@ def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]
         return {}
     result = {}
     for field in msgspec.structs.fields(type(struct)):
+        if field.name.startswith(("min_", "max_")) or field.name in (
+            "disjoint",
+            "exhaustive",
+        ):
+            continue
         val = getattr(struct, field.name)
         if isinstance(val, list):
             result[field.name] = val
@@ -250,7 +262,7 @@ def _resample_groupings(
     for g in groupings:
         fill_val = fill_map.get(g.name, -1)
         new_ids = [fill_val if idx is None else g.ids[idx] for idx in matched_indices]
-        new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
+        new_groupings.append(msgspec.structs.replace(g, ids=new_ids, exhaustive=False))
     return new_groupings
 
 
@@ -272,6 +284,37 @@ def _coerce_trim_bound(value: _TrimBound) -> float | Fraction | None:
 def _fraction_pair(value: Fraction) -> list[int]:
     """Encode a reduced fraction as a JSON-compatible pair."""
     return [value.numerator, value.denominator]
+
+
+def _get_extent_axis_bound_attrs(
+    extent_tag: str, target_field: str
+) -> tuple[str, str] | None:
+    """Return the (min_attr, max_attr) field names for an extent axis, if defined."""
+    specs = EXTENT_AXES_METADATA.get(extent_tag, [])
+    for spec in specs:
+        if (
+            spec.get("origin") == target_field
+            or spec.get("field") == target_field
+            or spec.get("dim") == target_field
+        ):
+            min_attr = spec.get("min_attr")
+            max_attr = spec.get("max_attr")
+            if min_attr and max_attr:
+                return min_attr, max_attr
+    return None
+
+
+def _format_bound_value(val: Any, *, fraction_axis: bool, integer_axis: bool) -> Any:
+    """Format a coordinate bound value into the schema-conforming type for the axis."""
+    if fraction_axis:
+        if isinstance(val, (list, tuple)):
+            return [int(val[0]), int(val[1])]
+        if isinstance(val, Fraction):
+            return _fraction_pair(val)
+        return _fraction_pair(Fraction(val))
+    if integer_axis:
+        return round(val)
+    return float(val)
 
 
 def _conversion_extent(
@@ -556,6 +599,7 @@ def trim(
     extent = getattr(annotation, "extent", msgspec.UNSET)
     axis_config = None
     fraction_axis = False
+    integer_axis = False
     extent_tag = None
     if extent is not msgspec.UNSET and extent is not None:
         extent_tag = _get_tag(extent)
@@ -579,6 +623,7 @@ def trim(
                 )
 
             fraction_axis = (extent_tag, resolved_target_field) in FRACTION_AXES
+            integer_axis = (extent_tag, resolved_target_field) in INTEGER_AXES
         elif resolved_target_field != "time":
             raise BoppArgumentError(
                 f"Unsupported target_field '{resolved_target_field}' for extent tag 'time_uniform'."
@@ -671,12 +716,86 @@ def trim(
                 else (float(new_start) - tu_shift)
             )
 
-        tu_new_extent = msgspec.structs.replace(
-            extent, start_time=float(new_start_time)
+        tu_updates: dict[str, Any] = {"start_time": float(new_start_time)}
+        old_min = getattr(extent, "min_time", msgspec.UNSET)
+        old_max = getattr(extent, "max_time", msgspec.UNSET)
+        old_min_f = (
+            float(old_min)
+            if old_min is not msgspec.UNSET and old_min is not None
+            else None
         )
+        old_max_f = (
+            float(old_max)
+            if old_max is not msgspec.UNSET and old_max is not None
+            else None
+        )
+
+        if old_min_f is not None and old_max_f is not None:
+            coord_min = (
+                max(old_min_f, float(new_start))
+                if new_start is not None
+                else old_min_f
+            )
+            coord_max = (
+                min(old_max_f, float(new_end))
+                if new_end is not None
+                else old_max_f
+            )
+            coord_max = max(coord_max, coord_min)
+            tu_updates["min_time"] = coord_min - tu_shift if reset else coord_min
+            tu_updates["max_time"] = coord_max - tu_shift if reset else coord_max
+        elif old_min_f is not None:
+            coord_min = (
+                max(old_min_f, float(new_start))
+                if new_start is not None
+                else old_min_f
+            )
+            tu_updates["min_time"] = coord_min - tu_shift if reset else coord_min
+        elif old_max_f is not None:
+            coord_max = (
+                min(old_max_f, float(new_end))
+                if new_end is not None
+                else old_max_f
+            )
+            tu_updates["max_time"] = coord_max - tu_shift if reset else coord_max
+
+        tu_exhaustive = False
+        if (
+            getattr(extent, "exhaustive", False) is True
+            and len(tu_kept_indices) > 0
+            and not strict
+        ):
+            candidate_tu = msgspec.structs.replace(
+                extent, exhaustive=False, **tu_updates
+            )
+            if is_exhaustive(candidate_tu, N=len(tu_kept_indices)):
+                tu_exhaustive = True
+
+        tu_updates["exhaustive"] = tu_exhaustive
+        tu_new_extent = msgspec.structs.replace(extent, **tu_updates)
         new_payload = _subset_struct_lists(payload, tu_kept_indices)
         new_confidence = _subset_struct_lists(confidence, tu_kept_indices)
         new_groupings = _subset_groupings(groupings, tu_kept_indices)
+        if new_groupings not in (None, msgspec.UNSET):
+            updated_groupings = []
+            for g in new_groupings:
+                g_exhaustive = False
+                if (
+                    getattr(g, "exhaustive", False) is True
+                    and len(tu_kept_indices) > 0
+                    and not strict
+                ):
+                    candidate_g = msgspec.structs.replace(g, exhaustive=False)
+                    if is_exhaustive(
+                        tu_new_extent,
+                        grouping=candidate_g,
+                        N=len(tu_kept_indices),
+                    ):
+                        g_exhaustive = True
+                updated_groupings.append(
+                    msgspec.structs.replace(g, exhaustive=g_exhaustive)
+                )
+            new_groupings = updated_groupings
 
         return _rebuild_annotation(
             annotation,
@@ -689,7 +808,7 @@ def trim(
             groupings=new_groupings,
         )
 
-    if axis_config is None:
+    if axis_config is None or not isinstance(extent, msgspec.Struct):
         return _rebuild_annotation(
             annotation,
             parents=new_parents,
@@ -707,7 +826,7 @@ def trim(
     shift = (
         new_start
         if (reset and new_start is not None)
-        else (Fraction(0) if fraction_axis else 0.0)
+        else (Fraction(0) if fraction_axis else (0 if integer_axis else 0.0))
     )
 
     extent_updates: dict[str, list[Any]] = {}
@@ -796,11 +915,115 @@ def trim(
             field: [_fraction_pair(value) for value in values]
             for field, values in extent_updates.items()
         }
+    elif integer_axis:
+        extent_updates = {
+            field: [round(value) for value in values]
+            for field, values in extent_updates.items()
+        }
 
-    new_extent = _subset_struct_lists(extent, kept_indices, overrides=extent_updates)
+    min_max_attrs = (
+        _get_extent_axis_bound_attrs(extent_tag, resolved_target_field)
+        if extent_tag is not None and resolved_target_field is not None
+        else None
+    )
+    scalar_updates: dict[str, Any] = {}
+    if min_max_attrs is not None:
+        min_attr, max_attr = min_max_attrs
+        old_min = getattr(extent, min_attr, msgspec.UNSET)
+        old_max = getattr(extent, max_attr, msgspec.UNSET)
+        has_old_min = old_min is not msgspec.UNSET and old_min is not None
+        has_old_max = old_max is not msgspec.UNSET and old_max is not None
+
+        if has_old_min and has_old_max:
+            coord_old_min = _to_coord(old_min)
+            coord_old_max = _to_coord(old_max)
+            coord_min = (
+                max(coord_old_min, new_start)
+                if new_start is not None
+                else coord_old_min
+            )
+            coord_max = (
+                min(coord_old_max, new_end) if new_end is not None else coord_old_max
+            )
+            coord_max = max(coord_max, coord_min)
+            final_min = coord_min - shift if reset else coord_min
+            final_max = coord_max - shift if reset else coord_max
+            scalar_updates[min_attr] = _format_bound_value(
+                final_min, fraction_axis=fraction_axis, integer_axis=integer_axis
+            )
+            scalar_updates[max_attr] = _format_bound_value(
+                final_max, fraction_axis=fraction_axis, integer_axis=integer_axis
+            )
+        elif has_old_min:
+            coord_old_min = _to_coord(old_min)
+            coord_min = (
+                max(coord_old_min, new_start)
+                if new_start is not None
+                else coord_old_min
+            )
+            final_min = coord_min - shift if reset else coord_min
+            scalar_updates[min_attr] = _format_bound_value(
+                final_min, fraction_axis=fraction_axis, integer_axis=integer_axis
+            )
+        elif has_old_max:
+            coord_old_max = _to_coord(old_max)
+            coord_max = (
+                min(coord_old_max, new_end) if new_end is not None else coord_old_max
+            )
+            final_max = coord_max - shift if reset else coord_max
+            scalar_updates[max_attr] = _format_bound_value(
+                final_max, fraction_axis=fraction_axis, integer_axis=integer_axis
+            )
+
+    raw_extent = _subset_struct_lists(
+        extent, kept_indices, overrides=extent_updates
+    )
+    candidate_extent: msgspec.Struct = (
+        raw_extent if isinstance(raw_extent, msgspec.Struct) else extent
+    )
+
+    if scalar_updates:
+        candidate_extent = msgspec.structs.replace(
+            candidate_extent, **scalar_updates
+        )
+
+    extent_exhaustive = False
+    if (
+        getattr(extent, "exhaustive", False) is True
+        and len(kept_indices) > 0
+        and not strict
+    ):
+        candidate_check = msgspec.structs.replace(
+            candidate_extent, exhaustive=False
+        )
+        if is_exhaustive(candidate_check, N=len(kept_indices)):
+            extent_exhaustive = True
+
+    scalar_updates["exhaustive"] = extent_exhaustive
+    new_extent = msgspec.structs.replace(candidate_extent, **scalar_updates)
     new_payload = _subset_struct_lists(payload, kept_indices)
     new_confidence = _subset_struct_lists(confidence, kept_indices)
     new_groupings = _subset_groupings(groupings, kept_indices)
+    if new_groupings not in (None, msgspec.UNSET):
+        updated_groupings = []
+        for g in new_groupings:
+            g_exhaustive = False
+            if (
+                getattr(g, "exhaustive", False) is True
+                and len(kept_indices) > 0
+                and not strict
+            ):
+                candidate_g = msgspec.structs.replace(g, exhaustive=False)
+                if is_exhaustive(
+                    new_extent,
+                    grouping=candidate_g,
+                    N=len(kept_indices),
+                ):
+                    g_exhaustive = True
+            updated_groupings.append(
+                msgspec.structs.replace(g, exhaustive=g_exhaustive)
+            )
+        new_groupings = updated_groupings
 
     return _rebuild_annotation(
         annotation,
@@ -1058,6 +1281,28 @@ def filter_by(
     new_extent = _subset_struct_lists(extent, kept_indices)
     new_confidence = _subset_struct_lists(confidence, kept_indices)
     new_groupings = _subset_groupings(groupings, kept_indices)
+
+    if (
+        new_extent is not None
+        and new_extent is not msgspec.UNSET
+        and getattr(new_extent, "exhaustive", False) is True
+        and len(kept_indices) < n_obs
+    ):
+        new_extent = msgspec.structs.replace(new_extent, exhaustive=False)
+
+    if (
+        new_groupings is not None
+        and new_groupings is not msgspec.UNSET
+        and len(kept_indices) < n_obs
+    ):
+        new_groupings = [
+            (
+                msgspec.structs.replace(g, exhaustive=False)
+                if getattr(g, "exhaustive", False) is True
+                else g
+            )
+            for g in new_groupings
+        ]
 
     return _rebuild_annotation(
         annotation,
