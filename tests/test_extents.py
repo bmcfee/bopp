@@ -408,43 +408,36 @@ def test_time_frequency_box_bound_constraints():
         "freq_min": [100.0],
         "freq_max": [200.0],
     }
-    # Valid explicit bounds
+    # Valid explicit bounds including negative time
     ann_valid = create(
         media_id="audio:tf_valid",
         payload_type="tag",
         extent_type="time_frequency_box",
-        min_time=0.0,
+        time=[-0.5],
+        duration=[1.0],
+        freq_min=[100.0],
+        freq_max=[200.0],
+        min_time=-1.0,
         max_time=5.0,
         min_freq=0.0,
         max_freq=500.0,
         value=["v"],
-        **base_kwargs,
     )
     assert validate(ann_valid) is True
 
-    # min_time < 0.0
-    bad_min_time = create(
-        media_id="audio:tf_bad",
+    # Negative duration is rejected
+    bad_duration = create(
+        media_id="audio:tf_bad_dur",
         payload_type="tag",
         extent_type="time_frequency_box",
-        min_time=-0.1,
+        time=[0.0],
+        duration=[-0.1],
+        freq_min=[100.0],
+        freq_max=[200.0],
         value=["v"],
-        **base_kwargs,
     )
     with pytest.raises(BoppValidationError):
-        validate(bad_min_time)
-
-    # max_time < 0.0
-    bad_max_time = create(
-        media_id="audio:tf_bad",
-        payload_type="tag",
-        extent_type="time_frequency_box",
-        max_time=-0.1,
-        value=["v"],
-        **base_kwargs,
-    )
-    with pytest.raises(BoppValidationError):
-        validate(bad_max_time)
+        validate(bad_duration)
 
     # min_freq < 0.0
     bad_min_freq = create(
