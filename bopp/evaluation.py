@@ -625,33 +625,13 @@ def _extract_multipitch_series(ann: BoppBase, role: str) -> tuple[Any, list[Any]
             f"Voicing array length ({len(voiced_flags)}) does not match frequencies length ({len(raw_freqs)}) for {role}."
         )
 
-    groupings = getattr(ann, "groupings", None)
-    if groupings is not None and groupings is not msgspec.UNSET and len(groupings) > 0:
-        if len(groupings) > 1:
-            raise BoppArgumentError(
-                f"Multipitch evaluation requires at most one grouping on {role} annotation, found {len(groupings)}."
-            )
-        g = groupings[0]
-        idx = [i for i, gid in enumerate(g.ids) if gid >= 0]
-        if not idx:
-            raise BoppArgumentError(
-                f"Grouping '{g.name}' on {role} contains no non-negative group IDs."
-            )
-        times = raw_times[idx]
-        freqs = raw_freqs[idx]
-        voiced = voiced_flags[idx]
-    else:
-        times = raw_times
-        freqs = raw_freqs
-        voiced = voiced_flags
-
-    unique_times = np.unique(times)
-    active_mask = voiced & (freqs > 0)
+    unique_times = np.unique(raw_times)
+    active_mask = voiced_flags & (raw_freqs > 0)
 
     freqs_list: list[Any] = []
     for t in unique_times:
-        t_mask = (times == t) & active_mask
-        t_freqs = freqs[t_mask]
+        t_mask = (raw_times == t) & active_mask
+        t_freqs = raw_freqs[t_mask]
         if len(t_freqs) == 0:
             freqs_list.append(np.empty(0, dtype=np.float64))
         else:
@@ -767,19 +747,10 @@ def evaluate(
                 "cartesian_time_interval",
             ):
                 resolved_task = "transcription"
+            elif not getattr(ref_extent, "disjoint", False):
+                resolved_task = "multipitch"
             else:
-                ref_groupings = getattr(ref, "groupings", None)
-                has_multi_contours = (
-                    ref_groupings is not None
-                    and ref_groupings is not msgspec.UNSET
-                    and len(ref_groupings) == 1
-                    and len({gid for gid in ref_groupings[0].ids if gid >= 0}) > 1
-                )
-                is_disjoint = getattr(ref_extent, "disjoint", False)
-                if not is_disjoint or has_multi_contours:
-                    resolved_task = "multipitch"
-                else:
-                    resolved_task = "melody"
+                resolved_task = "melody"
         else:
             resolved_task = PAYLOAD_TASK_MAP.get(ref_tag)
             if resolved_task is None:

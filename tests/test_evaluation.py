@@ -1397,7 +1397,7 @@ def test_evaluate_multipitch_resampling_and_validation_errors():
     with pytest.raises(BoppArgumentError, match="requires non-empty observations"):
         evaluate(empty_mp, valid_mp, task="multipitch")
 
-    # 4. Multiple groupings
+    # 4. Groupings on annotation do not restrict multipitch evaluation
     multi_groupings = create(
         media_id="audio:1",
         payload_type="frequency_hz",
@@ -1410,27 +1410,13 @@ def test_evaluate_multipitch_resampling_and_validation_errors():
             {"name": "g2", "ids": [1, 1], "disjoint": True, "exhaustive": False},
         ],
     )
-    with pytest.raises(BoppArgumentError, match="requires at most one grouping"):
-        evaluate(multi_groupings, valid_mp, task="multipitch")
+    res_grouped = evaluate(multi_groupings, multi_groupings, task="multipitch")
+    assert "Accuracy" in res_grouped
+    assert res_grouped["Accuracy"] == 1.0
 
-    # 5. Grouping with only negative IDs
+    # 5. Mismatched array lengths
     import copy
 
-    g_mp = create(
-        media_id="audio:1",
-        payload_type="frequency_hz",
-        extent_type="time",
-        time=[0.0, 0.1],
-        value=[440.0, 440.0],
-        disjoint=True,
-        groupings=[{"name": "g", "ids": [0, 0], "disjoint": True, "exhaustive": False}],
-    )
-    bad_mp_neg = copy.deepcopy(g_mp)
-    object.__setattr__(bad_mp_neg.groupings[0], "ids", [-1, -1])
-    with pytest.raises(BoppArgumentError, match="contains no non-negative group IDs"):
-        evaluate(bad_mp_neg, valid_mp, task="multipitch")
-
-    # 6. Mismatched array lengths
     bad_lens = copy.deepcopy(valid_mp)
     bad_lens.payload.value = [440.0]
     with pytest.raises(
