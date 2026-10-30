@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 from .. import core
 
@@ -14,3 +14,20 @@ class ScoreQuarterNotes(Struct, tag_field="extent_type", tag="score_quarter"):
     quarter: Annotated[
         list[core.Fraction], Meta(description="An array of fractional quarter values.")
     ]
+    disjoint: Annotated[
+        bool, Meta(description="Indicates whether all quarter positions are unique.")
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether quarter observations cover the range without missing observations."
+        ),
+    ]
+    min_quarter: (
+        Annotated[core.Fraction, Meta(description="Lower bound in quarter notes.")]
+        | UnsetType
+    ) = UNSET
+    max_quarter: (
+        Annotated[core.Fraction, Meta(description="Upper bound in quarter notes.")]
+        | UnsetType
+    ) = UNSET

@@ -259,7 +259,9 @@ def test_repr_mimebundle():
 
 
 def test_grouping_without_labels():
-    grouping = Grouping(name="sections", ids=[0, 1, 0, 1, 2])
+    grouping = Grouping(
+        name="sections", ids=[0, 1, 0, 1, 2], disjoint=False, exhaustive=False
+    )
     assert grouping.name == "sections"
     assert grouping.ids == [0, 1, 0, 1, 2]
     assert grouping.labels is msgspec.UNSET
@@ -272,6 +274,8 @@ def test_grouping_valid_bijective_labels():
             name="sections",
             ids=[0, 1, 0, 2],
             labels={"verse": 0, "chorus": 1, "bridge": 2},
+            disjoint=False,
+            exhaustive=False,
         )
     assert grouping.labels == {"verse": 0, "chorus": 1, "bridge": 2}
 
@@ -283,6 +287,8 @@ def test_grouping_negative_ids_allowed_unmapped():
             name="sections",
             ids=[-1, 0, -1, 1],
             labels={"verse": 0, "chorus": 1},
+            disjoint=False,
+            exhaustive=False,
         )
     assert grouping.ids == [-1, 0, -1, 1]
 
@@ -296,6 +302,8 @@ def test_grouping_warns_unmapped_non_negative_ids():
             name="sections",
             ids=[0, 1, 2],
             labels={"verse": 0, "chorus": 1},
+            disjoint=False,
+            exhaustive=False,
         )
 
 
@@ -308,6 +316,8 @@ def test_grouping_duplicate_id_values_raises():
             name="sections",
             ids=[0, 0],
             labels={"verse": 0, "chorus": 0},
+            disjoint=False,
+            exhaustive=False,
         )
 
 
@@ -353,8 +363,8 @@ def test_duplicate_grouping_names_raises():
             metadata=HumanAnnotationMetadata(annotator_id="user_1", tool="manual"),
             payload=MarkerPayload(description="test"),
             groupings=[
-                Grouping(name="sections", ids=[0, 1]),
-                Grouping(name="sections", ids=[1, 0]),
+                Grouping(name="sections", ids=[0, 1], disjoint=False, exhaustive=False),
+                Grouping(name="sections", ids=[1, 0], disjoint=False, exhaustive=False),
             ],
         )
 
@@ -368,7 +378,9 @@ def test_create_with_metadata_and_groupings():
         annotator_id="user_1",
         tool="sonic-visualiser",
         description="beats",
-        groupings=[Grouping(name="beats", ids=[0, 1])],
+        groupings=[
+            Grouping(name="beats", ids=[0, 1], disjoint=False, exhaustive=False)
+        ],
     )
     assert isinstance(ann1.metadata, HumanAnnotationMetadata)
     assert ann1.metadata.annotator_id == "user_1"

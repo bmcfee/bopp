@@ -237,11 +237,17 @@ def test_csv_roundtrip_with_groupings(tmp_path):
     ann = Annotation(
         media_id="track:csv_groupings",
         bopp_version="1.0",
-        extent=Time(time=[0.1, 0.4]),
+        extent=Time(time=[0.1, 0.4], disjoint=True, exhaustive=False),
         payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
-            Grouping(name="voices", ids=[0, 1], labels={"v1": 0, "v2": 1}),
-            Grouping(name="phrases", ids=[10, 10]),
+            Grouping(
+                name="voices",
+                ids=[0, 1],
+                labels={"v1": 0, "v2": 1},
+                disjoint=True,
+                exhaustive=False,
+            ),
+            Grouping(name="phrases", ids=[10, 10], disjoint=True, exhaustive=False),
         ],
     )
     file_path = tmp_path / "test_groupings.csv"
@@ -262,10 +268,10 @@ def test_csv_roundtrip_with_groupings_pandas(tmp_path):
     ann = Annotation(
         media_id="track:csv_groupings_pd",
         bopp_version="1.0",
-        extent=Time(time=[0.1, 0.4]),
+        extent=Time(time=[0.1, 0.4], disjoint=True, exhaustive=False),
         payload=BeatPositionPayload(value=[1, 2]),
         groupings=[
-            Grouping(name="voices", ids=[0, 1]),
+            Grouping(name="voices", ids=[0, 1], disjoint=True, exhaustive=False),
         ],
     )
     file_path = tmp_path / "test_groupings_pd.csv"

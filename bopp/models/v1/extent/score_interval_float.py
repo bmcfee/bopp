@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
@@ -23,3 +23,21 @@ class ScoreIntervalFloat(Struct, tag_field="extent_type", tag="score_interval_fl
             description="Array of interval durations in quarter notes, as floating-point numbers."
         ),
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all quarter intervals in the extent are non-overlapping."
+        ),
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether quarter intervals fully cover the range without gaps."
+        ),
+    ]
+    min_quarter: (
+        Annotated[float, Meta(description="Lower bound in quarter notes.")] | UnsetType
+    ) = UNSET
+    max_quarter: (
+        Annotated[float, Meta(description="Upper bound in quarter notes.")] | UnsetType
+    ) = UNSET

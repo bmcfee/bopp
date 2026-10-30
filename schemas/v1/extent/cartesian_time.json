@@ -35,7 +35,55 @@
       "items": {
         "type": "number"
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all spatiotemporal points (time, x, y, z) are unique."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether spatiotemporal observations cover the range without missing observations."
+    },
+    "min_time": {
+      "type": "number",
+      "description": "Lower bound of the time extent in seconds."
+    },
+    "max_time": {
+      "type": "number",
+      "description": "Upper bound of the time extent in seconds."
+    },
+    "min_x": {
+      "type": "number",
+      "description": "Lower bound along x-axis in space."
+    },
+    "max_x": {
+      "type": "number",
+      "description": "Upper bound along x-axis in space."
+    },
+    "min_y": {
+      "type": "number",
+      "description": "Lower bound along y-axis in space."
+    },
+    "max_y": {
+      "type": "number",
+      "description": "Upper bound along y-axis in space."
+    },
+    "min_z": {
+      "type": "number",
+      "description": "Lower bound along z-axis in space."
+    },
+    "max_z": {
+      "type": "number",
+      "description": "Upper bound along z-axis in space."
     }
   },
-  "required": ["extent_type", "time", "x", "y", "z"]
+  "required": [
+    "extent_type",
+    "time",
+    "x",
+    "y",
+    "z",
+    "disjoint",
+    "exhaustive"
+  ]
 }

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
@@ -18,3 +18,21 @@ class MidiInterval(Struct, tag_field="extent_type", tag="midi_interval"):
         list[DurationItem],
         Meta(description="Array of interval durations in MIDI ticks."),
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all MIDI intervals in the extent are non-overlapping."
+        ),
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether MIDI intervals fully cover the tick range without gaps."
+        ),
+    ]
+    min_tick: (
+        Annotated[float, Meta(description="Lower bound in MIDI ticks.")] | UnsetType
+    ) = UNSET
+    max_tick: (
+        Annotated[float, Meta(description="Upper bound in MIDI ticks.")] | UnsetType
+    ) = UNSET

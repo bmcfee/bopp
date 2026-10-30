@@ -5,10 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
-
-type TimeItem = Annotated[float, Meta(ge=0.0)]
-
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
@@ -20,9 +17,7 @@ type FreqMaxItem = Annotated[float, Meta(ge=0.0)]
 
 
 class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequency_box"):
-    time: Annotated[
-        list[TimeItem], Meta(description="Array of start times in seconds.")
-    ]
+    time: Annotated[list[float], Meta(description="Array of start times in seconds.")]
     duration: Annotated[
         list[DurationItem], Meta(description="Array of box durations in seconds.")
     ]
@@ -32,3 +27,37 @@ class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequenc
     freq_max: Annotated[
         list[FreqMaxItem], Meta(description="Array of maximum frequencies in Hz.")
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all time-frequency boxes in the extent are non-overlapping."
+        ),
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether the boxes fully cover the time-frequency range without gaps."
+        ),
+    ]
+    min_time: (
+        Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    max_time: (
+        Annotated[float, Meta(description="Upper bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    min_freq: (
+        Annotated[
+            float,
+            Meta(description="Lower bound of the frequency extent in Hz.", ge=0.0),
+        ]
+        | UnsetType
+    ) = UNSET
+    max_freq: (
+        Annotated[
+            float,
+            Meta(description="Upper bound of the frequency extent in Hz.", ge=0.0),
+        ]
+        | UnsetType
+    ) = UNSET

@@ -36,7 +36,39 @@
         "type": "number",
         "minimum": 0.0
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all pixel boxes in the extent are non-overlapping."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether the pixel boxes fully cover the pixel range without gaps."
+    },
+    "min_x": {
+      "type": "number",
+      "description": "Lower bound along x-axis in pixels."
+    },
+    "max_x": {
+      "type": "number",
+      "description": "Upper bound along x-axis in pixels."
+    },
+    "min_y": {
+      "type": "number",
+      "description": "Lower bound along y-axis in pixels."
+    },
+    "max_y": {
+      "type": "number",
+      "description": "Upper bound along y-axis in pixels."
     }
   },
-  "required": ["extent_type", "x", "width", "y", "height"]
+  "required": [
+    "extent_type",
+    "x",
+    "width",
+    "y",
+    "height",
+    "disjoint",
+    "exhaustive"
+  ]
 }

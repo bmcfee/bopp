@@ -21,7 +21,29 @@
         "type": "number",
         "minimum": 0.0
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all MIDI intervals in the extent are non-overlapping."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether MIDI intervals fully cover the tick range without gaps."
+    },
+    "min_tick": {
+      "type": "number",
+      "description": "Lower bound in MIDI ticks."
+    },
+    "max_tick": {
+      "type": "number",
+      "description": "Upper bound in MIDI ticks."
     }
   },
-  "required": ["extent_type", "tick", "duration"]
+  "required": [
+    "extent_type",
+    "tick",
+    "duration",
+    "disjoint",
+    "exhaustive"
+  ]
 }

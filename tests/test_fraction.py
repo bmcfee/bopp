@@ -44,7 +44,14 @@ def test_fraction_schema_values(target_type, value, expected_valid):
 def test_score_quarter_accepts_signed_numerator(quarter):
     """Score quarters accept zero and negative numerators as tuples."""
     decoded = msgspec.json.decode(
-        msgspec.json.encode({"extent_type": "score_quarter", "quarter": quarter}),
+        msgspec.json.encode(
+            {
+                "extent_type": "score_quarter",
+                "quarter": quarter,
+                "disjoint": False,
+                "exhaustive": False,
+            }
+        ),
         type=ScoreQuarterNotes,
     )
     assert decoded.quarter == [tuple(value) for value in quarter]
@@ -55,7 +62,14 @@ def test_score_quarter_rejects_invalid_fraction(quarter):
     """Score quarters reject nonpositive denominators and invalid lengths."""
     with pytest.raises(msgspec.ValidationError):
         msgspec.json.decode(
-            msgspec.json.encode({"extent_type": "score_quarter", "quarter": quarter}),
+            msgspec.json.encode(
+                {
+                    "extent_type": "score_quarter",
+                    "quarter": quarter,
+                    "disjoint": False,
+                    "exhaustive": False,
+                }
+            ),
             type=ScoreQuarterNotes,
         )
 
@@ -63,7 +77,7 @@ def test_score_quarter_rejects_invalid_fraction(quarter):
 def test_score_interval_accepts_zero_duration():
     """Score intervals accept zero duration and a zero start quarter."""
     decoded = msgspec.json.decode(
-        b'{"extent_type": "score_interval", "quarter": [[0, 1]], "duration": [[0, 1]]}',
+        b'{"extent_type": "score_interval", "quarter": [[0, 1]], "duration": [[0, 1]], "disjoint": false, "exhaustive": false}',
         type=ScoreInterval,
     )
     assert decoded.quarter == [(0, 1)]

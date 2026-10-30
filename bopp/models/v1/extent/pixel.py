@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class Pixel(Struct, tag_field="extent_type", tag="pixel"):
@@ -19,3 +19,28 @@ class Pixel(Struct, tag_field="extent_type", tag="pixel"):
     y: Annotated[
         list[float], Meta(description="Array of vertical y-coordinates in pixels.")
     ]
+    disjoint: Annotated[
+        bool, Meta(description="Indicates whether all pixel coordinates are unique.")
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether the pixel observations cover the coordinate range without missing observations."
+        ),
+    ]
+    min_x: (
+        Annotated[float, Meta(description="Lower bound along x-axis in pixels.")]
+        | UnsetType
+    ) = UNSET
+    max_x: (
+        Annotated[float, Meta(description="Upper bound along x-axis in pixels.")]
+        | UnsetType
+    ) = UNSET
+    min_y: (
+        Annotated[float, Meta(description="Lower bound along y-axis in pixels.")]
+        | UnsetType
+    ) = UNSET
+    max_y: (
+        Annotated[float, Meta(description="Upper bound along y-axis in pixels.")]
+        | UnsetType
+    ) = UNSET

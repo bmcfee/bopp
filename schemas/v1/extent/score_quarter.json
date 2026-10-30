@@ -13,7 +13,28 @@
       "items": {
         "$ref": "../core.json#/$defs/Fraction"
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all quarter positions are unique."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether quarter observations cover the range without missing observations."
+    },
+    "min_quarter": {
+      "$ref": "../core.json#/$defs/Fraction",
+      "description": "Lower bound in quarter notes."
+    },
+    "max_quarter": {
+      "$ref": "../core.json#/$defs/Fraction",
+      "description": "Upper bound in quarter notes."
     }
   },
-  "required": ["extent_type", "quarter"]
+  "required": [
+    "extent_type",
+    "quarter",
+    "disjoint",
+    "exhaustive"
+  ]
 }

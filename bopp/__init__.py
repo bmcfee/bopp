@@ -41,6 +41,12 @@ from .transforms import (
     to_times,
     trim,
 )
+from .util import (
+    get_extent_bounds,
+    infer_extent_bounds,
+    is_disjoint,
+    is_exhaustive,
+)
 
 __all__ = [
     "DEFAULT_SCHEMA_VERSION",
@@ -59,8 +65,12 @@ __all__ = [
     "extensions",
     "filter_by",
     "get_current_schema_version",
+    "get_extent_bounds",
     "get_registry_version",
+    "infer_extent_bounds",
     "io",
+    "is_disjoint",
+    "is_exhaustive",
     "models",
     "registries",
     "resolve_extensions",

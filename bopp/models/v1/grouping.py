@@ -18,6 +18,18 @@ class Grouping(GroupingBase):
             description="Parallel array of signed integer group IDs corresponding to annotation elements"
         ),
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether observations within each group (non-negative group ID) are non-overlapping."
+        ),
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether observations within each group (non-negative group ID) cover the extent bounds without gaps."
+        ),
+    ]
     labels: (
         Annotated[
             dict[str, int],

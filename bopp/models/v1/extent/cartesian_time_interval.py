@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
@@ -26,3 +26,47 @@ class CartesianTimeIntervalExtent(
     x: Annotated[list[float], Meta(description="Array of x-coordinates in space.")]
     y: Annotated[list[float], Meta(description="Array of y-coordinates in space.")]
     z: Annotated[list[float], Meta(description="Array of z-coordinates in space.")]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether time intervals at identical spatial coordinates are non-overlapping."
+        ),
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether time intervals cover the time range without gaps."
+        ),
+    ]
+    min_time: (
+        Annotated[float, Meta(description="Lower bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    max_time: (
+        Annotated[float, Meta(description="Upper bound of the time extent in seconds.")]
+        | UnsetType
+    ) = UNSET
+    min_x: (
+        Annotated[float, Meta(description="Lower bound along x-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    max_x: (
+        Annotated[float, Meta(description="Upper bound along x-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    min_y: (
+        Annotated[float, Meta(description="Lower bound along y-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    max_y: (
+        Annotated[float, Meta(description="Upper bound along y-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    min_z: (
+        Annotated[float, Meta(description="Lower bound along z-axis in space.")]
+        | UnsetType
+    ) = UNSET
+    max_z: (
+        Annotated[float, Meta(description="Upper bound along z-axis in space.")]
+        | UnsetType
+    ) = UNSET

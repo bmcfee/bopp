@@ -15,7 +15,30 @@
         "type": "integer",
         "minimum": 0
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all character offsets are unique."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether all character positions in the range are observed."
+    },
+    "min_offset": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Lower bound character offset."
+    },
+    "max_offset": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Upper bound character offset."
     }
   },
-  "required": ["extent_type", "offset"]
+  "required": [
+    "extent_type",
+    "offset",
+    "disjoint",
+    "exhaustive"
+  ]
 }

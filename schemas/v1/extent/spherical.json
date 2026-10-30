@@ -33,7 +33,56 @@
         "type": "number",
         "minimum": 0.0
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all spherical coordinates (azimuth, elevation, radius) are unique."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether spherical observations cover the space without missing observations."
+    },
+    "min_azimuth": {
+      "type": "number",
+      "minimum": -180.0,
+      "exclusiveMaximum": 180.0,
+      "description": "Lower bound of azimuth angle in degrees in [-180, +180)."
+    },
+    "max_azimuth": {
+      "type": "number",
+      "minimum": -180.0,
+      "exclusiveMaximum": 180.0,
+      "description": "Upper bound of azimuth angle in degrees in [-180, +180)."
+    },
+    "min_elevation": {
+      "type": "number",
+      "minimum": -90.0,
+      "maximum": 90.0,
+      "description": "Lower bound of elevation angle in degrees in [-90, +90]."
+    },
+    "max_elevation": {
+      "type": "number",
+      "minimum": -90.0,
+      "maximum": 90.0,
+      "description": "Upper bound of elevation angle in degrees in [-90, +90]."
+    },
+    "min_radius": {
+      "type": "number",
+      "minimum": 0.0,
+      "description": "Lower bound of non-negative radial distance."
+    },
+    "max_radius": {
+      "type": "number",
+      "minimum": 0.0,
+      "description": "Upper bound of non-negative radial distance."
     }
   },
-  "required": ["extent_type", "azimuth", "elevation", "radius"]
+  "required": [
+    "extent_type",
+    "azimuth",
+    "elevation",
+    "radius",
+    "disjoint",
+    "exhaustive"
+  ]
 }

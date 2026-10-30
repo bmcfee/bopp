@@ -16,7 +16,30 @@
       "type": "number",
       "exclusiveMinimum": 0.0,
       "description": "Sampling period (time step) between consecutive observations in seconds."
+    },
+    "disjoint": {
+      "type": "boolean",
+      "const": true,
+      "description": "Uniformly sampled times are implicitly disjoint."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether the sampled timesteps cover the time range without gaps."
+    },
+    "min_time": {
+      "type": "number",
+      "description": "Lower bound of the time extent in seconds."
+    },
+    "max_time": {
+      "type": "number",
+      "description": "Upper bound of the time extent in seconds."
     }
   },
-  "required": ["extent_type", "start_time", "sampling_period"]
+  "required": [
+    "extent_type",
+    "start_time",
+    "sampling_period",
+    "disjoint",
+    "exhaustive"
+  ]
 }

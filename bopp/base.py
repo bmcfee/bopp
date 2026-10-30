@@ -50,16 +50,80 @@ class BoppBase(msgspec.Struct):
                 "across Extent, Payload, Confidence, and Groupings facets."
             )
 
+        extent_field = getattr(self, "extent", msgspec.UNSET)
+        if extent_field is not msgspec.UNSET and extent_field is not None:
+            from .util import _get_tag, is_disjoint, is_exhaustive
+
+            tag = _get_tag(extent_field)
+            # Special check for time_uniform: disjoint must be True
+            if (
+                tag == "time_uniform"
+                and getattr(extent_field, "disjoint", None) is not True
+            ):
+                raise BoppValidationError("Uniform time extent requires disjoint=True.")
+
+            if getattr(extent_field, "disjoint", False) is True and not is_disjoint(
+                extent_field
+            ):
+                raise BoppValidationError(
+                    f"Extent '{tag}' is marked disjoint=True, but observations overlap."
+                )
+
+            if getattr(extent_field, "exhaustive", False) is True:
+                n_obs = all_lengths[0] if all_lengths else 0
+                if not is_exhaustive(extent_field, N=n_obs):
+                    raise BoppValidationError(
+                        f"Extent '{tag}' is marked exhaustive=True, "
+                        "but observations do not cover the specified bounds without gaps."
+                    )
+
+            if groupings_field is not msgspec.UNSET and groupings_field is not None:
+                for g in groupings_field:
+                    if getattr(g, "disjoint", False) is True and not is_disjoint(
+                        extent_field, grouping=g
+                    ):
+                        raise BoppValidationError(
+                            f"Grouping '{getattr(g, 'name', '')}' is marked disjoint=True, "
+                            "but observations within at least one group overlap."
+                        )
+                    if getattr(g, "exhaustive", False) is True:
+                        n_obs = all_lengths[0] if all_lengths else 0
+                        if not is_exhaustive(extent_field, grouping=g, N=n_obs):
+                            raise BoppValidationError(
+                                f"Grouping '{getattr(g, 'name', '')}' is marked exhaustive=True, "
+                                "but observations within at least one group do not cover bounds without gaps."
+                            )
+        else:
+            if groupings_field is not msgspec.UNSET and groupings_field is not None:
+                for g in groupings_field:
+                    if getattr(g, "disjoint", False) is True:
+                        raise BoppValidationError(
+                            f"Grouping '{getattr(g, 'name', '')}' is marked disjoint=True, "
+                            "but annotation has no extent."
+                        )
+                    if getattr(g, "exhaustive", False) is True:
+                        raise BoppValidationError(
+                            f"Grouping '{getattr(g, 'name', '')}' is marked exhaustive=True, "
+                            "but annotation has no extent."
+                        )
+
     @staticmethod
     def _get_all_column_lengths(
-        facet_struct: msgspec.Struct, facet_name: str
+        facet_struct: msgspec.Struct | None, facet_name: str
     ) -> list[int]:
         """
         Dynamically scans a msgspec struct for all list/array fields
         and returns a list of their lengths.
         """
+        if facet_struct is None or facet_struct is msgspec.UNSET:
+            return []
         lengths = []
         for field in msgspec.structs.fields(type(facet_struct)):
+            if field.name.startswith(("min_", "max_")) or field.name in (
+                "disjoint",
+                "exhaustive",
+            ):
+                continue
             val = getattr(facet_struct, field.name)
 
             if isinstance(val, list):

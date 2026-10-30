@@ -163,6 +163,30 @@ def test_text_and_text_interval_constraints():
     with pytest.raises(BoppValidationError):
         validate(bad_ti)
 
+    # Invalid negative bound rejects on validation
+    bad_text_min_offset = create(
+        media_id="doc:bad_text_bound",
+        payload_type="tag",
+        extent_type="text",
+        offset=[0],
+        min_offset=-1,
+        value=["bad"],
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_text_min_offset)
+
+    bad_ti_max_offset = create(
+        media_id="doc:bad_ti_bound",
+        payload_type="tag",
+        extent_type="text_interval",
+        offset=[0],
+        length=[5],
+        max_offset=-1,
+        value=["bad"],
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_ti_max_offset)
+
 
 def test_spherical_range_constraints():
     # Valid bounds
@@ -253,6 +277,191 @@ def test_spherical_range_constraints():
     )
     with pytest.raises(BoppValidationError):
         validate(bad_r_neg)
+
+
+@pytest.mark.parametrize(
+    "extent_type, base_kwargs",
+    [
+        (
+            "spherical",
+            {
+                "azimuth": [0.0],
+                "elevation": [0.0],
+                "radius": [1.0],
+            },
+        ),
+        (
+            "spherical_time",
+            {
+                "time": [0.0],
+                "azimuth": [0.0],
+                "elevation": [0.0],
+                "radius": [1.0],
+            },
+        ),
+        (
+            "spherical_time_interval",
+            {
+                "time": [0.0],
+                "duration": [1.0],
+                "azimuth": [0.0],
+                "elevation": [0.0],
+                "radius": [1.0],
+            },
+        ),
+    ],
+)
+def test_spherical_bound_constraints(extent_type, base_kwargs):
+    # Valid explicit bounds
+    ann_valid = create(
+        media_id=f"audio:{extent_type}_valid",
+        payload_type="tag",
+        extent_type=extent_type,
+        min_azimuth=-180.0,
+        max_azimuth=179.9,
+        min_elevation=-90.0,
+        max_elevation=90.0,
+        min_radius=0.0,
+        max_radius=5.0,
+        value=["v"],
+        **base_kwargs,
+    )
+    assert validate(ann_valid) is True
+
+    # min_azimuth < -180.0
+    bad_min_az = create(
+        media_id=f"audio:{extent_type}_bad",
+        payload_type="tag",
+        extent_type=extent_type,
+        min_azimuth=-180.1,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_min_az)
+
+    # max_azimuth >= 180.0
+    bad_max_az = create(
+        media_id=f"audio:{extent_type}_bad",
+        payload_type="tag",
+        extent_type=extent_type,
+        max_azimuth=180.0,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_max_az)
+
+    # min_elevation < -90.0
+    bad_min_el = create(
+        media_id=f"audio:{extent_type}_bad",
+        payload_type="tag",
+        extent_type=extent_type,
+        min_elevation=-90.1,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_min_el)
+
+    # max_elevation > 90.0
+    bad_max_el = create(
+        media_id=f"audio:{extent_type}_bad",
+        payload_type="tag",
+        extent_type=extent_type,
+        max_elevation=90.1,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_max_el)
+
+    # min_radius < 0.0
+    bad_min_rad = create(
+        media_id=f"audio:{extent_type}_bad",
+        payload_type="tag",
+        extent_type=extent_type,
+        min_radius=-0.1,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_min_rad)
+
+    # max_radius < 0.0
+    bad_max_rad = create(
+        media_id=f"audio:{extent_type}_bad",
+        payload_type="tag",
+        extent_type=extent_type,
+        max_radius=-0.1,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_max_rad)
+
+
+def test_time_frequency_box_bound_constraints():
+    base_kwargs = {
+        "time": [1.0],
+        "duration": [1.0],
+        "freq_min": [100.0],
+        "freq_max": [200.0],
+    }
+    # Valid explicit bounds including negative time
+    ann_valid = create(
+        media_id="audio:tf_valid",
+        payload_type="tag",
+        extent_type="time_frequency_box",
+        time=[-0.5],
+        duration=[1.0],
+        freq_min=[100.0],
+        freq_max=[200.0],
+        min_time=-1.0,
+        max_time=5.0,
+        min_freq=0.0,
+        max_freq=500.0,
+        value=["v"],
+    )
+    assert validate(ann_valid) is True
+
+    # Negative duration is rejected
+    bad_duration = create(
+        media_id="audio:tf_bad_dur",
+        payload_type="tag",
+        extent_type="time_frequency_box",
+        time=[0.0],
+        duration=[-0.1],
+        freq_min=[100.0],
+        freq_max=[200.0],
+        value=["v"],
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_duration)
+
+    # min_freq < 0.0
+    bad_min_freq = create(
+        media_id="audio:tf_bad",
+        payload_type="tag",
+        extent_type="time_frequency_box",
+        min_freq=-1.0,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_min_freq)
+
+    # max_freq < 0.0
+    bad_max_freq = create(
+        media_id="audio:tf_bad",
+        payload_type="tag",
+        extent_type="time_frequency_box",
+        max_freq=-1.0,
+        value=["v"],
+        **base_kwargs,
+    )
+    with pytest.raises(BoppValidationError):
+        validate(bad_max_freq)
 
 
 def test_time_uniform_constraints():

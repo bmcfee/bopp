@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 type OffsetItem = Annotated[int, Meta(ge=0)]
 
@@ -26,3 +26,23 @@ class TextInterval(Struct, tag_field="extent_type", tag="text_interval"):
         list[LengthItem],
         Meta(description="Array of character span lengths (number of characters)."),
     ]
+    disjoint: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether all text intervals in the extent are non-overlapping."
+        ),
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether character intervals fully cover the text range without gaps."
+        ),
+    ]
+    min_offset: (
+        Annotated[int, Meta(description="Lower bound character offset.", ge=0)]
+        | UnsetType
+    ) = UNSET
+    max_offset: (
+        Annotated[int, Meta(description="Upper bound character offset.", ge=0)]
+        | UnsetType
+    ) = UNSET

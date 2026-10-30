@@ -13,7 +13,28 @@
       "items": {
         "type": "number"
       }
+    },
+    "disjoint": {
+      "type": "boolean",
+      "description": "Indicates whether all time values are unique."
+    },
+    "exhaustive": {
+      "type": "boolean",
+      "description": "Indicates whether the observations cover the time range with no missing observations."
+    },
+    "min_time": {
+      "type": "number",
+      "description": "Lower bound of the time extent in seconds."
+    },
+    "max_time": {
+      "type": "number",
+      "description": "Upper bound of the time extent in seconds."
     }
   },
-  "required": ["extent_type", "time"]
+  "required": [
+    "extent_type",
+    "time",
+    "disjoint",
+    "exhaustive"
+  ]
 }

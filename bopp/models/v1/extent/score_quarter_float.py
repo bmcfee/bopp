@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import UNSET, Meta, Struct, UnsetType
 
 
 class ScoreQuarterNotesFloat(
@@ -15,3 +15,18 @@ class ScoreQuarterNotesFloat(
         list[float],
         Meta(description="An array of quarter values as floating-point numbers."),
     ]
+    disjoint: Annotated[
+        bool, Meta(description="Indicates whether all quarter positions are unique.")
+    ]
+    exhaustive: Annotated[
+        bool,
+        Meta(
+            description="Indicates whether quarter observations cover the range without missing observations."
+        ),
+    ]
+    min_quarter: (
+        Annotated[float, Meta(description="Lower bound in quarter notes.")] | UnsetType
+    ) = UNSET
+    max_quarter: (
+        Annotated[float, Meta(description="Upper bound in quarter notes.")] | UnsetType
+    ) = UNSET
