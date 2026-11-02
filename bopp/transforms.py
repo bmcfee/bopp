@@ -129,15 +129,15 @@ def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]
     if struct is None or struct is msgspec.UNSET:
         return {}
     result = {}
-    for field in msgspec.structs.fields(type(struct)):
-        if field.name.startswith(("min_", "max_")) or field.name in (
+    for field_name in struct.__struct_fields__:
+        if field_name.startswith(("min_", "max_")) or field_name in (
             "disjoint",
             "exhaustive",
         ):
             continue
-        val = getattr(struct, field.name)
+        val = getattr(struct, field_name)
         if isinstance(val, list):
-            result[field.name] = val
+            result[field_name] = val
     return result
 
 
@@ -732,30 +732,22 @@ def trim(
 
         if old_min_f is not None and old_max_f is not None:
             coord_min = (
-                max(old_min_f, float(new_start))
-                if new_start is not None
-                else old_min_f
+                max(old_min_f, float(new_start)) if new_start is not None else old_min_f
             )
             coord_max = (
-                min(old_max_f, float(new_end))
-                if new_end is not None
-                else old_max_f
+                min(old_max_f, float(new_end)) if new_end is not None else old_max_f
             )
             coord_max = max(coord_max, coord_min)
             tu_updates["min_time"] = coord_min - tu_shift if reset else coord_min
             tu_updates["max_time"] = coord_max - tu_shift if reset else coord_max
         elif old_min_f is not None:
             coord_min = (
-                max(old_min_f, float(new_start))
-                if new_start is not None
-                else old_min_f
+                max(old_min_f, float(new_start)) if new_start is not None else old_min_f
             )
             tu_updates["min_time"] = coord_min - tu_shift if reset else coord_min
         elif old_max_f is not None:
             coord_max = (
-                min(old_max_f, float(new_end))
-                if new_end is not None
-                else old_max_f
+                min(old_max_f, float(new_end)) if new_end is not None else old_max_f
             )
             tu_updates["max_time"] = coord_max - tu_shift if reset else coord_max
 
@@ -779,19 +771,16 @@ def trim(
         if new_groupings not in (None, msgspec.UNSET):
             updated_groupings = []
             for g in new_groupings:
-                g_exhaustive = False
-                if (
+                g_exhaustive = bool(
                     getattr(g, "exhaustive", False) is True
                     and len(tu_kept_indices) > 0
                     and not strict
-                ):
-                    candidate_g = msgspec.structs.replace(g, exhaustive=False)
-                    if is_exhaustive(
+                    and is_exhaustive(
                         tu_new_extent,
-                        grouping=candidate_g,
+                        grouping=g,
                         N=len(tu_kept_indices),
-                    ):
-                        g_exhaustive = True
+                    )
+                )
                 updated_groupings.append(
                     msgspec.structs.replace(g, exhaustive=g_exhaustive)
                 )
@@ -975,29 +964,20 @@ def trim(
                 final_max, fraction_axis=fraction_axis, integer_axis=integer_axis
             )
 
-    raw_extent = _subset_struct_lists(
-        extent, kept_indices, overrides=extent_updates
-    )
+    raw_extent = _subset_struct_lists(extent, kept_indices, overrides=extent_updates)
     candidate_extent: msgspec.Struct = (
         raw_extent if isinstance(raw_extent, msgspec.Struct) else extent
     )
 
     if scalar_updates:
-        candidate_extent = msgspec.structs.replace(
-            candidate_extent, **scalar_updates
-        )
+        candidate_extent = msgspec.structs.replace(candidate_extent, **scalar_updates)
 
-    extent_exhaustive = False
-    if (
+    extent_exhaustive = bool(
         getattr(extent, "exhaustive", False) is True
         and len(kept_indices) > 0
         and not strict
-    ):
-        candidate_check = msgspec.structs.replace(
-            candidate_extent, exhaustive=False
-        )
-        if is_exhaustive(candidate_check, N=len(kept_indices)):
-            extent_exhaustive = True
+        and is_exhaustive(candidate_extent, N=len(kept_indices))
+    )
 
     scalar_updates["exhaustive"] = extent_exhaustive
     new_extent = msgspec.structs.replace(candidate_extent, **scalar_updates)
@@ -1007,19 +987,16 @@ def trim(
     if new_groupings not in (None, msgspec.UNSET):
         updated_groupings = []
         for g in new_groupings:
-            g_exhaustive = False
-            if (
+            g_exhaustive = bool(
                 getattr(g, "exhaustive", False) is True
                 and len(kept_indices) > 0
                 and not strict
-            ):
-                candidate_g = msgspec.structs.replace(g, exhaustive=False)
-                if is_exhaustive(
+                and is_exhaustive(
                     new_extent,
-                    grouping=candidate_g,
+                    grouping=g,
                     N=len(kept_indices),
-                ):
-                    g_exhaustive = True
+                )
+            )
             updated_groupings.append(
                 msgspec.structs.replace(g, exhaustive=g_exhaustive)
             )
@@ -1324,8 +1301,8 @@ def _validate_fill_values(
     """Validate that fill values conform to the struct's field types."""
     struct_type = type(struct)
     dummy_kwargs: dict[str, Any] = {
-        f.name: [fill_map[f.name]] if f.name in fill_map else getattr(struct, f.name)
-        for f in msgspec.structs.fields(struct_type)
+        fname: [fill_map[fname]] if fname in fill_map else getattr(struct, fname)
+        for fname in struct_type.__struct_fields__
     }
     try:
         msgspec.convert(dummy_kwargs, struct_type)
