@@ -130,7 +130,7 @@ def _extract_kwargs(
     dict
         Dictionary of extracted keyword arguments relevant to `cls`.
     """
-    valid_keys = {f.name for f in msgspec.structs.fields(cls)}
+    valid_keys = cls.__struct_fields__
     return {k: kwargs.pop(k) for k in list(kwargs.keys()) if k in valid_keys}
 
 

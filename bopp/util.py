@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import types
 import typing
 from collections import defaultdict
@@ -72,6 +73,14 @@ def _get_tag(struct: msgspec.Struct) -> str | None:
     if config is not None:
         return getattr(config, "tag", None)
     return None
+
+
+@functools.cache
+def _get_struct_fields(
+    cls: type[msgspec.Struct],
+) -> tuple[msgspec.structs.FieldInfo, ...]:
+    """Return cached msgspec struct field metadata for a Struct class."""
+    return msgspec.structs.fields(cls)
 
 
 def _validate_dataframe_columns(
@@ -165,8 +174,7 @@ def _validate_dataframe_columns(
 
         # Rule 4: Field exists on target type struct
         struct_cls = type_registry[type_tag]
-        valid_fields = {f.name for f in msgspec.structs.fields(struct_cls)}
-        if field_name not in valid_fields:
+        if field_name not in struct_cls.__struct_fields__:
             raise BoppValidationError(
                 f"Field '{field_name}' in column '{col}' does not exist on type '{type_tag}'."
             )
@@ -329,7 +337,7 @@ def _extract_facet_data(
     facet_attrs: dict[str, Any] = {}
     has_list_fields = False
 
-    for field in msgspec.structs.fields(type(struct)):
+    for field in _get_struct_fields(type(struct)):
         if field.name == type_field_name:
             continue
         val = getattr(struct, field.name)
@@ -497,16 +505,16 @@ def to_dataframe(
         if groupings_header:
             header["groupings"] = groupings_header
 
-    for field in msgspec.structs.fields(annotation):
-        if field.name in FACET_REGISTRY_KEYS or field.name in (
+    for field_name in annotation.__struct_fields__:
+        if field_name in FACET_REGISTRY_KEYS or field_name in (
             "bopp_version",
             "media_id",
             "groupings",
         ):
             continue
-        val = getattr(annotation, field.name, msgspec.UNSET)
+        val = getattr(annotation, field_name, msgspec.UNSET)
         if val not in (msgspec.UNSET, None):
-            header[field.name] = msgspec.to_builtins(val)
+            header[field_name] = msgspec.to_builtins(val)
 
     if backend in ("pandas", "pandas-pyarrow"):
         try:
@@ -1015,6 +1023,9 @@ EXTENT_AXES_METADATA: dict[str, list[dict[str, Any]]] = {
 }
 
 
+FRACTION_EXTENT_TAGS: frozenset[str] = frozenset({"score_quarter", "score_interval"})
+
+
 def _to_coord(val: Any) -> Any:
     """Normalize fractional pairs to Fraction and pass numbers through unchanged."""
     if (
@@ -1025,6 +1036,22 @@ def _to_coord(val: Any) -> Any:
     ):
         return Fraction(val[0], val[1])
     return val
+
+
+def _normalize_coords(vals: list[Any], is_fraction: bool) -> list[Any]:
+    """Normalize coordinate array elements only if the extent uses rational fractions."""
+    if not is_fraction:
+        return vals
+    return [Fraction(v[0], v[1]) if isinstance(v, (list, tuple)) else v for v in vals]
+
+
+def _partition_group_indices(ids: list[int]) -> dict[int, list[int]]:
+    """Partition observation indices by non-negative group ID in a single O(N) pass."""
+    groups: dict[int, list[int]] = defaultdict(list)
+    for i, gid in enumerate(ids):
+        if gid >= 0:
+            groups[gid].append(i)
+    return groups
 
 
 def _resolve_extent_and_n(
@@ -1074,6 +1101,7 @@ def infer_extent_bounds(
 
     tag = _get_tag(extent)
     specs = EXTENT_AXES_METADATA.get(tag or "", [])
+    is_fraction = tag in FRACTION_EXTENT_TAGS
     bounds: dict[str, tuple[Any, Any]] = {}
 
     for spec in specs:
@@ -1087,7 +1115,7 @@ def infer_extent_bounds(
             if not raw_vals:
                 bounds[dim] = (None, None)
             else:
-                coords = [_to_coord(v) for v in raw_vals]
+                coords = _normalize_coords(raw_vals, is_fraction)
                 bounds[dim] = (min(coords), max(coords))
 
         elif kind == "origin_span":
@@ -1099,10 +1127,12 @@ def infer_extent_bounds(
             if not raw_starts:
                 bounds[dim] = (None, None)
             else:
-                starts = [_to_coord(v) for v in raw_starts]
-                spans = [_to_coord(v) for v in raw_spans]
-                ends = [s + sp for s, sp in zip(starts, spans)]
-                bounds[dim] = (min(starts), max(ends))
+                starts = _normalize_coords(raw_starts, is_fraction)
+                spans = _normalize_coords(raw_spans, is_fraction)
+                bounds[dim] = (
+                    min(starts),
+                    max(s + sp for s, sp in zip(starts, spans)),
+                )
 
         elif kind == "min_max":
             raw_mins = getattr(extent, spec["min_field"], [])
@@ -1113,8 +1143,8 @@ def infer_extent_bounds(
             if not raw_mins:
                 bounds[dim] = (None, None)
             else:
-                mins = [_to_coord(v) for v in raw_mins]
-                maxs = [_to_coord(v) for v in raw_maxs]
+                mins = _normalize_coords(raw_mins, is_fraction)
+                maxs = _normalize_coords(raw_maxs, is_fraction)
                 bounds[dim] = (min(mins), max(maxs))
 
         elif kind == "uniform":
@@ -1132,6 +1162,30 @@ def infer_extent_bounds(
                 )
 
     return bounds
+
+
+def _get_explicit_extent_bounds(
+    extent: msgspec.Struct,
+) -> dict[str, tuple[Any, Any]]:
+    """Extract only explicitly specified min/max attributes from an extent."""
+    tag = _get_tag(extent)
+    specs = EXTENT_AXES_METADATA.get(tag or "", [])
+    result: dict[str, tuple[Any, Any]] = {}
+    for spec in specs:
+        min_attr = getattr(extent, spec["min_attr"], msgspec.UNSET)
+        max_attr = getattr(extent, spec["max_attr"], msgspec.UNSET)
+        b_min = (
+            None
+            if (min_attr is msgspec.UNSET or min_attr is None)
+            else _to_coord(min_attr)
+        )
+        b_max = (
+            None
+            if (max_attr is msgspec.UNSET or max_attr is None)
+            else _to_coord(max_attr)
+        )
+        result[spec["dim"]] = (b_min, b_max)
+    return result
 
 
 def get_extent_bounds(
@@ -1161,28 +1215,21 @@ def get_extent_bounds(
     if extent is None or extent is msgspec.UNSET:
         return {}
 
-    tag = _get_tag(extent)
-    specs = EXTENT_AXES_METADATA.get(tag or "", [])
+    explicit = _get_explicit_extent_bounds(extent)
+    if all(
+        b_min is not None and b_max is not None for b_min, b_max in explicit.values()
+    ):
+        return explicit
+
     inferred = infer_extent_bounds(extent, indices=indices, N=N)
     result: dict[str, tuple[Any, Any]] = {}
 
-    for spec in specs:
-        dim = spec["dim"]
-        min_attr = getattr(extent, spec["min_attr"], msgspec.UNSET)
-        max_attr = getattr(extent, spec["max_attr"], msgspec.UNSET)
+    for dim, (exp_min, exp_max) in explicit.items():
         inf_min, inf_max = inferred.get(dim, (None, None))
-
-        final_min = (
-            inf_min
-            if (min_attr is msgspec.UNSET or min_attr is None)
-            else _to_coord(min_attr)
+        result[dim] = (
+            inf_min if exp_min is None else exp_min,
+            inf_max if exp_max is None else exp_max,
         )
-        final_max = (
-            inf_max
-            if (max_attr is msgspec.UNSET or max_attr is None)
-            else _to_coord(max_attr)
-        )
-        result[dim] = (final_min, final_max)
 
     return result
 
@@ -1243,12 +1290,14 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
     if not specs:
         return True
 
+    is_fraction = tag in FRACTION_EXTENT_TAGS
+
     # 1D Point extents
     if len(specs) == 1 and specs[0]["kind"] == "point":
         vals = getattr(extent, specs[0]["field"], [])
         if indices is not None:
             vals = [vals[i] for i in indices]
-        coords = [_to_coord(v) for v in vals]
+        coords = _normalize_coords(vals, is_fraction)
         return len(set(coords)) == len(coords)
 
     # 1D Interval extents
@@ -1260,23 +1309,18 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
             raw_spans = [raw_spans[i] for i in indices]
         if len(raw_starts) <= 1:
             return True
-        starts = [_to_coord(s) for s in raw_starts]
-        spans = [_to_coord(sp) for sp in raw_spans]
-        intervals = [(s, s + sp) for s, sp in zip(starts, spans)]
-        intervals.sort(key=lambda x: (x[0], x[1]))
-        max_end = intervals[0][1]
-        for i in range(1, len(intervals)):
-            s, e = intervals[i]
+        starts = _normalize_coords(raw_starts, is_fraction)
+        spans = _normalize_coords(raw_spans, is_fraction)
+        pairs = sorted(zip(starts, spans))
+        prev_s, prev_sp = pairs[0]
+        max_end = prev_s + prev_sp
+        for s, sp in pairs[1:]:
             if s < max_end:
                 return False
-            if (
-                s == max_end
-                and s == e
-                and intervals[i - 1][0] == s
-                and intervals[i - 1][1] == s
-            ):
+            if s == max_end and sp == 0 and prev_sp == 0:
                 return False
-            max_end = max(max_end, e)
+            max_end = max(max_end, s + sp)
+            prev_sp = sp
         return True
 
     # Multi-dimensional Point extents
@@ -1286,9 +1330,9 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
             arr = getattr(extent, s["field"], [])
             if indices is not None:
                 arr = [arr[i] for i in indices]
-            col_lists.append([_to_coord(v) for v in arr])
-        tuples = list(zip(*col_lists))
-        return len(set(tuples)) == len(tuples)
+            col_lists.append(arr)
+        n = len(col_lists[0])
+        return len(set(zip(*col_lists))) == n
 
     # 2D Box extents (pixel_box, time_frequency_box)
     if tag in ("pixel_box", "time_frequency_box"):
@@ -1302,15 +1346,7 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
                 ws = [ws[i] for i in indices]
                 ys = [ys[i] for i in indices]
                 hs = [hs[i] for i in indices]
-            boxes = [
-                (
-                    _to_coord(x),
-                    _to_coord(x) + _to_coord(w),
-                    _to_coord(y),
-                    _to_coord(y) + _to_coord(h),
-                )
-                for x, w, y, h in zip(xs, ws, ys, hs)
-            ]
+            boxes = [(x, x + w, y, y + h) for x, w, y, h in zip(xs, ws, ys, hs)]
         else:
             ts = getattr(extent, "time", [])
             ds = getattr(extent, "duration", [])
@@ -1322,18 +1358,13 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
                 f_mins = [f_mins[i] for i in indices]
                 f_maxs = [f_maxs[i] for i in indices]
             boxes = [
-                (
-                    _to_coord(t),
-                    _to_coord(t) + _to_coord(d),
-                    _to_coord(f_min),
-                    _to_coord(f_max),
-                )
+                (t, t + d, f_min, f_max)
                 for t, d, f_min, f_max in zip(ts, ds, f_mins, f_maxs)
             ]
 
         if len(boxes) <= 1:
             return True
-        boxes.sort(key=lambda b: (b[0], b[2]))
+        boxes.sort()
         for i in range(len(boxes)):
             b1 = boxes[i]
             for j in range(i + 1, len(boxes)):
@@ -1355,26 +1386,26 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
         )
         ts = getattr(extent, "time", [])
         ds = getattr(extent, "duration", [])
-        spat_cols = [getattr(extent, f, []) for f in spatial_fields]
+        c0, c1, c2 = (getattr(extent, f, []) for f in spatial_fields)
         if indices is not None:
             ts = [ts[i] for i in indices]
             ds = [ds[i] for i in indices]
-            spat_cols = [[c[i] for i in indices] for c in spat_cols]
+            c0 = [c0[i] for i in indices]
+            c1 = [c1[i] for i in indices]
+            c2 = [c2[i] for i in indices]
 
-        spatial_groups: dict[tuple[Any, ...], list[tuple[Any, Any]]] = defaultdict(list)
-        for i in range(len(ts)):
-            pt = tuple(_to_coord(c[i]) for c in spat_cols)
-            spatial_groups[pt].append(
-                (_to_coord(ts[i]), _to_coord(ts[i]) + _to_coord(ds[i]))
-            )
+        spatial_groups: dict[tuple[Any, Any, Any], list[tuple[Any, Any]]] = defaultdict(
+            list
+        )
+        for x0, x1, x2, t, d in zip(c0, c1, c2, ts, ds):
+            spatial_groups[(x0, x1, x2)].append((t, t + d))
 
         for intervals in spatial_groups.values():
             if len(intervals) <= 1:
                 continue
-            intervals.sort(key=lambda x: (x[0], x[1]))
+            intervals.sort()
             max_end = intervals[0][1]
-            for i in range(1, len(intervals)):
-                s, e = intervals[i]
+            for s, e in intervals[1:]:
                 if s < max_end:
                     return False
                 max_end = max(max_end, e)
@@ -1419,9 +1450,8 @@ def is_disjoint(
             indices = [i for i, gid in enumerate(ids) if gid == group_id]
             return _is_disjoint_indices(extent, indices)
         else:
-            non_neg_gids = sorted({gid for gid in ids if gid >= 0})
-            for gid in non_neg_gids:
-                indices = [i for i, g in enumerate(ids) if g == gid]
+            groups = _partition_group_indices(ids)
+            for indices in groups.values():
                 if not _is_disjoint_indices(extent, indices):
                     return False
             return True
@@ -1441,6 +1471,8 @@ def _is_exhaustive_indices(
     specs = EXTENT_AXES_METADATA.get(tag or "", [])
     if not specs:
         return True
+
+    is_fraction = tag in FRACTION_EXTENT_TAGS
 
     if indices is not None:
         count = len(indices)
@@ -1487,28 +1519,27 @@ def _is_exhaustive_indices(
         if indices is not None:
             raw_starts = [raw_starts[i] for i in indices]
             raw_spans = [raw_spans[i] for i in indices]
-        starts = [_to_coord(s) for s in raw_starts]
-        spans = [_to_coord(sp) for sp in raw_spans]
-        intervals = [(s, s + sp) for s, sp in zip(starts, spans)]
+        starts = _normalize_coords(raw_starts, is_fraction)
+        spans = _normalize_coords(raw_spans, is_fraction)
+        pairs = sorted(zip(starts, spans))
 
         if b_min is None:
-            b_min = min(starts)
+            b_min = pairs[0][0]
         if b_max is None:
-            b_max = max(e for _, e in intervals)
+            b_max = max(s + sp for s, sp in pairs)
         if b_min > b_max:
             return False
         if b_min == b_max:
             return True
 
-        intervals.sort(key=lambda x: (x[0], x[1]))
-        if intervals[0][0] > b_min:
+        if pairs[0][0] > b_min:
             return False
 
         covered_until = b_min
-        for s, e in intervals:
+        for s, sp in pairs:
             if s > covered_until:
                 return False
-            covered_until = max(covered_until, e)
+            covered_until = max(covered_until, s + sp)
             if covered_until >= b_max:
                 break
         return bool(covered_until >= b_max)
@@ -1544,15 +1575,7 @@ def _is_exhaustive_indices(
                 ws = [ws[i] for i in indices]
                 ys = [ys[i] for i in indices]
                 hs = [hs[i] for i in indices]
-            boxes = [
-                (
-                    _to_coord(x),
-                    _to_coord(x) + _to_coord(w),
-                    _to_coord(y),
-                    _to_coord(y) + _to_coord(h),
-                )
-                for x, w, y, h in zip(xs, ws, ys, hs)
-            ]
+            boxes = [(x, x + w, y, y + h) for x, w, y, h in zip(xs, ws, ys, hs)]
         else:
             b_x = bounds.get("time", (None, None))
             b_y = bounds.get("frequency", (None, None))
@@ -1566,12 +1589,7 @@ def _is_exhaustive_indices(
                 f_mins = [f_mins[i] for i in indices]
                 f_maxs = [f_maxs[i] for i in indices]
             boxes = [
-                (
-                    _to_coord(t),
-                    _to_coord(t) + _to_coord(d),
-                    _to_coord(f_min),
-                    _to_coord(f_max),
-                )
+                (t, t + d, f_min, f_max)
                 for t, d, f_min, f_max in zip(ts, ds, f_mins, f_maxs)
             ]
 
@@ -1601,23 +1619,20 @@ def _is_exhaustive_indices(
         if indices is not None:
             ts = [ts[i] for i in indices]
             ds = [ds[i] for i in indices]
-        starts = [_to_coord(s) for s in ts]
-        spans = [_to_coord(sp) for sp in ds]
-        intervals = [(s, s + sp) for s, sp in zip(starts, spans)]
-        b_min = b_time[0] if b_time[0] is not None else min(starts)
-        b_max = b_time[1] if b_time[1] is not None else max(e for _, e in intervals)
+        pairs = sorted(zip(ts, ds))
+        b_min = b_time[0] if b_time[0] is not None else pairs[0][0]
+        b_max = b_time[1] if b_time[1] is not None else max(s + sp for s, sp in pairs)
         if b_min > b_max:
             return False
         if b_min == b_max:
             return True
-        intervals.sort(key=lambda x: (x[0], x[1]))
-        if intervals[0][0] > b_min:
+        if pairs[0][0] > b_min:
             return False
         covered_until = b_min
-        for s, e in intervals:
+        for s, sp in pairs:
             if s > covered_until:
                 return False
-            covered_until = max(covered_until, e)
+            covered_until = max(covered_until, s + sp)
             if covered_until >= b_max:
                 break
         return bool(covered_until >= b_max)
@@ -1629,16 +1644,18 @@ def _is_exhaustive_indices(
         raw_vals = getattr(extent, spec["field"], [])
         if indices is not None:
             raw_vals = [raw_vals[i] for i in indices]
-        vals = [_to_coord(v) for v in raw_vals]
+        vals = _normalize_coords(raw_vals, is_fraction)
+        v_min = min(vals)
+        v_max = max(vals)
         if b_min is None:
-            b_min = min(vals)
+            b_min = v_min
         if b_max is None:
-            b_max = max(vals)
+            b_max = v_max
         if b_min > b_max:
             return False
         if b_min == b_max:
             continue
-        if min(vals) > b_min or max(vals) < b_max:
+        if v_min > b_min or v_max < b_max:
             return False
 
     return True
@@ -1678,9 +1695,10 @@ def is_exhaustive(
     if extent is None or extent is msgspec.UNSET:
         return False
 
-    effective_bounds = bounds if bounds is not None else get_extent_bounds(extent, N=N)
-
     if grouping is not None:
+        effective_bounds = (
+            bounds if bounds is not None else get_extent_bounds(extent, N=N)
+        )
         ids = getattr(grouping, "ids", None)
         if ids is None or ids is msgspec.UNSET:
             return _is_exhaustive_indices(
@@ -1692,13 +1710,12 @@ def is_exhaustive(
                 extent, indices=indices, bounds=effective_bounds, N=len(indices)
             )
         else:
-            non_neg_gids = sorted({gid for gid in ids if gid >= 0})
-            if not non_neg_gids:
+            groups = _partition_group_indices(ids)
+            if not groups:
                 return _is_exhaustive_indices(
                     extent, indices=[], bounds=effective_bounds, N=0
                 )
-            for gid in non_neg_gids:
-                indices = [i for i, g in enumerate(ids) if g == gid]
+            for indices in groups.values():
                 if not _is_exhaustive_indices(
                     extent,
                     indices=indices,
@@ -1708,4 +1725,7 @@ def is_exhaustive(
                     return False
             return True
 
+    effective_bounds = (
+        bounds if bounds is not None else _get_explicit_extent_bounds(extent)
+    )
     return _is_exhaustive_indices(extent, indices=None, bounds=effective_bounds, N=N)

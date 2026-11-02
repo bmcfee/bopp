@@ -24,6 +24,7 @@ from .extensions import resolve_extensions
 from .registries import FACET_REGISTRY_KEYS, get_registry
 from .util import (
     AnnotationDataFrame,
+    _get_struct_fields,
     _polars_column_dtype,
     from_dataframe,
     to_dataframe,
@@ -308,7 +309,7 @@ def _build_polars_csv_schema(
                 if struct_cls is not None:
                     if struct_cls not in struct_type_hints:
                         struct_type_hints[struct_cls] = {
-                            f.name: f.type for f in msgspec.structs.fields(struct_cls)
+                            f.name: f.type for f in _get_struct_fields(struct_cls)
                         }
 
                     hints = struct_type_hints[struct_cls]

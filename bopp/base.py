@@ -118,13 +118,13 @@ class BoppBase(msgspec.Struct):
         if facet_struct is None or facet_struct is msgspec.UNSET:
             return []
         lengths = []
-        for field in msgspec.structs.fields(type(facet_struct)):
-            if field.name.startswith(("min_", "max_")) or field.name in (
+        for field_name in facet_struct.__struct_fields__:
+            if field_name.startswith(("min_", "max_")) or field_name in (
                 "disjoint",
                 "exhaustive",
             ):
                 continue
-            val = getattr(facet_struct, field.name)
+            val = getattr(facet_struct, field_name)
 
             if isinstance(val, list):
                 lengths.append(len(val))
