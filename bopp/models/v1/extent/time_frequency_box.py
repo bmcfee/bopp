@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
@@ -16,16 +19,24 @@ type FreqMinItem = Annotated[float, Meta(ge=0.0)]
 type FreqMaxItem = Annotated[float, Meta(ge=0.0)]
 
 
-class TimeFrequencyBoxExtent(Struct, tag_field="extent_type", tag="time_frequency_box"):
-    time: Annotated[list[float], Meta(description="Array of start times in seconds.")]
+class TimeFrequencyBoxExtent(
+    ArrowStructBase, tag_field="extent_type", tag="time_frequency_box"
+):
+    time: Annotated[
+        ArrowArray[Literal["float64"], float],
+        Meta(description="Array of start times in seconds."),
+    ]
     duration: Annotated[
-        list[DurationItem], Meta(description="Array of box durations in seconds.")
+        ArrowArray[Literal["float64"], DurationItem],
+        Meta(description="Array of box durations in seconds."),
     ]
     freq_min: Annotated[
-        list[FreqMinItem], Meta(description="Array of minimum frequencies in Hz.")
+        ArrowArray[Literal["float32"], FreqMinItem],
+        Meta(description="Array of minimum frequencies in Hz."),
     ]
     freq_max: Annotated[
-        list[FreqMaxItem], Meta(description="Array of maximum frequencies in Hz.")
+        ArrowArray[Literal["float32"], FreqMaxItem],
+        Meta(description="Array of maximum frequencies in Hz."),
     ]
     disjoint: Annotated[
         bool,

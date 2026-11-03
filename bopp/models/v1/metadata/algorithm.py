@@ -5,13 +5,15 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp.base import ArrowStructBase
 
 
-class AlgorithmAnnotationMetadata(Struct, tag_field="metadata_type", tag="algorithm"):
-    """
-    Metadata for annotations created by algorithms or models.
-    """
+class AlgorithmAnnotationMetadata(
+    ArrowStructBase, tag_field="metadata_type", tag="algorithm"
+):
+    """Metadata for annotations created by algorithms or models."""
 
     algorithm_id: Annotated[
         str, Meta(description="A unique identifier for the algorithm.")

@@ -8,7 +8,7 @@
       "const": "frequency_hz"
     },
     "value": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Frequencies in Hz",
       "items": {
         "type": "number",
@@ -16,7 +16,7 @@
       }
     },
     "voiced": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/BoolArray",
       "description": "Optional voicing flag indicating whether each observation is voiced",
       "items": {
         "type": "boolean"

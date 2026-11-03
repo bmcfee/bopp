@@ -5,13 +5,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp.base import ArrowStructBase
 
 
-class CrowdSourcedAnnotationMetadata(Struct, tag_field="metadata_type", tag="crowd"):
-    """
-    Metadata for annotations created by crowdsourcing.
-    """
+class CrowdSourcedAnnotationMetadata(
+    ArrowStructBase, tag_field="metadata_type", tag="crowd"
+):
+    """Metadata for annotations created by crowdsourcing."""
 
     platform: Annotated[
         str,

@@ -9,7 +9,7 @@
       "const": "text"
     },
     "offset": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/UInt32Array",
       "description": "Array of 0-based character offsets in text.",
       "items": {
         "type": "integer",

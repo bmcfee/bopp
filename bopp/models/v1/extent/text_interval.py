@@ -3,27 +3,28 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
 
-type OffsetItem = Annotated[int, Meta(ge=0)]
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
+
+type OffsetItem = Annotated[int, Meta(ge=0, le=4294967295)]
 
 
-type LengthItem = Annotated[int, Meta(ge=0)]
+type LengthItem = Annotated[int, Meta(ge=0, le=4294967295)]
 
 
-class TextInterval(Struct, tag_field="extent_type", tag="text_interval"):
-    """
-    Character span intervals (offset and length) in text.
-    """
+class TextInterval(ArrowStructBase, tag_field="extent_type", tag="text_interval"):
+    """Character span intervals (offset and length) in text."""
 
     offset: Annotated[
-        list[OffsetItem],
+        ArrowArray[Literal["uint32"], OffsetItem],
         Meta(description="Array of 0-based character start offsets in text."),
     ]
     length: Annotated[
-        list[LengthItem],
+        ArrowArray[Literal["uint32"], LengthItem],
         Meta(description="Array of character span lengths (number of characters)."),
     ]
     disjoint: Annotated[

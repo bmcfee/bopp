@@ -3,20 +3,21 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
 
-type OffsetItem = Annotated[int, Meta(ge=0)]
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
+
+type OffsetItem = Annotated[int, Meta(ge=0, le=4294967295)]
 
 
-class Text(Struct, tag_field="extent_type", tag="text"):
-    """
-    Character point offsets in text.
-    """
+class Text(ArrowStructBase, tag_field="extent_type", tag="text"):
+    """Character point offsets in text."""
 
     offset: Annotated[
-        list[OffsetItem],
+        ArrowArray[Literal["uint32"], OffsetItem],
         Meta(description="Array of 0-based character offsets in text."),
     ]
     disjoint: Annotated[

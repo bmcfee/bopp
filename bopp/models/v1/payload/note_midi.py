@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class NoteMidiPayload(Struct, tag_field="payload_type", tag="note_midi"):
+class NoteMidiPayload(ArrowStructBase, tag_field="payload_type", tag="note_midi"):
     value: Annotated[
-        list[float], Meta(description="Note pitches in (fractional) MIDI note numbers")
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Note pitches in (fractional) MIDI note numbers"),
     ]

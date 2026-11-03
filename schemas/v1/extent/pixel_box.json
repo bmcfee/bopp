@@ -8,14 +8,14 @@
       "const": "pixel_box"
     },
     "x": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of x-coordinates in pixels.",
       "items": {
         "type": "number"
       }
     },
     "width": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of box widths in pixels.",
       "items": {
         "type": "number",
@@ -23,14 +23,14 @@
       }
     },
     "y": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of y-coordinates in pixels.",
       "items": {
         "type": "number"
       }
     },
     "height": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of box heights in pixels.",
       "items": {
         "type": "number",

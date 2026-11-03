@@ -3,10 +3,16 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class TagPayload(Struct, tag_field="payload_type", tag="tag"):
-    value: Annotated[list[str], Meta(description="Tag vocabularies allow all strings")]
+class TagPayload(ArrowStructBase, tag_field="payload_type", tag="tag"):
+    value: Annotated[
+        ArrowArray[Literal["string"], str],
+        Meta(description="Tag vocabularies allow all strings"),
+    ]

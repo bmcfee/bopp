@@ -8,14 +8,14 @@
       "const": "mood_thayer"
     },
     "valence": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Valence",
       "items": {
         "type": "number"
       }
     },
     "arousal": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Arousal",
       "items": {
         "type": "number"

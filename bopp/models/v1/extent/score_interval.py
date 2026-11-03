@@ -5,12 +5,14 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp.base import ArrowStructBase
 
 from .. import core
 
 
-class ScoreInterval(Struct, tag_field="extent_type", tag="score_interval"):
+class ScoreInterval(ArrowStructBase, tag_field="extent_type", tag="score_interval"):
     quarter: Annotated[
         list[core.Fraction],
         Meta(description="Array of interval start times in fractional quarter notes."),

@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type WidthItem = Annotated[float, Meta(ge=0.0)]
 
@@ -13,14 +16,22 @@ type WidthItem = Annotated[float, Meta(ge=0.0)]
 type HeightItem = Annotated[float, Meta(ge=0.0)]
 
 
-class PixelBoxExtent(Struct, tag_field="extent_type", tag="pixel_box"):
-    x: Annotated[list[float], Meta(description="Array of x-coordinates in pixels.")]
-    width: Annotated[
-        list[WidthItem], Meta(description="Array of box widths in pixels.")
+class PixelBoxExtent(ArrowStructBase, tag_field="extent_type", tag="pixel_box"):
+    x: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of x-coordinates in pixels."),
     ]
-    y: Annotated[list[float], Meta(description="Array of y-coordinates in pixels.")]
+    width: Annotated[
+        ArrowArray[Literal["float32"], WidthItem],
+        Meta(description="Array of box widths in pixels."),
+    ]
+    y: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of y-coordinates in pixels."),
+    ]
     height: Annotated[
-        list[HeightItem], Meta(description="Array of box heights in pixels.")
+        ArrowArray[Literal["float32"], HeightItem],
+        Meta(description="Array of box heights in pixels."),
     ]
     disjoint: Annotated[
         bool,

@@ -9,14 +9,14 @@
       "const": "pixel"
     },
     "x": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of horizontal x-coordinates in pixels.",
       "items": {
         "type": "number"
       }
     },
     "y": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of vertical y-coordinates in pixels.",
       "items": {
         "type": "number"

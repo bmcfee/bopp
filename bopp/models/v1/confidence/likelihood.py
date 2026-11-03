@@ -3,15 +3,20 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type ConfidenceItem = Annotated[float, Meta(ge=0.0, le=1.0)]
 
 
-class LikelihoodConfidence(Struct, tag_field="confidence_type", tag="likelihood"):
+class LikelihoodConfidence(
+    ArrowStructBase, tag_field="confidence_type", tag="likelihood"
+):
     confidence: Annotated[
-        list[ConfidenceItem],
+        ArrowArray[Literal["float32"], ConfidenceItem],
         Meta(description="The likelihood (probability) of each observation"),
     ]

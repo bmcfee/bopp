@@ -3,19 +3,29 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class CartesianExtent(Struct, tag_field="extent_type", tag="cartesian"):
-    """
-    3D spatial coordinates in Cartesian space (x, y, z).
-    """
+class CartesianExtent(ArrowStructBase, tag_field="extent_type", tag="cartesian"):
+    """3D spatial coordinates in Cartesian space (x, y, z)."""
 
-    x: Annotated[list[float], Meta(description="Array of x-coordinates in space.")]
-    y: Annotated[list[float], Meta(description="Array of y-coordinates in space.")]
-    z: Annotated[list[float], Meta(description="Array of z-coordinates in space.")]
+    x: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of x-coordinates in space."),
+    ]
+    y: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of y-coordinates in space."),
+    ]
+    z: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of z-coordinates in space."),
+    ]
     disjoint: Annotated[
         bool,
         Meta(description="Indicates whether all spatial points (x, y, z) are unique."),

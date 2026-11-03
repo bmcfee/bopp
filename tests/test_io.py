@@ -258,10 +258,10 @@ def test_csv_roundtrip_with_groupings(tmp_path):
     assert loaded.media_id == ann.media_id
     assert len(loaded.groupings) == 2
     assert loaded.groupings[0].name == "voices"
-    assert loaded.groupings[0].ids == [0, 1]
+    assert loaded.groupings[0].ids.to_pylist() == [0, 1]
     assert loaded.groupings[0].labels == {"v1": 0, "v2": 1}
     assert loaded.groupings[1].name == "phrases"
-    assert loaded.groupings[1].ids == [10, 10]
+    assert loaded.groupings[1].ids.to_pylist() == [10, 10]
 
 
 def test_csv_roundtrip_with_groupings_pandas(tmp_path):
@@ -282,7 +282,7 @@ def test_csv_roundtrip_with_groupings_pandas(tmp_path):
     assert loaded.media_id == ann.media_id
     assert len(loaded.groupings) == 1
     assert loaded.groupings[0].name == "voices"
-    assert loaded.groupings[0].ids == [0, 1]
+    assert loaded.groupings[0].ids.to_pylist() == [0, 1]
 
 
 def test_csv_roundtrip_object_payload(tmp_path):
@@ -319,7 +319,7 @@ def test_csv_roundtrip_nested_extent_polars(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert loaded.payload.value == ["C:maj", "G:maj"]
+    assert loaded.payload.value.to_pylist() == ["C:maj", "G:maj"]
     assert loaded.extent.quarter == [(0, 1), (1, 2)]
     assert loaded.extent.duration == [(1, 2), (1, 4)]
 
@@ -493,7 +493,7 @@ def test_load_bopp_csv_string_with_brackets(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert loaded.payload.value == ["[intro]", "(chorus)", "{verse}"]
+    assert loaded.payload.value.to_pylist() == ["[intro]", "(chorus)", "{verse}"]
 
 
 def test_csv_roundtrip_numeric_string_tags(tmp_path):
@@ -510,8 +510,8 @@ def test_csv_roundtrip_numeric_string_tags(tmp_path):
 
     loaded = load_bopp_csv(file_path)
     assert loaded.media_id == ann.media_id
-    assert loaded.payload.value == ["1", "2", "007"]
-    assert all(isinstance(v, str) for v in loaded.payload.value)
+    assert loaded.payload.value.to_pylist() == ["1", "2", "007"]
+    assert all(isinstance(v, str) for v in loaded.payload.value.to_pylist())
 
 
 def test_load_bopp_csv_invalid_schema(tmp_path):
@@ -635,7 +635,7 @@ def test_load_bopp_csv_non_string_columns(tmp_path):
     save_bopp_csv(ann, file_path)
 
     loaded = load_bopp_csv(file_path)
-    assert loaded.payload.value == [1, 2]
+    assert loaded.payload.value.to_pylist() == [1, 2]
 
 
 def test_load_bopp_csv_non_target_columns(tmp_path):
@@ -670,8 +670,8 @@ def test_load_bopp_csv_crlf_newlines(tmp_path):
 
     loaded = load_bopp_csv(file_path, validate_id=False)
     assert loaded.media_id == "track:crlf_test"
-    assert loaded.payload.value == [1, 2]
-    assert loaded.extent.time == [0.1, 0.5]
+    assert loaded.payload.value.to_pylist() == [1, 2]
+    assert loaded.extent.time.to_pylist() == [0.1, 0.5]
 
 
 def test_parse_complex_and_str_cell():
@@ -832,8 +832,8 @@ def test_load_bopp_csv_non_seekable_stream():
 
     loaded = load_bopp_csv(stream, validate_id=False)  # type: ignore[arg-type]
     assert loaded.media_id == "track:non_seekable"
-    assert loaded.payload.value == [1, 2]
-    assert loaded.extent.time == [0.1, 0.5]
+    assert loaded.payload.value.to_pylist() == [1, 2]
+    assert loaded.extent.time.to_pylist() == [0.1, 0.5]
 
 
 def test_load_bopp_csv_unsupported_backend():
@@ -888,7 +888,7 @@ def test_csv_roundtrip_marker_payload(tmp_path):
         loaded = load_bopp_csv(file_path, backend=backend)
         assert loaded.media_id == ann.media_id
         assert loaded.payload.description == "cues"
-        assert loaded.extent.time == [0.1, 0.5, 1.2]
+        assert loaded.extent.time.to_pylist() == [0.1, 0.5, 1.2]
         assert loaded.id == ann.id
 
 
@@ -925,7 +925,7 @@ def test_csv_roundtrip_lyrics_payload(tmp_path):
         loaded = load_bopp_csv(file_path, backend=backend)
         assert loaded.media_id == ann.media_id
         assert loaded.payload.language == "en-US"
-        assert loaded.payload.value == ["hello", "world"]
+        assert loaded.payload.value.to_pylist() == ["hello", "world"]
 
 
 def test_csv_roundtrip_frequency_hz_with_voiced(tmp_path):
@@ -943,8 +943,8 @@ def test_csv_roundtrip_frequency_hz_with_voiced(tmp_path):
         save_bopp_csv(ann, file_path, backend=backend)
         loaded = load_bopp_csv(file_path, backend=backend)
         assert loaded.media_id == ann.media_id
-        assert loaded.payload.value == [440.0, 0.0, 880.0]
-        assert loaded.payload.voiced == [True, False, True]
+        assert loaded.payload.value.to_pylist() == pytest.approx([440.0, 0.0, 880.0])
+        assert loaded.payload.voiced.to_pylist() == [True, False, True]
 
 
 def test_csv_roundtrip_object_with_description(tmp_path):
@@ -980,7 +980,7 @@ def test_csv_roundtrip_note_spn_payload(tmp_path):
         save_bopp_csv(ann, file_path, backend=backend)
         loaded = load_bopp_csv(file_path, backend=backend)
         assert loaded.media_id == ann.media_id
-        assert loaded.payload.value == ["C4", "C♯4", "E♭3"]
+        assert loaded.payload.value.to_pylist() == ["C4", "C♯4", "E♭3"]
 
 
 def test_csv_roundtrip_chord_unicode_accidentals(tmp_path):
@@ -998,4 +998,4 @@ def test_csv_roundtrip_chord_unicode_accidentals(tmp_path):
         save_bopp_csv(ann, file_path, backend=backend)
         loaded = load_bopp_csv(file_path, backend=backend)
         assert loaded.media_id == ann.media_id
-        assert loaded.payload.value == ["C♯:maj", "D♭:min7"]
+        assert loaded.payload.value.to_pylist() == ["C♯:maj", "D♭:min7"]

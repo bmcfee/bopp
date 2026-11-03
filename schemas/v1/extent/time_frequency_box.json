@@ -8,14 +8,14 @@
       "const": "time_frequency_box"
     },
     "time": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "Array of start times in seconds.",
       "items": {
         "type": "number"
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "Array of box durations in seconds.",
       "items": {
         "type": "number",
@@ -23,7 +23,7 @@
       }
     },
     "freq_min": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of minimum frequencies in Hz.",
       "items": {
         "type": "number",
@@ -31,7 +31,7 @@
       }
     },
     "freq_max": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of maximum frequencies in Hz.",
       "items": {
         "type": "number",

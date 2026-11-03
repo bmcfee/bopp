@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp.base import ArrowStructBase
 
 
-class AnnotationMetadataOther(Struct, tag_field="metadata_type", tag="other"):
-    """
-    Metadata for annotations from unknown sources
-    """
+class AnnotationMetadataOther(ArrowStructBase, tag_field="metadata_type", tag="other"):
+    """Metadata for annotations from unknown sources"""
 
     notes: Annotated[str, Meta(description="Notes or comments about the annotation.")]

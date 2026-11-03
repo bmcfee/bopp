@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type ValueItem = Annotated[
     str,
@@ -15,8 +18,8 @@ type ValueItem = Annotated[
 ]
 
 
-class ChordPayload(Struct, tag_field="payload_type", tag="chord"):
+class ChordPayload(ArrowStructBase, tag_field="payload_type", tag="chord"):
     value: Annotated[
-        list[ValueItem],
+        ArrowArray[Literal["string"], ValueItem],
         Meta(description="A musical chord string in extended Harte notation."),
     ]

@@ -1,0 +1,14 @@
+{%- macro apply_arrow(type_str, extras) -%}
+{%- if extras and 'x_arrow_dtype' in extras -%}
+{%- set dtype = extras['x_arrow_dtype'] -%}
+{%- if type_str.startswith('Annotated[list[') -%}
+Annotated[ArrowArray[Literal["{{ dtype }}"], {{ type_str[15:] }}
+{%- elif type_str.startswith('list[') -%}
+ArrowArray[Literal["{{ dtype }}"], {{ type_str[5:] }}
+{%- else -%}
+{{ type_str }}
+{%- endif -%}
+{%- else -%}
+{{ type_str }}
+{%- endif -%}
+{%- endmacro -%}

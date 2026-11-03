@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type ConfidenceItem = Annotated[float, Meta(ge=0.0)]
 
 
-class VarianceConfidence(Struct, tag_field="confidence_type", tag="variance"):
+class VarianceConfidence(ArrowStructBase, tag_field="confidence_type", tag="variance"):
     confidence: Annotated[
-        list[ConfidenceItem], Meta(description="The variance of each observation")
+        ArrowArray[Literal["float32"], ConfidenceItem],
+        Meta(description="The variance of each observation"),
     ]

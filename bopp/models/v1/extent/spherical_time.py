@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type AzimuthItem = Annotated[float, Meta(ge=-180.0, lt=180.0)]
 
@@ -16,24 +19,25 @@ type ElevationItem = Annotated[float, Meta(ge=-90.0, le=90.0)]
 type Radiu = Annotated[float, Meta(ge=0.0)]
 
 
-class SphericalTimeExtent(Struct, tag_field="extent_type", tag="spherical_time"):
-    """
-    Spatiotemporal point coordinates in spherical space with timestamps.
-    """
+class SphericalTimeExtent(
+    ArrowStructBase, tag_field="extent_type", tag="spherical_time"
+):
+    """Spatiotemporal point coordinates in spherical space with timestamps."""
 
     time: Annotated[
-        list[float], Meta(description="Array of point timestamps in seconds.")
+        ArrowArray[Literal["float64"], float],
+        Meta(description="Array of point timestamps in seconds."),
     ]
     azimuth: Annotated[
-        list[AzimuthItem],
+        ArrowArray[Literal["float32"], AzimuthItem],
         Meta(description="Array of azimuth angles in degrees in [-180, +180)."),
     ]
     elevation: Annotated[
-        list[ElevationItem],
+        ArrowArray[Literal["float32"], ElevationItem],
         Meta(description="Array of elevation angles in degrees in [-90, +90]."),
     ]
     radius: Annotated[
-        list[Radiu],
+        ArrowArray[Literal["float32"], Radiu],
         Meta(
             description="Array of non-negative radial distances (greater than or equal to 0)."
         ),

@@ -5,10 +5,12 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp.base import ArrowStructBase
 
 
-class ExtensionPayload(Struct, tag_field="payload_type", tag="ext"):
+class ExtensionPayload(ArrowStructBase, tag_field="payload_type", tag="ext"):
     ext_schema: Annotated[
         str,
         Meta(

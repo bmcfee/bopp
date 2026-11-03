@@ -3,16 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
 class ScoreQuarterNotesFloat(
-    Struct, tag_field="extent_type", tag="score_quarter_float"
+    ArrowStructBase, tag_field="extent_type", tag="score_quarter_float"
 ):
     quarter: Annotated[
-        list[float],
+        ArrowArray[Literal["float64"], float],
         Meta(description="An array of quarter values as floating-point numbers."),
     ]
     disjoint: Annotated[

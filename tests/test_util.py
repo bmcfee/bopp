@@ -203,7 +203,7 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
     # Verify parallel array data columns are created correctly
     assert list(df["extent:time:time"]) == [0.1, 0.2]
     assert list(df["payload:beat:value"]) == [1, 1]
-    assert list(df["confidence:likelihood:confidence"]) == [0.8, 0.9]
+    assert list(df["confidence:likelihood:confidence"]) == pytest.approx([0.8, 0.9])
 
     # Verify discriminator tag fields are excluded from DataFrame columns
     assert "extent:time:extent_type" not in df.columns
@@ -267,10 +267,10 @@ def test_groupings_to_and_from_dataframe_pandas():
     assert reconstructed.media_id == ann.media_id
     assert len(reconstructed.groupings) == 2
     assert reconstructed.groupings[0].name == "voices"
-    assert reconstructed.groupings[0].ids == [0, 1, 0]
+    assert reconstructed.groupings[0].ids.to_pylist() == [0, 1, 0]
     assert reconstructed.groupings[0].labels == {"soprano": 0, "alto": 1}
     assert reconstructed.groupings[1].name == "measures"
-    assert reconstructed.groupings[1].ids == [1, 1, 2]
+    assert reconstructed.groupings[1].ids.to_pylist() == [1, 1, 2]
 
 
 def test_groupings_to_and_from_dataframe_polars():
@@ -290,7 +290,7 @@ def test_groupings_to_and_from_dataframe_polars():
 
     reconstructed = from_dataframe(ann_df)
     assert reconstructed.groupings[0].name == "section"
-    assert reconstructed.groupings[0].ids == [0, 1]
+    assert reconstructed.groupings[0].ids.to_pylist() == [0, 1]
 
 
 def test_groupings_mismatched_length_raises():
@@ -609,24 +609,24 @@ def test_polars_column_dtypes_match_csv_reader():
 
 
 @pytest.mark.parametrize(
-    "column",
+    "column, expected_dtype",
     [
-        "extent:time:time",
-        "extent:time_interval:duration",
-        "extent:midi_interval:duration",
-        "extent:time_frequency_box:freq_min",
-        "extent:pixel_box:width",
-        "payload:tempo:value",
-        "payload:frequency_hz:value",
-        "confidence:likelihood:confidence",
+        ("extent:time:time", pl.Float64),
+        ("extent:time_interval:duration", pl.Float64),
+        ("extent:midi_interval:duration", pl.Float64),
+        ("extent:time_frequency_box:freq_min", pl.Float32),
+        ("extent:pixel_box:width", pl.Float32),
+        ("payload:tempo:value", pl.Float32),
+        ("payload:frequency_hz:value", pl.Float32),
+        ("confidence:likelihood:confidence", pl.Float32),
     ],
 )
-def test_polars_column_dtype_constrained_numbers(column):
-    """Number columns with constrained (aliased) items map to Float64."""
+def test_polars_column_dtype_constrained_numbers(column, expected_dtype):
+    """Number columns with constrained (aliased) items map to Float64 or Float32."""
     facet, tag, field_name = column.split(":")
     struct_cls = get_registry("1.0")[FACET_REGISTRY_KEYS[facet]][tag]
     field = next(f for f in msgspec.structs.fields(struct_cls) if f.name == field_name)
-    assert _polars_column_dtype(field.type, pl) == pl.Float64
+    assert _polars_column_dtype(field.type, pl) == expected_dtype
 
 
 def test_validate_dataframe_columns_grouping_indices():
@@ -675,7 +675,7 @@ def test_to_and_from_dataframe_marker_payload():
         assert reconstructed.media_id == ann.media_id
         assert isinstance(reconstructed.payload, MarkerPayload)
         assert reconstructed.payload.description == "cues"
-        assert reconstructed.extent.time == [0.1, 0.5, 1.2]
+        assert reconstructed.extent.time.to_pylist() == [0.1, 0.5, 1.2]
         assert reconstructed.id == ann.id
 
 
@@ -729,7 +729,7 @@ def test_to_and_from_dataframe_lyrics_payload():
 
         reconstructed = from_dataframe(ann_df)
         assert reconstructed.payload.language == "en"
-        assert reconstructed.payload.value == ["hello", "world"]
+        assert reconstructed.payload.value.to_pylist() == ["hello", "world"]
 
 
 def test_to_and_from_dataframe_frequency_hz_with_voiced():
@@ -748,8 +748,8 @@ def test_to_and_from_dataframe_frequency_hz_with_voiced():
         assert "payload:frequency_hz:voiced" in ann_df.df.columns
 
         reconstructed = from_dataframe(ann_df)
-        assert reconstructed.payload.value == [440.0, 880.0]
-        assert reconstructed.payload.voiced == [True, False]
+        assert reconstructed.payload.value.to_pylist() == pytest.approx([440.0, 880.0])
+        assert reconstructed.payload.voiced.to_pylist() == [True, False]
 
 
 def test_to_and_from_dataframe_object_with_description():
@@ -786,4 +786,4 @@ def test_to_and_from_dataframe_note_payload():
         assert "payload:note:value" in ann_df.df.columns
 
         reconstructed = from_dataframe(ann_df)
-        assert reconstructed.payload.value == ["C4", "C♯4"]
+        assert reconstructed.payload.value.to_pylist() == ["C4", "C♯4"]

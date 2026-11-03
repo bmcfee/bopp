@@ -5,13 +5,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp.base import ArrowStructBase
 
 
-class HumanAnnotationMetadata(Struct, tag_field="metadata_type", tag="human"):
-    """
-    Metadata for annotations created by human annotators.
-    """
+class HumanAnnotationMetadata(ArrowStructBase, tag_field="metadata_type", tag="human"):
+    """Metadata for annotations created by human annotators."""
 
     annotator_id: Annotated[
         str, Meta(description="A unique identifier for the human annotator.")

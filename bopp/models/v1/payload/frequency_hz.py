@@ -3,18 +3,23 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type ValueItem = Annotated[float, Meta(ge=0.0)]
 
 
-class FrequencyHzPayload(Struct, tag_field="payload_type", tag="frequency_hz"):
-    value: Annotated[list[ValueItem], Meta(description="Frequencies in Hz")]
+class FrequencyHzPayload(ArrowStructBase, tag_field="payload_type", tag="frequency_hz"):
+    value: Annotated[
+        ArrowArray[Literal["float32"], ValueItem], Meta(description="Frequencies in Hz")
+    ]
     voiced: (
         Annotated[
-            list[bool],
+            ArrowArray[Literal["bool"], bool],
             Meta(
                 description="Optional voicing flag indicating whether each observation is voiced"
             ),

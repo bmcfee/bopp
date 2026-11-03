@@ -3,17 +3,85 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from msgspec import Meta
+
+from bopp._arrow import ArrowArray
 
 type BoppCorePrimitives = Annotated[Any, Meta(title="BOPP Core Primitives")]
 
 
 type Array = Annotated[list[Any], Meta(description="A dense columnar array buffer.")]
-"""
-A dense columnar array buffer.
-"""
+"""A dense columnar array buffer."""
+
+
+type Float32Array = Annotated[
+    ArrowArray[Literal["float32"], float],
+    Meta(description="A dense columnar 32-bit floating-point array buffer."),
+]
+"""A dense columnar 32-bit floating-point array buffer."""
+
+
+type Float64Array = Annotated[
+    ArrowArray[Literal["float64"], float],
+    Meta(description="A dense columnar 64-bit floating-point array buffer."),
+]
+"""A dense columnar 64-bit floating-point array buffer."""
+
+
+type UInt8ArrayItem = Annotated[int, Meta(ge=0, le=255)]
+
+
+type UInt8Array = Annotated[
+    ArrowArray[Literal["uint8"], UInt8ArrayItem],
+    Meta(description="A dense columnar 8-bit unsigned integer array buffer."),
+]
+"""A dense columnar 8-bit unsigned integer array buffer."""
+
+
+type UInt16ArrayItem = Annotated[int, Meta(ge=0, le=65535)]
+
+
+type UInt16Array = Annotated[
+    ArrowArray[Literal["uint16"], UInt16ArrayItem],
+    Meta(description="A dense columnar 16-bit unsigned integer array buffer."),
+]
+"""A dense columnar 16-bit unsigned integer array buffer."""
+
+
+type UInt32ArrayItem = Annotated[int, Meta(ge=0, le=4294967295)]
+
+
+type UInt32Array = Annotated[
+    ArrowArray[Literal["uint32"], UInt32ArrayItem],
+    Meta(description="A dense columnar 32-bit unsigned integer array buffer."),
+]
+"""A dense columnar 32-bit unsigned integer array buffer."""
+
+
+type Int32ArrayItem = Annotated[int, Meta(ge=-2147483648, le=2147483647)]
+
+
+type Int32Array = Annotated[
+    ArrowArray[Literal["int32"], Int32ArrayItem],
+    Meta(description="A dense columnar 32-bit signed integer array buffer."),
+]
+"""A dense columnar 32-bit signed integer array buffer."""
+
+
+type BoolArray = Annotated[
+    ArrowArray[Literal["bool"], bool],
+    Meta(description="A dense columnar boolean array buffer."),
+]
+"""A dense columnar boolean array buffer."""
+
+
+type StringArray = Annotated[
+    ArrowArray[Literal["string"], str],
+    Meta(description="A dense columnar UTF-8 string array buffer."),
+]
+"""A dense columnar UTF-8 string array buffer."""
 
 
 type FractionItem = Annotated[
@@ -29,9 +97,7 @@ type Fraction = Annotated[
     tuple[int, FractionItem],
     Meta(description="Rational number encoded as numerator and non-zero denominator"),
 ]
-"""
-Rational number encoded as numerator and non-zero denominator
-"""
+"""Rational number encoded as numerator and non-zero denominator"""
 
 
 type FractionNonnegativeItem = Annotated[
@@ -52,6 +118,4 @@ type FractionNonnegative = Annotated[
     tuple[FractionNonnegativeItem, FractionNonnegativeItem1],
     Meta(description="Non-negative rational number"),
 ]
-"""
-Non-negative rational number
-"""
+"""Non-negative rational number"""

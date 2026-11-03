@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 import bopp
+from bopp._arrow import arrow_dec_hook, arrow_json_enc_hook
 from bopp.core import create
 from bopp.exceptions import BoppArgumentError, BoppValidationError
 from bopp.models.v1.annotation import Annotation
@@ -127,10 +128,10 @@ def test_subset_groupings_helper():
     subsetted = _subset_groupings([g1, g2], [1, 3])
     assert len(subsetted) == 2
     assert subsetted[0].name == "pattern"
-    assert subsetted[0].ids == [2, 2]
+    assert subsetted[0].ids.to_pylist() == [2, 2]
     assert subsetted[0].labels == {"A": 1, "B": 2, "C": 3}
     assert subsetted[1].name == "source"
-    assert subsetted[1].ids == [1, 1]
+    assert subsetted[1].ids.to_pylist() == [1, 1]
 
 
 def test_resample_struct_helper():
@@ -142,7 +143,7 @@ def test_resample_struct_helper():
     resampled = _resample_struct(
         payload, cols, [1, None, 0], fill_map={"value": "empty"}
     )
-    assert resampled.value == ["banana", "empty", "apple"]
+    assert resampled.value.to_pylist() == ["banana", "empty", "apple"]
 
 
 def test_resample_groupings_helper():
@@ -158,7 +159,7 @@ def test_resample_groupings_helper():
     )
     resampled = _resample_groupings([g], [0, None, 1], fill_map={"section": -1})
     assert len(resampled) == 1
-    assert resampled[0].ids == [0, -1, 1]
+    assert resampled[0].ids.to_pylist() == [0, -1, 1]
     assert resampled[0].name == "section"
     assert resampled[0].labels == {"intro": 0, "verse": 1}
 
@@ -186,9 +187,9 @@ def test_rebuild_annotation_helper():
     assert rebuilt.id != "old_id"
     assert rebuilt.parents == ["old_id"]
     assert rebuilt.sandbox == {"foo": "bar"}
-    assert rebuilt.payload.value == ["new_test"]
-    assert rebuilt.extent.time == [2.0]
-    assert rebuilt.groupings[0].ids == [2]
+    assert rebuilt.payload.value.to_pylist() == ["new_test"]
+    assert rebuilt.extent.time.to_pylist() == [2.0]
+    assert rebuilt.groupings[0].ids.to_pylist() == [2]
 
 
 def test_trim_invalid_arguments():
@@ -299,7 +300,7 @@ def test_trim_no_extent():
 
     result = trim(ann, start=1.0, end=5.0)
     assert result.extent is msgspec.UNSET
-    assert result.payload.value == ["pop"]
+    assert result.payload.value.to_pylist() == ["pop"]
     assert result is not ann
     assert result.parents == [ann.id]
     assert isinstance(result.metadata, DerivedAnnotationMetadata)
@@ -318,9 +319,9 @@ def test_trim_time_extent():
     )
 
     trimmed = trim(ann, start=2.0, end=6.0, reset=True)
-    assert trimmed.extent.time == [1.0, 3.0]  # 3.0 - 2.0, 5.0 - 2.0
-    assert trimmed.payload.value == ["b", "c"]
-    assert trimmed.confidence.confidence == [0.3, 0.5]
+    assert trimmed.extent.time.to_pylist() == [1.0, 3.0]  # 3.0 - 2.0, 5.0 - 2.0
+    assert trimmed.payload.value.to_pylist() == ["b", "c"]
+    assert trimmed.confidence.confidence.to_pylist() == pytest.approx([0.3, 0.5])
     assert isinstance(trimmed.metadata, DerivedAnnotationMetadata)
     assert trimmed.metadata.transform == "trim"
     assert trimmed.metadata.parameters["start"] == 2.0
@@ -349,22 +350,22 @@ def test_trim_with_groupings():
     bopp.ensure_annotation_id(ann)
 
     trimmed = trim(ann, start=2.0, end=6.0, reset=True)
-    assert trimmed.extent.time == [1.0, 3.0]
-    assert trimmed.payload.value == ["b", "c"]
+    assert trimmed.extent.time.to_pylist() == [1.0, 3.0]
+    assert trimmed.payload.value.to_pylist() == ["b", "c"]
     assert len(trimmed.groupings) == 2
     assert trimmed.groupings[0].name == "pattern"
-    assert trimmed.groupings[0].ids == [1, 1]
+    assert trimmed.groupings[0].ids.to_pylist() == [1, 1]
     assert trimmed.groupings[0].labels == {"intro": 0, "verse": 1, "outro": 2}
     assert trimmed.groupings[1].name == "stream"
-    assert trimmed.groupings[1].ids == [11, 12]
+    assert trimmed.groupings[1].ids.to_pylist() == [11, 12]
     assert bopp.validate(trimmed)
 
     # Empty trim
     empty = trim(ann, start=20.0, end=30.0)
-    assert empty.extent.time == []
-    assert empty.payload.value == []
-    assert empty.groupings[0].ids == []
-    assert empty.groupings[1].ids == []
+    assert empty.extent.time.to_pylist() == []
+    assert empty.payload.value.to_pylist() == []
+    assert empty.groupings[0].ids.to_pylist() == []
+    assert empty.groupings[1].ids.to_pylist() == []
     assert bopp.validate(empty)
 
 
@@ -377,11 +378,11 @@ def test_trim_numeric_bounds_pass_through():
         value=list("abc"),
     )
     result = trim(tm, start=1, end=math.inf)
-    assert result.extent.time == [1.0, 2.0]
+    assert result.extent.time.to_pylist() == [1.0, 2.0]
     assert result.metadata.parameters["end"] == math.inf
 
     result = trim(tm, start=-math.inf, end=1)
-    assert result.extent.time == [0.0, 1.0]
+    assert result.extent.time.to_pylist() == [0.0, 1.0]
     assert result.metadata.parameters["start"] == -math.inf
 
     with pytest.raises(BoppArgumentError, match="Trim bound must be an int or float"):
@@ -400,7 +401,7 @@ def test_trim_no_extent_infinite_bound():
 
     result = trim(ann, start=0, end=math.inf)
     assert result.extent is msgspec.UNSET
-    assert result.payload == ann.payload
+    assert result.payload.value.to_pylist() == ann.payload.value.to_pylist()
     assert result.metadata.parameters["end"] == math.inf
 
 
@@ -416,13 +417,13 @@ def test_trim_point_extent_open_ended_bounds():
 
     # Only start bound
     res_start = trim(ann, start=3.0)
-    assert res_start.extent.time == [3.0, 4.0, 5.0]
-    assert res_start.payload.value == ["c", "d", "e"]
+    assert res_start.extent.time.to_pylist() == [3.0, 4.0, 5.0]
+    assert res_start.payload.value.to_pylist() == ["c", "d", "e"]
 
     # Only end bound
     res_end = trim(ann, end=3.0)
-    assert res_end.extent.time == [1.0, 2.0, 3.0]
-    assert res_end.payload.value == ["a", "b", "c"]
+    assert res_end.extent.time.to_pylist() == [1.0, 2.0, 3.0]
+    assert res_end.payload.value.to_pylist() == ["a", "b", "c"]
 
 
 def test_trim_time_interval_non_strict():
@@ -440,15 +441,15 @@ def test_trim_time_interval_non_strict():
 
     # Trim to [1.0, 6.0] non-strict
     trimmed = trim(ann, start=1.0, end=6.0, strict=False, reset=False)
-    assert trimmed.extent.time == [1.0, 2.0, 5.0]
-    assert trimmed.extent.duration == [1.0, 4.0, 1.0]
-    assert trimmed.payload.value == ["first", "second", "third"]
-    assert trimmed.confidence.confidence == [0.2, 0.4, 0.6]
+    assert trimmed.extent.time.to_pylist() == [1.0, 2.0, 5.0]
+    assert trimmed.extent.duration.to_pylist() == [1.0, 4.0, 1.0]
+    assert trimmed.payload.value.to_pylist() == ["first", "second", "third"]
+    assert trimmed.confidence.confidence.to_pylist() == pytest.approx([0.2, 0.4, 0.6])
 
     # With reset=True
     trimmed_reset = trim(ann, start=1.0, end=6.0, strict=False, reset=True)
-    assert trimmed_reset.extent.time == [0.0, 1.0, 4.0]
-    assert trimmed_reset.extent.duration == [1.0, 4.0, 1.0]
+    assert trimmed_reset.extent.time.to_pylist() == [0.0, 1.0, 4.0]
+    assert trimmed_reset.extent.duration.to_pylist() == [1.0, 4.0, 1.0]
 
 
 def test_trim_time_interval_strict():
@@ -464,9 +465,9 @@ def test_trim_time_interval_strict():
 
     # Trim to [1.0, 6.0] strict (only [2, 6] is strictly contained)
     trimmed = trim(ann, start=1.0, end=6.0, strict=True, reset=False)
-    assert trimmed.extent.time == [2.0]
-    assert trimmed.extent.duration == [4.0]
-    assert trimmed.payload.value == ["second"]
+    assert trimmed.extent.time.to_pylist() == [2.0]
+    assert trimmed.extent.duration.to_pylist() == [4.0]
+    assert trimmed.payload.value.to_pylist() == ["second"]
 
 
 def test_trim_time_frequency_box():
@@ -487,11 +488,11 @@ def test_trim_time_frequency_box():
     bopp.ensure_annotation_id(ann)
 
     trimmed = trim(ann, start=1.0, end=5.0, strict=False, reset=True)
-    assert trimmed.extent.time == [0.0, 3.0]
-    assert trimmed.extent.duration == [2.0, 1.0]
-    assert trimmed.extent.freq_min == [100.0, 200.0]
-    assert trimmed.extent.freq_max == [500.0, 800.0]
-    assert trimmed.payload.value == ["low", "high"]
+    assert trimmed.extent.time.to_pylist() == [0.0, 3.0]
+    assert trimmed.extent.duration.to_pylist() == [2.0, 1.0]
+    assert trimmed.extent.freq_min.to_pylist() == pytest.approx([100.0, 200.0])
+    assert trimmed.extent.freq_max.to_pylist() == pytest.approx([500.0, 800.0])
+    assert trimmed.payload.value.to_pylist() == ["low", "high"]
 
 
 def test_trim_time_frequency_box_along_frequency():
@@ -516,17 +517,17 @@ def test_trim_time_frequency_box_along_frequency():
     trimmed_freq = trim(
         ann, start=250.0, end=600.0, target_field="frequency", reset=True
     )
-    assert trimmed_freq.extent.freq_min == [0.0, 0.0, 250.0]
-    assert trimmed_freq.extent.freq_max == [50.0, 150.0, 350.0]
-    assert trimmed_freq.payload.value == ["low", "mid", "high"]
+    assert trimmed_freq.extent.freq_min.to_pylist() == pytest.approx([0.0, 0.0, 250.0])
+    assert trimmed_freq.extent.freq_max.to_pylist() == pytest.approx([50.0, 150.0, 350.0])
+    assert trimmed_freq.payload.value.to_pylist() == ["low", "mid", "high"]
 
     # Trim frequency axis strict (150 to 450 strictly contains [200, 400])
     trimmed_freq_strict = trim(
         ann, start=150.0, end=450.0, target_field="frequency", strict=True
     )
-    assert trimmed_freq_strict.extent.freq_min == [200.0]
-    assert trimmed_freq_strict.extent.freq_max == [400.0]
-    assert trimmed_freq_strict.payload.value == ["mid"]
+    assert trimmed_freq_strict.extent.freq_min.to_pylist() == pytest.approx([200.0])
+    assert trimmed_freq_strict.extent.freq_max.to_pylist() == pytest.approx([400.0])
+    assert trimmed_freq_strict.payload.value.to_pylist() == ["mid"]
 
 
 def test_trim_min_max_strict_and_non_strict():
@@ -551,37 +552,37 @@ def test_trim_min_max_strict_and_non_strict():
     trimmed_non_strict = trim(
         ann, start=150.0, end=600.0, target_field="frequency", strict=False
     )
-    assert trimmed_non_strict.extent.freq_min == [200.0, 500.0]
-    assert trimmed_non_strict.extent.freq_max == [400.0, 600.0]
-    assert trimmed_non_strict.payload.value == ["mid", "high"]
+    assert trimmed_non_strict.extent.freq_min.to_pylist() == pytest.approx([200.0, 500.0])
+    assert trimmed_non_strict.extent.freq_max.to_pylist() == pytest.approx([400.0, 600.0])
+    assert trimmed_non_strict.payload.value.to_pylist() == ["mid", "high"]
 
     # Non-strict trim with only start (tests start is not None, end is None branch)
     trimmed_only_start_ns = trim(
         ann, start=300.0, target_field="frequency", strict=False
     )
-    assert trimmed_only_start_ns.extent.freq_min == [300.0, 500.0, 700.0]
-    assert trimmed_only_start_ns.extent.freq_max == [400.0, 800.0, 900.0]
+    assert trimmed_only_start_ns.extent.freq_min.to_pylist() == pytest.approx([300.0, 500.0, 700.0])
+    assert trimmed_only_start_ns.extent.freq_max.to_pylist() == pytest.approx([400.0, 800.0, 900.0])
 
     # Non-strict trim with only end (tests start is None, end is not None branch)
     trimmed_only_end_ns = trim(ann, end=450.0, target_field="frequency", strict=False)
-    assert trimmed_only_end_ns.extent.freq_min == [50.0, 200.0]
-    assert trimmed_only_end_ns.extent.freq_max == [100.0, 400.0]
+    assert trimmed_only_end_ns.extent.freq_min.to_pylist() == pytest.approx([50.0, 200.0])
+    assert trimmed_only_end_ns.extent.freq_max.to_pylist() == pytest.approx([100.0, 400.0])
 
     # Strict trim with start and end
     trimmed_strict = trim(
         ann, start=150.0, end=600.0, target_field="frequency", strict=True
     )
-    assert trimmed_strict.extent.freq_min == [200.0]
-    assert trimmed_strict.extent.freq_max == [400.0]
-    assert trimmed_strict.payload.value == ["mid"]
+    assert trimmed_strict.extent.freq_min.to_pylist() == pytest.approx([200.0])
+    assert trimmed_strict.extent.freq_max.to_pylist() == pytest.approx([400.0])
+    assert trimmed_strict.payload.value.to_pylist() == ["mid"]
 
     # Strict trim with only start
     trimmed_only_start_s = trim(ann, start=150.0, target_field="frequency", strict=True)
-    assert trimmed_only_start_s.extent.freq_min == [200.0, 500.0, 700.0]
+    assert trimmed_only_start_s.extent.freq_min.to_pylist() == pytest.approx([200.0, 500.0, 700.0])
 
     # Strict trim with only end
     trimmed_only_end_s = trim(ann, end=600.0, target_field="frequency", strict=True)
-    assert trimmed_only_end_s.extent.freq_min == [50.0, 200.0]
+    assert trimmed_only_end_s.extent.freq_min.to_pylist() == pytest.approx([50.0, 200.0])
 
 
 def test_trim_empty_and_out_of_bounds_extents():
@@ -609,9 +610,9 @@ def test_trim_empty_and_out_of_bounds_extents():
     trimmed_empty = trim(
         ann_empty, start=100.0, end=200.0, target_field="frequency", strict=True
     )
-    assert trimmed_empty.extent.freq_min == []
-    assert trimmed_empty.extent.freq_max == []
-    assert trimmed_empty.payload.value == []
+    assert trimmed_empty.extent.freq_min.to_pylist() == []
+    assert trimmed_empty.extent.freq_max.to_pylist() == []
+    assert trimmed_empty.payload.value.to_pylist() == []
     assert trimmed_empty.parents == [ann_empty.id]
 
     # 2. Functional case: Extent with observations completely outside [start, end]
@@ -636,9 +637,9 @@ def test_trim_empty_and_out_of_bounds_extents():
     trimmed_oob = trim(
         ann_oob, start=100.0, end=200.0, target_field="frequency", strict=False
     )
-    assert trimmed_oob.extent.freq_min == []
-    assert trimmed_oob.extent.freq_max == []
-    assert trimmed_oob.payload.value == []
+    assert trimmed_oob.extent.freq_min.to_pylist() == []
+    assert trimmed_oob.extent.freq_max.to_pylist() == []
+    assert trimmed_oob.payload.value.to_pylist() == []
     assert trimmed_oob.parents == [ann_oob.id]
 
 
@@ -660,16 +661,16 @@ def test_trim_pixel_box():
 
     # Trimming along x
     trimmed_x = trim(ann, start=20.0, end=70.0, target_field="x", reset=True)
-    assert trimmed_x.extent.x == [0.0, 30.0]  # [30-20, 50-20]
-    assert trimmed_x.extent.width == [10.0, 20.0]
-    assert trimmed_x.extent.y == [100.0, 200.0]
-    assert trimmed_x.payload.value == ["obj1", "obj2"]
+    assert trimmed_x.extent.x.to_pylist() == pytest.approx([0.0, 30.0])  # [30-20, 50-20]
+    assert trimmed_x.extent.width.to_pylist() == pytest.approx([10.0, 20.0])
+    assert trimmed_x.extent.y.to_pylist() == pytest.approx([100.0, 200.0])
+    assert trimmed_x.payload.value.to_pylist() == ["obj1", "obj2"]
 
     # Trimming along y (180.0 to 260.0 keeps obj2 [200..250])
     trimmed_y = trim(ann, start=180.0, end=260.0, target_field="y", reset=False)
-    assert trimmed_y.extent.y == [200.0]
-    assert trimmed_y.extent.height == [50.0]
-    assert trimmed_y.payload.value == ["obj2"]
+    assert trimmed_y.extent.y.to_pylist() == pytest.approx([200.0])
+    assert trimmed_y.extent.height.to_pylist() == pytest.approx([50.0])
+    assert trimmed_y.payload.value.to_pylist() == ["obj2"]
 
 
 def test_trim_transitive_parents_and_immutability():
@@ -726,9 +727,9 @@ def test_filter_by_default_payload():
     )
 
     filtered = filter_by(ann, lambda v: v == "rock")
-    assert filtered.payload.value == ["rock", "rock"]
-    assert filtered.extent.time == [1.0, 3.0]
-    assert filtered.confidence.confidence == [0.5, 0.7]
+    assert filtered.payload.value.to_pylist() == ["rock", "rock"]
+    assert filtered.extent.time.to_pylist() == [1.0, 3.0]
+    assert filtered.confidence.confidence.to_pylist() == pytest.approx([0.5, 0.7])
     assert filtered.parents == [ann.id]
     assert filtered.id != ann.id
     assert isinstance(filtered.metadata, DerivedAnnotationMetadata)
@@ -746,8 +747,8 @@ def test_filter_by_target_on_payload():
     )
 
     filtered = filter_by(ann, lambda v: len(v) == 4, target="value")
-    assert filtered.payload.value == ["rock"]
-    assert filtered.extent.time == [1.0]
+    assert filtered.payload.value.to_pylist() == ["rock"]
+    assert filtered.extent.time.to_pylist() == [1.0]
 
 
 def test_filter_by_target_on_extent():
@@ -762,9 +763,9 @@ def test_filter_by_target_on_extent():
     )
 
     filtered = filter_by(ann, lambda t: t > 2.0, facet="extent", target="time")
-    assert filtered.extent.time == [3.0, 4.0]
-    assert filtered.payload.value == ["c", "d"]
-    assert filtered.confidence.confidence == [0.3, 0.4]
+    assert filtered.extent.time.to_pylist() == [3.0, 4.0]
+    assert filtered.payload.value.to_pylist() == ["c", "d"]
+    assert filtered.confidence.confidence.to_pylist() == pytest.approx([0.3, 0.4])
 
 
 def test_filter_by_confidence_facet():
@@ -781,9 +782,9 @@ def test_filter_by_confidence_facet():
     filtered = filter_by(
         ann, lambda c: c >= 0.5, facet="confidence", target="confidence"
     )
-    assert filtered.confidence.confidence == [0.8, 0.5]
-    assert filtered.payload.value == ["b", "c"]
-    assert filtered.extent.time == [2.0, 3.0]
+    assert filtered.confidence.confidence.to_pylist() == pytest.approx([0.8, 0.5])
+    assert filtered.payload.value.to_pylist() == ["b", "c"]
+    assert filtered.extent.time.to_pylist() == [2.0, 3.0]
 
 
 def test_filter_by_groupings_facet():
@@ -809,17 +810,17 @@ def test_filter_by_groupings_facet():
     res_verse = filter_by(
         ann, lambda gid: gid == 1, facet="groupings", target="pattern"
     )
-    assert res_verse.payload.value == ["b", "c"]
-    assert res_verse.extent.time == [2.0, 3.0]
-    assert res_verse.groupings[0].ids == [1, 1]
-    assert res_verse.groupings[1].ids == [20, 20]
+    assert res_verse.payload.value.to_pylist() == ["b", "c"]
+    assert res_verse.extent.time.to_pylist() == [2.0, 3.0]
+    assert res_verse.groupings[0].ids.to_pylist() == [1, 1]
+    assert res_verse.groupings[1].ids.to_pylist() == [20, 20]
     assert bopp.validate(res_verse)
 
     # Filter with record access across multiple grouping layers
     res_rec = filter_by(
         ann, lambda r: r.pattern == 1 and r.track == 20, facet="groupings"
     )
-    assert res_rec.payload.value == ["b", "c"]
+    assert res_rec.payload.value.to_pylist() == ["b", "c"]
 
     # Filter when only 1 grouping is present and target is None
     g_single = Grouping(
@@ -839,7 +840,7 @@ def test_filter_by_groupings_facet():
     )
     bopp.ensure_annotation_id(ann_single_g)
     res_single = filter_by(ann_single_g, lambda gid: gid == 0, facet="groupings")
-    assert res_single.payload.value == ["a"]
+    assert res_single.payload.value.to_pylist() == ["a"]
 
 
 def test_filter_by_multi_column_payload():
@@ -856,13 +857,13 @@ def test_filter_by_multi_column_payload():
 
     # Filter with record
     filtered = filter_by(ann, lambda r: r.valence > 0 and r.arousal > 0)
-    assert filtered.payload.valence == [0.5]
-    assert filtered.payload.arousal == [0.1]
+    assert filtered.payload.valence.to_pylist() == pytest.approx([0.5])
+    assert filtered.payload.arousal.to_pylist() == pytest.approx([0.1])
 
     # Explicit target on one field
     filtered_v = filter_by(ann, lambda v: v > 0, target="valence")
-    assert filtered_v.payload.valence == [0.5, 0.8]
-    assert filtered_v.payload.arousal == [0.1, -0.3]
+    assert filtered_v.payload.valence.to_pylist() == pytest.approx([0.5, 0.8])
+    assert filtered_v.payload.arousal.to_pylist() == pytest.approx([0.1, -0.3])
 
 
 def test_filter_by_facet_all():
@@ -884,10 +885,10 @@ def test_filter_by_facet_all():
         lambda r: r.confidence >= 0.8 and r.value.startswith("v") and r.pattern == 1,
         facet="all",
     )
-    assert filtered.payload.value == ["verse"]
-    assert filtered.extent.time == [4.0]
-    assert filtered.confidence.confidence == [0.85]
-    assert filtered.groupings[0].ids == [1]
+    assert filtered.payload.value.to_pylist() == ["verse"]
+    assert filtered.extent.time.to_pylist() == [4.0]
+    assert filtered.confidence.confidence.to_pylist() == pytest.approx([0.85])
+    assert filtered.groupings[0].ids.to_pylist() == [1]
 
     # Filter across facets specifying target on grouping name
     filtered_target_g = filter_by(
@@ -896,9 +897,9 @@ def test_filter_by_facet_all():
         facet="all",
         target="pattern",
     )
-    assert filtered_target_g.extent.time == [3.0]
-    assert filtered_target_g.payload.value == ["chorus"]
-    assert filtered_target_g.groupings[0].ids == [2]
+    assert filtered_target_g.extent.time.to_pylist() == [3.0]
+    assert filtered_target_g.payload.value.to_pylist() == ["chorus"]
+    assert filtered_target_g.groupings[0].ids.to_pylist() == [2]
 
     # Filter across facets specifying target on time
     filtered_target = filter_by(
@@ -907,8 +908,8 @@ def test_filter_by_facet_all():
         facet="all",
         target="time",
     )
-    assert filtered_target.extent.time == [1.0, 2.0]
-    assert filtered_target.payload.value == ["intro", "verse"]
+    assert filtered_target.extent.time.to_pylist() == [1.0, 2.0]
+    assert filtered_target.payload.value.to_pylist() == ["intro", "verse"]
 
 
 def test_filter_by_skips_empty_facet_in_obs_counting():
@@ -923,7 +924,7 @@ def test_filter_by_skips_empty_facet_in_obs_counting():
         payload=TagPayload(value=["one", "two", "three"]),
     )
     filtered = filter_by(ann, lambda v: v != "two")
-    assert filtered.payload.value == ["one", "three"]
+    assert filtered.payload.value.to_pylist() == ["one", "three"]
     assert filtered.extent is msgspec.UNSET
 
 
@@ -1002,14 +1003,14 @@ def test_filter_by_empty_or_none_remaining():
     )
 
     filtered_none = filter_by(ann, lambda v: False)
-    assert filtered_none.payload.value == []
-    assert filtered_none.extent.time == []
+    assert filtered_none.payload.value.to_pylist() == []
+    assert filtered_none.extent.time.to_pylist() == []
     assert filtered_none.parents == [ann.id]
 
     # Now filter the already empty annotation
     filtered_again = filter_by(filtered_none, lambda v: True)
-    assert filtered_again.payload.value == []
-    assert filtered_again.extent.time == []
+    assert filtered_again.payload.value.to_pylist() == []
+    assert filtered_again.extent.time.to_pylist() == []
     assert filtered_again.parents == [ann.id, filtered_none.id]
 
 
@@ -1119,10 +1120,10 @@ def test_to_times_from_time_interval_with_sample_rate():
     )
 
     res = to_times(ann, sample_rate=1.0)
-    assert res.extent.time == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert res.extent.time.to_pylist() == [0.0, 1.0, 2.0, 3.0, 4.0]
     # At t=2.0, both intervals cover [0, 2] and [2, 4]; overlap defaults to 'latest'
-    assert res.payload.value == ["verse", "verse", "chorus", "chorus", "chorus"]
-    assert res.confidence.confidence == [0.8, 0.8, 0.9, 0.9, 0.9]
+    assert res.payload.value.to_pylist() == ["verse", "verse", "chorus", "chorus", "chorus"]
+    assert res.confidence.confidence.to_pylist() == pytest.approx([0.8, 0.8, 0.9, 0.9, 0.9])
     assert res.parents == [ann.id]
     assert res.id != ann.id
     assert isinstance(res.metadata, DerivedAnnotationMetadata)
@@ -1161,10 +1162,10 @@ def test_to_times_with_groupings():
             "source": -99,
         },
     )
-    assert res.extent.time == [0.0, 1.5, 3.0]
-    assert res.payload.value == ["gap_val", "a", "b"]
-    assert res.groupings[0].ids == [-1, 1, 2]
-    assert res.groupings[1].ids == [-99, 10, 20]
+    assert res.extent.time.to_pylist() == [0.0, 1.5, 3.0]
+    assert res.payload.value.to_pylist() == ["gap_val", "a", "b"]
+    assert res.groupings[0].ids.to_pylist() == [-1, 1, 2]
+    assert res.groupings[1].ids.to_pylist() == [-99, 10, 20]
     assert bopp.validate(res)
 
     # Test default grouping fill value (-1)
@@ -1173,8 +1174,8 @@ def test_to_times_with_groupings():
         times=[0.0, 1.5],
         fill_value={"value": "gap_val"},
     )
-    assert res_default_fill.groupings[0].ids == [-1, 1]
-    assert res_default_fill.groupings[1].ids == [-1, 10]
+    assert res_default_fill.groupings[0].ids.to_pylist() == [-1, 1]
+    assert res_default_fill.groupings[1].ids.to_pylist() == [-1, 10]
 
     # Test invalid grouping fill value type
     with pytest.raises(BoppValidationError, match="must be an integer"):
@@ -1197,14 +1198,14 @@ def test_to_times_overlap_strategies():
 
     # Sampling at t=1.5 falls into both [0, 2] and [1, 3]
     res_latest = to_times(ann, times=[1.5], overlap="latest")
-    assert res_latest.payload.value == ["second"]
+    assert res_latest.payload.value.to_pylist() == ["second"]
 
     res_first = to_times(ann, times=[1.5], overlap="first")
-    assert res_first.payload.value == ["first"]
+    assert res_first.payload.value.to_pylist() == ["first"]
 
     res_multi = to_times(ann, times=[1.5], overlap="multiple")
-    assert res_multi.extent.time == [1.5, 1.5]
-    assert res_multi.payload.value == ["first", "second"]
+    assert res_multi.extent.time.to_pylist() == [1.5, 1.5]
+    assert res_multi.payload.value.to_pylist() == ["first", "second"]
 
 
 def test_to_times_interval_gaps_and_fill_value():
@@ -1224,9 +1225,9 @@ def test_to_times_interval_gaps_and_fill_value():
         times=[0.0, 1.5, 3.0],
         fill_value="silence",
     )
-    assert res.extent.time == [0.0, 1.5, 3.0]
-    assert res.payload.value == ["silence", "vocal", "silence"]
-    assert res.confidence.confidence == [0.0, 0.9, 0.0]
+    assert res.extent.time.to_pylist() == [0.0, 1.5, 3.0]
+    assert res.payload.value.to_pylist() == ["silence", "vocal", "silence"]
+    assert res.confidence.confidence.to_pylist() == pytest.approx([0.0, 0.9, 0.0])
 
 
 def test_to_times_from_point_time_extent():
@@ -1242,11 +1243,11 @@ def test_to_times_from_point_time_extent():
     res_prev = to_times(
         ann, times=[0.5, 1.5, 3.0, 4.0], method="previous", fill_value="none"
     )
-    assert res_prev.payload.value == ["none", "a", "b", "b"]
+    assert res_prev.payload.value.to_pylist() == ["none", "a", "b", "b"]
 
     # nearest lookup
     res_near = to_times(ann, times=[0.5, 1.9, 2.1, 4.0], method="nearest")
-    assert res_near.payload.value == ["a", "a", "b", "b"]
+    assert res_near.payload.value.to_pylist() == ["a", "a", "b", "b"]
 
 
 def test_to_times_global_annotation():
@@ -1266,8 +1267,8 @@ def test_to_times_global_annotation():
 
     # explicit times broadcasts
     res = to_times(ann, times=[0.0, 1.0, 2.0])
-    assert res.extent.time == [0.0, 1.0, 2.0]
-    assert res.payload.value == ["rock", "rock", "rock"]
+    assert res.extent.time.to_pylist() == [0.0, 1.0, 2.0]
+    assert res.payload.value.to_pylist() == ["rock", "rock", "rock"]
 
 
 def test_to_times_time_frequency_box():
@@ -1288,8 +1289,8 @@ def test_to_times_time_frequency_box():
     bopp.ensure_annotation_id(ann)
 
     res = to_times(ann, times=[1.0, 3.0])
-    assert res.extent.time == [1.0, 3.0]
-    assert res.payload.value == ["low", "high"]
+    assert res.extent.time.to_pylist() == [1.0, 3.0]
+    assert res.payload.value.to_pylist() == ["low", "high"]
 
 
 def test_to_times_fill_value_dict_with_value_fallback_and_confidence():
@@ -1309,9 +1310,9 @@ def test_to_times_fill_value_dict_with_value_fallback_and_confidence():
         times=[0.0, 1.5, 3.0],
         fill_value={"value": "silent", "confidence": 0.05},
     )
-    assert res.extent.time == [0.0, 1.5, 3.0]
-    assert res.payload.value == ["silent", "solo", "silent"]
-    assert res.confidence.confidence == [0.05, 0.9, 0.05]
+    assert res.extent.time.to_pylist() == [0.0, 1.5, 3.0]
+    assert res.payload.value.to_pylist() == ["silent", "solo", "silent"]
+    assert res.confidence.confidence.to_pylist() == pytest.approx([0.05, 0.9, 0.05])
 
 
 def test_to_times_fill_value_dict_missing_required_key():
@@ -1360,9 +1361,9 @@ def test_to_times_multi_column_payload_dict_fill():
 
     # Proper dict fill
     res = to_times(ann, times=[0.0, 1.5], fill_value={"valence": 0.0, "arousal": 0.0})
-    assert res.extent.time == [0.0, 1.5]
-    assert res.payload.valence == [0.0, 0.5]
-    assert res.payload.arousal == [0.0, 0.8]
+    assert res.extent.time.to_pylist() == [0.0, 1.5]
+    assert res.payload.valence.to_pylist() == pytest.approx([0.0, 0.5])
+    assert res.payload.arousal.to_pylist() == pytest.approx([0.0, 0.8])
 
 
 def test_to_times_multi_column_payload_none_fill_value():
@@ -1385,7 +1386,7 @@ def test_to_times_multi_column_payload_none_fill_value():
     bopp.ensure_annotation_id(ann)
 
     res = to_times(ann, times=[0.0, 1.0], method="previous", fill_value=None)
-    assert res.extent.time == [0.0, 1.0]
+    assert res.extent.time.to_pylist() == [0.0, 1.0]
     assert res.payload.label == [None, "test"]
     assert res.payload.comment == [None, "note"]
 
@@ -1401,7 +1402,7 @@ def test_to_times_sample_rate_grid_boundary_pop():
     )
     # sample_rate=1.0 over [0.0, 1.0] creates points [0.0, 1.0]
     res = to_times(ann, sample_rate=1.0)
-    assert res.extent.time == [0.0, 1.0]
+    assert res.extent.time.to_pylist() == [0.0, 1.0]
 
 
 def test_to_times_fill_value_type_validation_error():
@@ -1430,13 +1431,13 @@ def test_to_times_empty_annotation_and_empty_times():
 
     # Empty times
     res_empty_times = to_times(ann, times=[])
-    assert res_empty_times.extent.time == []
-    assert res_empty_times.payload.value == []
+    assert res_empty_times.extent.time.to_pylist() == []
+    assert res_empty_times.payload.value.to_pylist() == []
 
     # Sampling empty annotation with times
     res_sampled = to_times(ann, times=[1.0, 2.0], fill_value="fill")
-    assert res_sampled.extent.time == [1.0, 2.0]
-    assert res_sampled.payload.value == ["fill", "fill"]
+    assert res_sampled.extent.time.to_pylist() == [1.0, 2.0]
+    assert res_sampled.payload.value.to_pylist() == ["fill", "fill"]
 
 
 def test_to_times_empty_annotation_with_confidence_and_fill():
@@ -1453,9 +1454,9 @@ def test_to_times_empty_annotation_with_confidence_and_fill():
     bopp.ensure_annotation_id(ann)
 
     res = to_times(ann, times=[0.0, 1.0], fill_value="silence")
-    assert res.extent.time == [0.0, 1.0]
-    assert res.payload.value == ["silence", "silence"]
-    assert res.confidence.confidence == [0.0, 0.0]
+    assert res.extent.time.to_pylist() == [0.0, 1.0]
+    assert res.payload.value.to_pylist() == ["silence", "silence"]
+    assert res.confidence.confidence.to_pylist() == pytest.approx([0.0, 0.0])
 
 
 def test_to_times_empty_annotation_confidence_fill_validation_failure():
@@ -1491,8 +1492,8 @@ def test_to_times_point_extent_previous_with_gaps_before_first_observation():
         value=["a", "b"],
     )
     res = to_times(ann, times=[1.0, 5.0, 7.0], method="previous", fill_value="gap")
-    assert res.extent.time == [1.0, 5.0, 7.0]
-    assert res.payload.value == ["gap", "a", "a"]
+    assert res.extent.time.to_pylist() == [1.0, 5.0, 7.0]
+    assert res.payload.value.to_pylist() == ["gap", "a", "a"]
 
 
 def test_to_times_warning_no_id_and_immutability():
@@ -1538,20 +1539,20 @@ def test_trim_fraction_points():
     result = trim(ann, start=[-2, 4], end=Fraction(1, 2))
     assert [list(q) for q in result.extent.quarter] == [[-1, 2], [0, 1], [1, 2]]
     assert all(isinstance(q, list) for q in result.extent.quarter)
-    assert result.payload.value == list("bcd")
+    assert result.payload.value.to_pylist() == list("bcd")
     assert result.metadata.parameters["start"] == [-1, 2]
     assert result.metadata.parameters["end"] == [1, 2]
 
     shifted = trim(ann, start=Fraction(-1, 2), end=(1, 2), reset=True)
     assert [list(q) for q in shifted.extent.quarter] == [[0, 1], [1, 2], [1, 1]]
-    assert shifted.payload.value == list("bcd")
+    assert shifted.payload.value.to_pylist() == list("bcd")
 
     only_start = trim(ann, start=(1, 2))
     assert [list(q) for q in only_start.extent.quarter] == [[1, 2], [1, 1]]
-    assert only_start.payload.value == list("de")
+    assert only_start.payload.value.to_pylist() == list("de")
     only_end = trim(ann, end=0)
     assert [list(q) for q in only_end.extent.quarter] == [[-1, 1], [-1, 2], [0, 1]]
-    assert only_end.payload.value == list("abc")
+    assert only_end.payload.value.to_pylist() == list("abc")
     assert ann == original
 
 
@@ -1580,14 +1581,14 @@ def test_trim_fraction_intervals(reset, strict):
         expected_values = list("bcd")
     assert [list(q) for q in result.extent.quarter] == expected_quarters
     assert [list(d) for d in result.extent.duration] == expected_durations
-    assert result.payload.value == expected_values
+    assert result.payload.value.to_pylist() == expected_values
     assert bopp.validate(result)
     assert ann == original
 
     empty = trim(ann, start=[5, 1], strict=strict, reset=reset)
     assert empty.extent.quarter == []
     assert empty.extent.duration == []
-    assert empty.payload.value == []
+    assert empty.payload.value.to_pylist() == []
 
 
 @pytest.mark.parametrize(
@@ -1604,7 +1605,7 @@ def test_trim_fraction_interval_boundaries(strict, expected_values):
         value=["left", "inside", "right"],
     )
     result = trim(ann, start=(1, 2), end=1, strict=strict)
-    assert result.payload.value == expected_values
+    assert result.payload.value.to_pylist() == expected_values
     assert bopp.validate(result)
 
 
@@ -1622,21 +1623,29 @@ def test_trim_fraction_bound_forms_and_roundtrip(bound, decoded, extent_type):
         **kwargs,
     )
     if decoded:
-        ann = msgspec.json.decode(msgspec.json.encode(ann), type=type(ann))
+        ann = msgspec.json.decode(
+            msgspec.json.encode(ann, enc_hook=arrow_json_enc_hook),
+            type=type(ann),
+            dec_hook=arrow_dec_hook,
+        )
         assert isinstance(ann.extent.quarter[0], tuple)
 
     result = trim(ann, start=bound, end=Fraction(3, 2), reset=True)
     assert [list(q) for q in result.extent.quarter] == [[0, 1], [1, 2]]
     if kwargs:
         assert [list(d) for d in result.extent.duration] == [[1, 2], [1, 2]]
-    assert result.payload.value == list("cd")
+    assert result.payload.value.to_pylist() == list("cd")
     assert result.metadata.parameters["start"] == (
         0.5 if isinstance(bound, float) else [1, 2]
     )
     assert result.metadata.parameters["end"] == [3, 2]
     assert not any(isinstance(v, Fraction) for v in result.metadata.parameters.values())
     assert bopp.validate(result)
-    roundtrip = msgspec.json.decode(msgspec.json.encode(result), type=type(result))
+    roundtrip = msgspec.json.decode(
+        msgspec.json.encode(result, enc_hook=arrow_json_enc_hook),
+        type=type(result),
+        dec_hook=arrow_dec_hook,
+    )
     assert roundtrip.id == result.id
     assert [list(q) for q in roundtrip.extent.quarter] == [[0, 1], [1, 2]]
     assert roundtrip.payload.value == result.payload.value
@@ -1900,8 +1909,8 @@ def test_trim_midi_tick():
         value=list("abcd"),
     )
     result = trim(ann, start=240, end=480, reset=True)
-    assert result.extent.tick == [0, 240]
-    assert result.payload.value == list("bc")
+    assert result.extent.tick.to_pylist() == [0, 240]
+    assert result.payload.value.to_pylist() == list("bc")
 
 
 def test_trim_midi_interval():
@@ -1914,9 +1923,9 @@ def test_trim_midi_interval():
         value=list("abcd"),
     )
     result = trim(ann, start=240, end=720)
-    assert result.extent.tick == [240, 240, 480]
-    assert result.extent.duration == [240, 240, 240]
-    assert result.payload.value == list("abc")
+    assert result.extent.tick.to_pylist() == [240, 240, 480]
+    assert result.extent.duration.to_pylist() == [240, 240, 240]
+    assert result.payload.value.to_pylist() == list("abc")
 
 
 def test_trim_axis_configuration_keys():
@@ -1950,7 +1959,7 @@ def test_filter_by_fraction_extent():
     )
     assert [list(q) for q in result.extent.quarter] == [[1, 1], [3, 2]]
     assert [list(d) for d in result.extent.duration] == [[2, 1], [1, 1]]
-    assert result.payload.value == list("cd")
+    assert result.payload.value.to_pylist() == list("cd")
 
 
 def test_filter_by_all_name_collision():
@@ -2021,7 +2030,11 @@ def _score_annotation(tag, **kwargs):
 def test_score_conversion_values_and_provenance(name, source, target, kwargs, decoded):
     ann = _score_annotation(source)
     if decoded:
-        ann = msgspec.json.decode(msgspec.json.encode(ann), type=type(ann))
+        ann = msgspec.json.decode(
+            msgspec.json.encode(ann, enc_hook=arrow_json_enc_hook),
+            type=type(ann),
+            dec_hook=arrow_dec_hook,
+        )
     original = copy.deepcopy(ann)
     convert = getattr(bopp, name)
     assert convert is getattr(bopp.transforms, name)
@@ -2031,19 +2044,19 @@ def test_score_conversion_values_and_provenance(name, source, target, kwargs, de
     ]
     assert type(result.extent) is target_cls
     if target.endswith("_float"):
-        assert result.extent.quarter == [-0.5, 0.0, 0.5, 1.0 / 3.0, 3.0]
+        assert result.extent.quarter.to_pylist() == pytest.approx([-0.5, 0.0, 0.5, 1.0 / 3.0, 3.0])
         if "interval" in target:
-            assert result.extent.duration == [0.0, 0.5, 1.0 / 3.0, 3.0, 0.125]
-        assert all(type(q) is float for q in result.extent.quarter)
+            assert result.extent.duration.to_pylist() == pytest.approx([0.0, 0.5, 1.0 / 3.0, 3.0, 0.125])
+        assert all(type(q) is float for q in result.extent.quarter.to_pylist())
     else:
-        assert result.extent.quarter == [[-1, 2], [0, 1], [1, 2], [1, 3], [3, 1]]
+        assert [list(q) for q in result.extent.quarter] == [[-1, 2], [0, 1], [1, 2], [1, 3], [3, 1]]
         if "interval" in target:
-            assert result.extent.duration == [[0, 1], [1, 2], [1, 3], [3, 1], [1, 8]]
+            assert [list(d) for d in result.extent.duration] == [[0, 1], [1, 2], [1, 3], [3, 1], [1, 8]]
         for field in msgspec.structs.fields(result.extent):
             val = getattr(result.extent, field.name)
-            if isinstance(val, list):
+            if isinstance(val, (list, tuple)):
                 for pair in val:
-                    assert type(pair) is list
+                    assert type(pair) in (list, tuple)
                     assert pair[1] > 0
                     assert math.gcd(*pair) == 1
     assert result.parents == [ann.id]
@@ -2057,10 +2070,16 @@ def test_score_conversion_values_and_provenance(name, source, target, kwargs, de
     assert result.metadata.parameters == kwargs
     assert bopp.validate(result)
     assert ann == original
-    loaded = msgspec.json.decode(msgspec.json.encode(result), type=type(result))
+    loaded = msgspec.json.decode(
+        msgspec.json.encode(result, enc_hook=arrow_json_enc_hook),
+        type=type(result),
+        dec_hook=arrow_dec_hook,
+    )
     assert loaded.id == result.id
     assert bopp.validate(loaded)
-    assert msgspec.json.encode(loaded.extent) == msgspec.json.encode(result.extent)
+    assert msgspec.json.encode(
+        loaded.extent, enc_hook=arrow_json_enc_hook
+    ) == msgspec.json.encode(result.extent, enc_hook=arrow_json_enc_hook)
 
 
 @pytest.mark.parametrize("shape", ["quarter", "interval"])
@@ -2195,7 +2214,9 @@ def test_score_conversion_required_keyword(shape):
 @pytest.mark.parametrize("value", [float("inf"), float("-inf"), float("nan")])
 def test_score_conversion_nonfinite(shape, field, value):
     ann = _score_annotation(f"score_{shape}_float")
-    getattr(ann.extent, field)[1] = value
+    vals = getattr(ann.extent, field).to_pylist()
+    vals[1] = value
+    setattr(ann.extent, field, vals)
     with pytest.raises(BoppArgumentError, match=rf"{field}.*index 1"):
         getattr(bopp, f"to_score_{shape}")(ann, max_denominator=8)
 
@@ -2218,8 +2239,10 @@ def test_score_conversion_lineage_and_independent_facets(name, source, target, k
     assert result.payload is not trimmed.payload
     assert result.confidence is not trimmed.confidence
     assert result.sandbox is not trimmed.sandbox
-    result.payload.value.append("f")
-    result.confidence.confidence.append(0.4)
+    result.payload.value = getattr(result.payload, "value").to_pylist() + ["f"]
+    result.confidence.confidence = (
+        getattr(result.confidence, "confidence").to_pylist() + [0.4]
+    )
     result.sandbox["custom"]["values"].append(3)
     result.parents.append("another")
     assert trimmed == original
@@ -2250,9 +2273,17 @@ def test_score_conversion_empty_columns(name, source, target, kwargs):
         **({"duration": []} if "interval" in source else {}),
     )
     result = getattr(bopp, name)(ann, **kwargs)
-    assert result.extent.quarter == []
+    assert (
+        result.extent.quarter.to_pylist() == []
+        if hasattr(result.extent.quarter, "to_pylist")
+        else result.extent.quarter == []
+    )
     if "interval" in source:
-        assert result.extent.duration == []
+        assert (
+            result.extent.duration.to_pylist() == []
+            if hasattr(result.extent.duration, "to_pylist")
+            else result.extent.duration == []
+        )
     assert bopp.validate(result)
 
 
@@ -2264,7 +2295,7 @@ def test_score_conversion_preserves_groupings(name, source, target, kwargs):
     assert result.groupings is not None
     assert len(result.groupings) == 1
     assert result.groupings[0].name == "layer"
-    assert result.groupings[0].ids == [0, 1, 0, 1, 2]
+    assert result.groupings[0].ids.to_pylist() == [0, 1, 0, 1, 2]
     assert result.groupings is not ann.groupings
     assert bopp.validate(result)
 
@@ -2278,15 +2309,15 @@ def test_marker_payload_transforms():
         description="cues",
     )
     trimmed = trim(ann, start=0.4, end=1.5)
-    assert trimmed.extent.time == [0.5, 1.0]
+    assert trimmed.extent.time.to_pylist() == [0.5, 1.0]
     assert trimmed.payload.description == "cues"
 
     filtered = filter_by(ann, lambda t: t > 0.5, facet="extent", target="time")
-    assert filtered.extent.time == [1.0, 2.0]
+    assert filtered.extent.time.to_pylist() == [1.0, 2.0]
     assert filtered.payload.description == "cues"
 
     resampled = to_times(ann, times=[0.0, 0.5, 1.5], method="nearest")
-    assert resampled.extent.time == [0.0, 0.5, 1.5]
+    assert resampled.extent.time.to_pylist() == [0.0, 0.5, 1.5]
     assert resampled.payload.description == "cues"
 
 
@@ -2300,12 +2331,12 @@ def test_lyrics_payload_transforms():
         language="en-US",
     )
     trimmed = trim(ann, start=0.4, end=1.5)
-    assert trimmed.extent.time == [0.5, 1.0]
-    assert trimmed.payload.value == ["world", "sing"]
+    assert trimmed.extent.time.to_pylist() == [0.5, 1.0]
+    assert trimmed.payload.value.to_pylist() == ["world", "sing"]
     assert trimmed.payload.language == "en-US"
 
     filtered = filter_by(ann, lambda v: len(v) == 4, facet="payload", target="value")
-    assert filtered.payload.value == ["sing", "song"]
+    assert filtered.payload.value.to_pylist() == ["sing", "song"]
     assert filtered.payload.language == "en-US"
 
 
@@ -2319,19 +2350,19 @@ def test_frequency_hz_with_voiced_transforms():
         voiced=[True, True, False, True],
     )
     trimmed = trim(ann, start=0.2, end=1.2)
-    assert trimmed.extent.time == [0.5, 1.0]
-    assert trimmed.payload.value == [442.0, 0.0]
-    assert trimmed.payload.voiced == [True, False]
+    assert trimmed.extent.time.to_pylist() == [0.5, 1.0]
+    assert trimmed.payload.value.to_pylist() == pytest.approx([442.0, 0.0])
+    assert trimmed.payload.voiced.to_pylist() == [True, False]
 
     # Filter by voiced flag using target
     voiced_only = filter_by(ann, lambda v: bool(v), target="voiced")
-    assert voiced_only.extent.time == [0.0, 0.5, 1.5]
-    assert voiced_only.payload.value == [440.0, 442.0, 880.0]
-    assert voiced_only.payload.voiced == [True, True, True]
+    assert voiced_only.extent.time.to_pylist() == [0.0, 0.5, 1.5]
+    assert voiced_only.payload.value.to_pylist() == pytest.approx([440.0, 442.0, 880.0])
+    assert voiced_only.payload.voiced.to_pylist() == [True, True, True]
 
     # Filter using facet="all" multi-column record access
     voiced_all = filter_by(ann, lambda r: r.voiced, facet="all")
-    assert voiced_all.payload.value == [440.0, 442.0, 880.0]
+    assert voiced_all.payload.value.to_pylist() == pytest.approx([440.0, 442.0, 880.0])
 
 
 def test_object_with_description_transforms():
@@ -2344,7 +2375,7 @@ def test_object_with_description_transforms():
         description="multi-track features",
     )
     trimmed = trim(ann, start=0.2)
-    assert trimmed.extent.time == [0.5]
+    assert trimmed.extent.time.to_pylist() == [0.5]
     assert trimmed.payload.value == [{"track": 2}]
     assert trimmed.payload.description == "multi-track features"
 
@@ -2358,8 +2389,8 @@ def test_note_payload_transforms():
         value=["C4", "C♯4", "E♭3"],
     )
     trimmed = trim(ann, start=0.5, end=1.5)
-    assert trimmed.extent.time == [1.0]
-    assert trimmed.payload.value == ["C♯4"]
+    assert trimmed.extent.time.to_pylist() == [1.0]
+    assert trimmed.payload.value.to_pylist() == ["C♯4"]
 
 
 def test_trim_exhaustive_time_interval():
@@ -2376,24 +2407,24 @@ def test_trim_exhaustive_time_interval():
     )
     # reset=True narrows and shifts bounds
     t_reset = trim(ann, start=5.0, end=25.0, reset=True)
-    assert t_reset.extent.time == [0.0, 5.0, 15.0]
-    assert t_reset.extent.duration == [5.0, 10.0, 5.0]
+    assert t_reset.extent.time.to_pylist() == [0.0, 5.0, 15.0]
+    assert t_reset.extent.duration.to_pylist() == [5.0, 10.0, 5.0]
     assert t_reset.extent.min_time == 0.0
     assert t_reset.extent.max_time == 20.0
     assert t_reset.extent.exhaustive is True
 
     # reset=False narrows bounds without shifting
     t_no_reset = trim(ann, start=5.0, end=25.0, reset=False)
-    assert t_no_reset.extent.time == [5.0, 10.0, 20.0]
-    assert t_no_reset.extent.duration == [5.0, 10.0, 5.0]
+    assert t_no_reset.extent.time.to_pylist() == [5.0, 10.0, 20.0]
+    assert t_no_reset.extent.duration.to_pylist() == [5.0, 10.0, 5.0]
     assert t_no_reset.extent.min_time == 5.0
     assert t_no_reset.extent.max_time == 25.0
     assert t_no_reset.extent.exhaustive is True
 
     # strict=True discards boundary-overlapping observations, sets exhaustive=False
     t_strict = trim(ann, start=5.0, end=25.0, strict=True)
-    assert t_strict.extent.time == [10.0]
-    assert t_strict.extent.duration == [10.0]
+    assert t_strict.extent.time.to_pylist() == [10.0]
+    assert t_strict.extent.duration.to_pylist() == [10.0]
     assert t_strict.extent.min_time == 5.0
     assert t_strict.extent.max_time == 25.0
     assert t_strict.extent.exhaustive is False
@@ -2430,7 +2461,7 @@ def test_trim_exhaustive_time_interval():
 
     # Trimming out of bounds (empty intersection: coord_min > coord_max clamps)
     t_oob = trim(ann, start=35.0, end=40.0, reset=False)
-    assert t_oob.extent.time == []
+    assert t_oob.extent.time.to_pylist() == []
     assert t_oob.extent.min_time == 35.0
     assert t_oob.extent.max_time == 35.0
     assert t_oob.extent.exhaustive is False
@@ -2470,7 +2501,7 @@ def test_trim_exhaustive_time_uniform():
     assert t_reset.extent.min_time == 0.0
     assert t_reset.extent.max_time == 2.0
     assert t_reset.extent.exhaustive is True
-    assert t_reset.payload.value == ["b", "c", "d"]
+    assert t_reset.payload.value.to_pylist() == ["b", "c", "d"]
     assert t_reset.groupings[0].exhaustive is True
 
     # reset=False preserves absolute coordinates
@@ -2522,7 +2553,7 @@ def test_trim_exhaustive_time_uniform():
 
     # Trimming time_uniform out of bounds (coord_min > coord_max clamps)
     t_tu_oob = trim(ann, start=10.0, end=20.0, reset=False)
-    assert t_tu_oob.payload.value == []
+    assert t_tu_oob.payload.value.to_pylist() == []
     assert t_tu_oob.extent.min_time == 10.0
     assert t_tu_oob.extent.max_time == 10.0
     assert t_tu_oob.extent.exhaustive is False
@@ -2591,15 +2622,15 @@ def test_trim_exhaustive_fraction_and_integer_axes():
     t_text_reset = trim(ann_text, start=2, end=12, reset=True)
     assert t_text_reset.extent.min_offset == 0
     assert t_text_reset.extent.max_offset == 10
-    assert t_text_reset.extent.offset == [0, 3, 8]
-    assert t_text_reset.extent.length == [3, 5, 2]
+    assert t_text_reset.extent.offset.to_pylist() == [0, 3, 8]
+    assert t_text_reset.extent.length.to_pylist() == [3, 5, 2]
     assert t_text_reset.extent.exhaustive is True
 
     t_text_no_reset = trim(ann_text, start=2, end=12, reset=False)
     assert t_text_no_reset.extent.min_offset == 2
     assert t_text_no_reset.extent.max_offset == 12
-    assert t_text_no_reset.extent.offset == [2, 5, 10]
-    assert t_text_no_reset.extent.length == [3, 5, 2]
+    assert t_text_no_reset.extent.offset.to_pylist() == [2, 5, 10]
+    assert t_text_no_reset.extent.length.to_pylist() == [3, 5, 2]
     assert t_text_no_reset.extent.exhaustive is True
 
 

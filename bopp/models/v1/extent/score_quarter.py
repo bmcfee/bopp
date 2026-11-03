@@ -5,12 +5,14 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp.base import ArrowStructBase
 
 from .. import core
 
 
-class ScoreQuarterNotes(Struct, tag_field="extent_type", tag="score_quarter"):
+class ScoreQuarterNotes(ArrowStructBase, tag_field="extent_type", tag="score_quarter"):
     quarter: Annotated[
         list[core.Fraction], Meta(description="An array of fractional quarter values.")
     ]

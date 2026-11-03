@@ -10,7 +10,7 @@
     },
     "ids": {
       "description": "Parallel array of signed integer group IDs corresponding to annotation elements",
-      "$ref": "core.json#/$defs/Array",
+      "$ref": "core.json#/$defs/Int32Array",
       "items": {
         "type": "integer"
       }

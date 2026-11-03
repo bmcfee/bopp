@@ -5,13 +5,15 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp.base import ArrowStructBase
 
 
-class DerivedAnnotationMetadata(Struct, tag_field="metadata_type", tag="derived"):
-    """
-    Metadata describing an annotation produced by transforming or aggregating parent annotation(s).
-    """
+class DerivedAnnotationMetadata(
+    ArrowStructBase, tag_field="metadata_type", tag="derived"
+):
+    """Metadata describing an annotation produced by transforming or aggregating parent annotation(s)."""
 
     transform: Annotated[
         str,

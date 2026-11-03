@@ -1,0 +1,16 @@
+{%- from "_bopp_arrow.jinja2" import apply_arrow -%}
+{%- macro get_type_annotation(_field) -%}
+{%- if _field.annotated -%}
+{{ apply_arrow(_field.annotated, _field.extras) }}
+{%- elif _field.field -%}
+Annotated[{{ apply_arrow(_field.type_hint, _field.extras) }}, {{ _field.field }}]
+{%- else -%}
+{{ apply_arrow(_field.type_hint, _field.extras) }}
+{%- endif -%}
+{%- endmacro %}
+type {{ class_name }} = {% if fields %}{{ get_type_annotation(fields[0]) }}{% else %}{{ base_class }}{% endif %}{% if comment is defined %}  # {{ comment }}{% endif %}
+{%- if description %}
+"""{{ description }}"""
+{%- elif fields and fields[0].docstring %}
+{{ fields[0].docstring }}
+{%- endif %}

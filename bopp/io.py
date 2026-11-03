@@ -12,6 +12,11 @@ from typing import Any, BinaryIO, Literal, TextIO
 import msgspec
 import polars as pl
 
+from ._arrow import (
+    arrow_dec_hook,
+    arrow_json_enc_hook,
+    arrow_msgpack_enc_hook,
+)
 from ._version import get_current_schema_version
 from .base import BoppBase
 from .core import (
@@ -425,6 +430,12 @@ def save_bopp_csv(
             df.to_csv(f, index=False)
 
 
+_JSON_ENCODER = msgspec.json.Encoder(enc_hook=arrow_json_enc_hook)
+_MSGPACK_ENCODER = msgspec.msgpack.Encoder(enc_hook=arrow_msgpack_enc_hook)
+_JSON_DECODER_VERSION = msgspec.json.Decoder(_VersionHeader)
+_MSGPACK_DECODER_VERSION = msgspec.msgpack.Decoder(_VersionHeader)
+
+
 def _save_msgspec_encoded(
     annotation: BoppBase,
     target: str | Path | BinaryIO | TextIO,
@@ -436,7 +447,10 @@ def _save_msgspec_encoded(
     _prepare_annotation_for_save(
         annotation, validate_id=validate_id, generate_id=generate_id
     )
-    encoded_data = codec.encode(annotation)
+    if codec is msgspec.json:
+        encoded_data = _JSON_ENCODER.encode(annotation)
+    else:
+        encoded_data = _MSGPACK_ENCODER.encode(annotation)
 
     with _open_or_yield_write(target, binary=True) as f:  # type: ignore[attr-defined]
         try:
@@ -455,9 +469,16 @@ def _load_msgspec_encoded(
 ) -> BoppBase:
     data = _read_bytes_from_source(source)
 
-    header = codec.decode(data, type=_VersionHeader)
-    annotation_cls = get_registry(header.bopp_version)["Annotation"]
-    ann = codec.decode(data, type=annotation_cls)
+    if codec is msgspec.json:
+        header = _JSON_DECODER_VERSION.decode(data)
+        annotation_cls = get_registry(header.bopp_version)["Annotation"]
+        ann = msgspec.json.decode(data, type=annotation_cls, dec_hook=arrow_dec_hook)
+    else:
+        header = _MSGPACK_DECODER_VERSION.decode(data)
+        annotation_cls = get_registry(header.bopp_version)["Annotation"]
+        ann = msgspec.msgpack.decode(
+            data, type=annotation_cls, dec_hook=arrow_dec_hook
+        )
 
     if validate_id:
         validate_annotation_id(ann)

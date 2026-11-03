@@ -6,6 +6,7 @@ from typing import Any
 import msgspec
 import pytest
 
+from bopp._arrow import arrow_dec_hook
 from bopp.base import BoppBase, GroupingBase
 from bopp.core import (
     _extract_kwargs,
@@ -250,7 +251,9 @@ def test_repr_mimebundle():
     assert isinstance(encoded_str, str)
 
     raw_bytes = base64.b64decode(encoded_str.encode("ascii"))
-    decoded_ann = msgspec.msgpack.decode(raw_bytes, type=Annotation)
+    decoded_ann = msgspec.msgpack.decode(
+        raw_bytes, type=Annotation, dec_hook=arrow_dec_hook
+    )
     assert decoded_ann == ann
 
     # Check that invocation with include and exclude succeeds
@@ -263,7 +266,7 @@ def test_grouping_without_labels():
         name="sections", ids=[0, 1, 0, 1, 2], disjoint=False, exhaustive=False
     )
     assert grouping.name == "sections"
-    assert grouping.ids == [0, 1, 0, 1, 2]
+    assert grouping.ids.to_pylist() == [0, 1, 0, 1, 2]
     assert grouping.labels is msgspec.UNSET
 
 
@@ -290,7 +293,7 @@ def test_grouping_negative_ids_allowed_unmapped():
             disjoint=False,
             exhaustive=False,
         )
-    assert grouping.ids == [-1, 0, -1, 1]
+    assert grouping.ids.to_pylist() == [-1, 0, -1, 1]
 
 
 def test_grouping_warns_unmapped_non_negative_ids():
@@ -599,7 +602,7 @@ def test_create_frequency_hz_payload():
         value=[440.0, 0.0],
         voiced=[True, False],
     )
-    assert ann_voiced.payload.voiced == [True, False]
+    assert ann_voiced.payload.voiced.to_pylist() == [True, False]
     assert validate(ann_voiced) is True
 
     # Mismatched voiced length raises BoppArrayError
@@ -647,7 +650,7 @@ def test_create_tag_payload():
         time=[0.1, 0.5],
         value=["rock", "guitar"],
     )
-    assert ann.payload.value == ["rock", "guitar"]
+    assert ann.payload.value.to_pylist() == ["rock", "guitar"]
     assert validate(ann) is True
 
 
@@ -665,8 +668,8 @@ def test_create_agreement_confidence():
     )
     assert ann.confidence is not None
     assert ann.confidence.__struct_config__.tag == "agreement"
-    assert ann.confidence.confidence == [0.8, 1.0]
-    assert ann.confidence.num_annotators == [5, 5]
+    assert ann.confidence.confidence.to_pylist() == pytest.approx([0.8, 1.0])
+    assert ann.confidence.num_annotators.to_pylist() == [5, 5]
     assert ann.confidence.num_annotators_common == 5
     assert validate(ann) is True
 
@@ -696,8 +699,8 @@ def test_create_relation_payload():
     )
     assert ann.payload.__struct_config__.tag == "relation"
     assert ann.payload.performance_id == "perf:100"
-    assert ann.payload.value == ["work:1", "work:2"]
-    assert ann.payload.relation == ["cover", "quote"]
+    assert ann.payload.value.to_pylist() == ["work:1", "work:2"]
+    assert ann.payload.relation.to_pylist() == ["cover", "quote"]
     assert validate(ann) is True
 
     # Array length mismatch between value and relation

@@ -8,7 +8,7 @@
       "const": "score_quarter_float"
     },
     "quarter": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "An array of quarter values as floating-point numbers.",
       "items": {
         "type": "number"

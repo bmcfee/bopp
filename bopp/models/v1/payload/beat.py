@@ -3,16 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
 
-type ValueItem = Annotated[int, Meta(ge=1)]
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
+
+type ValueItem = Annotated[int, Meta(ge=1, le=255)]
 
 
-class BeatPositionPayload(Struct, tag_field="payload_type", tag="beat"):
+class BeatPositionPayload(ArrowStructBase, tag_field="payload_type", tag="beat"):
     value: Annotated[
-        list[ValueItem],
+        ArrowArray[Literal["uint8"], ValueItem],
         Meta(
             description="The metric position of the beat within the measure (e.g., 1 for downbeat, 2, 3, 4)."
         ),

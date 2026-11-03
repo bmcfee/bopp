@@ -5,6 +5,7 @@ from typing import Any, TypeVar, cast
 
 import msgspec
 
+from ._arrow import arrow_dec_hook, arrow_json_enc_hook
 from ._version import get_current_schema_version
 from .exceptions import (
     BoppArgumentError,
@@ -44,7 +45,9 @@ def compute_annotation_id(annotation: Any) -> str:
     str
         The computed UUIDv5 string representation.
     """
-    data = msgspec.to_builtins(annotation, order="deterministic")
+    data = msgspec.to_builtins(
+        annotation, order="deterministic", enc_hook=arrow_json_enc_hook
+    )
     if "id" in data:
         del data["id"]
     canonical_bytes = msgspec.json.encode(data, order="deterministic")
@@ -259,7 +262,11 @@ def create(
         meta_type = metadata.get("metadata_type")
         if meta_type not in METADATA_TYPE_REGISTRY:
             raise BoppRegistryError(f"Unrecognized metadata type: {meta_type!r}")
-        metadata_obj = msgspec.convert(metadata, METADATA_TYPE_REGISTRY[meta_type])
+        metadata_obj = msgspec.convert(
+            metadata,
+            METADATA_TYPE_REGISTRY[meta_type],
+            dec_hook=arrow_dec_hook,
+        )
 
     groupings_obj = groupings
     if (
@@ -273,7 +280,9 @@ def create(
                 g_copy = dict(g)
                 g_copy.setdefault("disjoint", False)
                 g_copy.setdefault("exhaustive", False)
-                groupings_list.append(msgspec.convert(g_copy, Grouping))
+                groupings_list.append(
+                    msgspec.convert(g_copy, Grouping, dec_hook=arrow_dec_hook)
+                )
             else:
                 groupings_list.append(g)
         groupings_obj = groupings_list
@@ -340,13 +349,13 @@ def validate(obj: Any, target_type: type[T] | None = None) -> bool:
 
     # 1. Handle Struct instances: convert to builtins to strip UNSET keys recursively
     if isinstance(obj, msgspec.Struct):
-        obj = msgspec.to_builtins(obj)
+        obj = msgspec.to_builtins(obj, enc_hook=arrow_json_enc_hook)
     # 2. Handle raw dicts: filter out top-level UNSET sentinels if manually populated
     elif isinstance(obj, dict):
         obj = {k: v for k, v in obj.items() if v is not msgspec.UNSET}
 
     try:
-        msgspec.convert(obj, target_type)
+        msgspec.convert(obj, target_type, dec_hook=arrow_dec_hook)
     except (msgspec.ValidationError, TypeError) as err:
         raise BoppValidationError(
             f"Validation failed for {target_type.__name__}: {err}"

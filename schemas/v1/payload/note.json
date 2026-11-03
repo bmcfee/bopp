@@ -8,11 +8,11 @@
       "const": "note"
     },
     "value": {
-      "$ref": "../core.json#/$defs/Array",
-      "description": "Musical notes in scientific pitch notation (e.g. C4, A4, C♯4, E♭3, F𝄪5, B𝄫2, D♮4, C-1)",
+      "$ref": "../core.json#/$defs/StringArray",
+      "description": "Musical notes in scientific pitch notation (e.g. C4, A4, C\u266f4, E\u266d3, F\ud834\udd2a5, B\ud834\udd2b2, D\u266e4, C-1)",
       "items": {
         "type": "string",
-        "pattern": "^[A-G]([b♭]*|𝄫|[#♯]*|𝄪|♮)-?[0-9]+$"
+        "pattern": "^[A-G]([b\u266d]*|\ud834\udd2b|[#\u266f]*|\ud834\udd2a|\u266e)-?[0-9]+$"
       }
     }
   },

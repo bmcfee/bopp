@@ -8,7 +8,9 @@ from fractions import Fraction
 from typing import Any, Literal
 
 import msgspec
+import pyarrow as pa
 
+from ._arrow import arrow_dec_hook
 from ._version import DEFAULT_SCHEMA_VERSION
 from .base import BoppBase
 from .core import ensure_annotation_id
@@ -124,8 +126,8 @@ class FilterRecord(dict):
         self[name] = value
 
 
-def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]]:
-    """Return dictionary of field name -> list value for all list fields in a struct."""
+def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, Any]:
+    """Return dictionary of field name -> array value for all list/array fields in a struct."""
     if struct is None or struct is msgspec.UNSET:
         return {}
     result = {}
@@ -136,7 +138,7 @@ def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]
         ):
             continue
         val = getattr(struct, field_name)
-        if isinstance(val, list):
+        if isinstance(val, (list, pa.Array, pa.ChunkedArray)):
             result[field_name] = val
     return result
 
@@ -198,18 +200,26 @@ def _rebuild_annotation(
 def _subset_struct_lists(
     struct: msgspec.Struct | Literal[msgspec.UnsetType.UNSET] | None,
     indices: list[int],
-    overrides: dict[str, list[Any]] | None = None,
+    overrides: dict[str, Any] | None = None,
 ) -> msgspec.Struct | Literal[msgspec.UnsetType.UNSET] | None:
     """Subset list fields of a struct using indices, applying optional pre-computed overrides."""
     if struct is None or struct is msgspec.UNSET:
         return struct
 
-    updates: dict[str, list[Any]] = dict(overrides) if overrides else {}
+    updates: dict[str, Any] = dict(overrides) if overrides else {}
     list_fields = _get_facet_list_fields(struct)
 
     for fname, fval in list_fields.items():
         if fname not in updates:
-            updates[fname] = [fval[idx] for idx in indices]
+            if isinstance(fval, (pa.Array, pa.ChunkedArray)):
+                arr = (
+                    fval.combine_chunks()
+                    if isinstance(fval, pa.ChunkedArray)
+                    else fval
+                )
+                updates[fname] = arr.take(pa.array(indices, type=pa.int32()))
+            else:
+                updates[fname] = [fval[idx] for idx in indices]
 
     return msgspec.structs.replace(struct, **updates)
 
@@ -224,14 +234,22 @@ def _subset_groupings(
 
     new_groupings = []
     for g in groupings:
-        new_ids = [g.ids[idx] for idx in indices]
+        if isinstance(g.ids, (pa.Array, pa.ChunkedArray)):
+            g_ids = (
+                g.ids.combine_chunks()
+                if isinstance(g.ids, pa.ChunkedArray)
+                else g.ids
+            )
+            new_ids = g_ids.take(pa.array(indices, type=pa.int32()))
+        else:
+            new_ids = [g.ids[idx] for idx in indices]
         new_groupings.append(msgspec.structs.replace(g, ids=new_ids))
     return new_groupings
 
 
 def _resample_struct(
     struct: msgspec.Struct | None,
-    cols: dict[str, list[Any]],
+    cols: dict[str, Any],
     matched_indices: list[int | None],
     fill_map: dict[str, Any],
 ) -> msgspec.Struct | None:
@@ -241,9 +259,14 @@ def _resample_struct(
 
     updates: dict[str, list[Any]] = {}
     for col_name, col_values in cols.items():
+        vals = (
+            col_values.to_pylist()
+            if hasattr(col_values, "to_pylist")
+            else col_values
+        )
         fill_val = fill_map.get(col_name)
         updates[col_name] = [
-            fill_val if idx is None else col_values[idx] for idx in matched_indices
+            fill_val if idx is None else vals[idx] for idx in matched_indices
         ]
 
     return msgspec.structs.replace(struct, **updates)
@@ -261,7 +284,8 @@ def _resample_groupings(
     new_groupings = []
     for g in groupings:
         fill_val = fill_map.get(g.name, -1)
-        new_ids = [fill_val if idx is None else g.ids[idx] for idx in matched_indices]
+        g_ids = g.ids.to_pylist() if hasattr(g.ids, "to_pylist") else g.ids
+        new_ids = [fill_val if idx is None else g_ids[idx] for idx in matched_indices]
         new_groupings.append(msgspec.structs.replace(g, ids=new_ids, exhaustive=False))
     return new_groupings
 
@@ -352,9 +376,10 @@ def _conversion_extent(
 
     columns: dict[str, list[Any]] = {}
     for name, values in _get_facet_list_fields(extent).items():
+        val_list = values.to_pylist() if hasattr(values, "to_pylist") else values
         if fraction_target:
             columns[name] = []
-            for index, value in enumerate(values):
+            for index, value in enumerate(val_list):
                 if not math.isfinite(value):
                     raise BoppArgumentError(
                         f"{transform}: field {name!r} at index {index} must be finite."
@@ -364,7 +389,7 @@ def _conversion_extent(
                 )
         else:
             columns[name] = [
-                numerator / denominator for numerator, denominator in values
+                numerator / denominator for numerator, denominator in val_list
             ]
     return _rebuild_converted_extent(
         annotation, target_tag, columns, transform, parameters
@@ -822,6 +847,8 @@ def trim(
 
     if kind == "point":
         pos_vals = getattr(extent, field_a)
+        if hasattr(pos_vals, "to_pylist"):
+            pos_vals = pos_vals.to_pylist()
         if fraction_axis:
             pos_vals = [Fraction(*value) for value in pos_vals]
         new_pos = []
@@ -839,6 +866,10 @@ def trim(
     elif kind == "origin_span":
         origin_vals = getattr(extent, field_a)
         span_vals = getattr(extent, field_b)  # type: ignore[arg-type]
+        if hasattr(origin_vals, "to_pylist"):
+            origin_vals = origin_vals.to_pylist()
+        if hasattr(span_vals, "to_pylist"):
+            span_vals = span_vals.to_pylist()
         if fraction_axis:
             origin_vals = [Fraction(*value) for value in origin_vals]
             span_vals = [Fraction(*value) for value in span_vals]
@@ -873,6 +904,10 @@ def trim(
     elif kind == "min_max":
         min_vals = getattr(extent, field_a)
         max_vals = getattr(extent, field_b)  # type: ignore[arg-type]
+        if hasattr(min_vals, "to_pylist"):
+            min_vals = min_vals.to_pylist()
+        if hasattr(max_vals, "to_pylist"):
+            max_vals = max_vals.to_pylist()
 
         new_min: list[float] = []
         new_max: list[float] = []
@@ -1134,15 +1169,26 @@ def filter_by(
     confidence = getattr(annotation, "confidence", None)
     groupings = getattr(annotation, "groupings", None)
 
-    payload_cols = _get_facet_list_fields(payload)
-    extent_cols = _get_facet_list_fields(extent)
-    confidence_cols = _get_facet_list_fields(confidence)
+    payload_cols = {
+        k: v.to_pylist() if hasattr(v, "to_pylist") else v
+        for k, v in _get_facet_list_fields(payload).items()
+    }
+    extent_cols = {
+        k: v.to_pylist() if hasattr(v, "to_pylist") else v
+        for k, v in _get_facet_list_fields(extent).items()
+    }
+    confidence_cols = {
+        k: v.to_pylist() if hasattr(v, "to_pylist") else v
+        for k, v in _get_facet_list_fields(confidence).items()
+    }
 
     groupings_cols: dict[str, list[int]] = {}
     if groupings is not None and groupings is not msgspec.UNSET:
         for g in groupings:
             if g.name is not None:
-                groupings_cols[g.name] = g.ids
+                groupings_cols[g.name] = (
+                    g.ids.to_pylist() if hasattr(g.ids, "to_pylist") else g.ids
+                )
 
     # Determine number of observations from any available facet column
     n_obs = 0
@@ -1305,7 +1351,7 @@ def _validate_fill_values(
         for fname in struct_type.__struct_fields__
     }
     try:
-        msgspec.convert(dummy_kwargs, struct_type)
+        msgspec.convert(dummy_kwargs, struct_type, dec_hook=arrow_dec_hook)
     except Exception as exc:
         raise BoppValidationError(
             f"Invalid fill value for {facet_name} struct '{struct_type.__name__}': {exc}"
@@ -1548,6 +1594,8 @@ def to_times(
             )
         if extent_tag in ("time", "spherical_time", "cartesian_time"):
             time_arr = extent.time  # type: ignore[union-attr]
+            if hasattr(time_arr, "to_pylist"):
+                time_arr = time_arr.to_pylist()
             t_min = min(time_arr)
             t_max = max(time_arr)
         elif extent_tag == "time_uniform":
@@ -1558,6 +1606,10 @@ def to_times(
         else:
             time_arr = extent.time  # type: ignore[union-attr]
             dur_arr = extent.duration  # type: ignore[union-attr]
+            if hasattr(time_arr, "to_pylist"):
+                time_arr = time_arr.to_pylist()
+            if hasattr(dur_arr, "to_pylist"):
+                dur_arr = dur_arr.to_pylist()
             t_min = min(time_arr)
             t_max = max(t + d for t, d in zip(time_arr, dur_arr))
 
@@ -1603,6 +1655,10 @@ def to_times(
     ):
         t_starts = extent.time  # type: ignore[union-attr]
         durations = extent.duration  # type: ignore[union-attr]
+        if hasattr(t_starts, "to_pylist"):
+            t_starts = t_starts.to_pylist()
+        if hasattr(durations, "to_pylist"):
+            durations = durations.to_pylist()
 
         for t in target_times:
             # An interval covers t if t_start <= t <= t_start + duration
@@ -1637,6 +1693,8 @@ def to_times(
             src_times = [st_val + i * sp_val for i in range(n_source_obs)]
         else:
             src_times = extent.time  # type: ignore[union-attr]
+            if hasattr(src_times, "to_pylist"):
+                src_times = src_times.to_pylist()
         for t in target_times:
             if method == "previous":
                 prev_candidates = [i for i, st in enumerate(src_times) if st <= t]

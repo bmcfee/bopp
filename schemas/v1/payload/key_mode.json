@@ -8,11 +8,11 @@
       "const": "key_mode"
     },
     "value": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/StringArray",
       "description": "Key and optional mode (major/minor or Greek modes)",
       "items": {
         "type": "string",
-        "pattern": "^((N)|(([A-G]([b♭]*|𝄫|[#♯]*|𝄪|♮))(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?))$"
+        "pattern": "^((N)|(([A-G]([b\u266d]*|\ud834\udd2b|[#\u266f]*|\ud834\udd2a|\u266e))(:(major|minor|ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian))?))$"
       }
     }
   },

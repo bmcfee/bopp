@@ -8,7 +8,7 @@
       "const": "midi_tick"
     },
     "tick": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "An array of MIDI tick values.",
       "items": {
         "type": "number"

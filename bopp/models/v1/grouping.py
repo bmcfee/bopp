@@ -3,17 +3,21 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from msgspec import UNSET, Meta, UnsetType
 
+from bopp._arrow import ArrowArray
+
 from ...base import GroupingBase
+
+type Id = Annotated[int, Meta(ge=-2147483648, le=2147483647)]
 
 
 class Grouping(GroupingBase):
     name: Annotated[str, Meta(description="Name of the grouping layer")]
     ids: Annotated[
-        list[int],
+        ArrowArray[Literal["int32"], Id],
         Meta(
             description="Parallel array of signed integer group IDs corresponding to annotation elements"
         ),

@@ -8,14 +8,14 @@
       "const": "time_interval"
     },
     "time": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "Array of interval start times in seconds.",
       "items": {
         "type": "number"
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "Array of interval durations in seconds.",
       "items": {
         "type": "number",

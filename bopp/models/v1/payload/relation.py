@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
 class RelationEnum(StrEnum):
@@ -19,18 +22,17 @@ class RelationEnum(StrEnum):
     live_performance = "live_performance"
 
 
-class RelationPayload(Struct, tag_field="payload_type", tag="relation"):
-    """
-    Columnar payload defining relationships between works (covers, quotes, etc).
-    """
+class RelationPayload(ArrowStructBase, tag_field="payload_type", tag="relation"):
+    """Columnar payload defining relationships between works (covers, quotes, etc)."""
 
     performance_id: str
     value: Annotated[
-        list[str], Meta(description="Array of referenced work or clique identifiers.")
+        ArrowArray[Literal["string"], str],
+        Meta(description="Array of referenced work or clique identifiers."),
     ]
     relation: (
         Annotated[
-            list[RelationEnum],
+            ArrowArray[Literal["string"], RelationEnum],
             Meta(description="Array of relation types parallel to work_id."),
         ]
         | UnsetType

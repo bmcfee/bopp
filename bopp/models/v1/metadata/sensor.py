@@ -5,13 +5,15 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp.base import ArrowStructBase
 
 
-class SensorAnnotationMetadata(Struct, tag_field="metadata_type", tag="sensor"):
-    """
-    Metadata for annotations created by sensors or hardware.
-    """
+class SensorAnnotationMetadata(
+    ArrowStructBase, tag_field="metadata_type", tag="sensor"
+):
+    """Metadata for annotations created by sensors or hardware."""
 
     device: Annotated[str, Meta(description="A unique identifier for the sensor.")]
     settings: Annotated[

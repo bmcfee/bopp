@@ -603,15 +603,15 @@ def test_trim_new_extents():
         value=["a", "b", "c", "d"],
     )
     trimmed_x = trim(ann_pixel, start=15.0, end=35.0, target_field="x")
-    assert trimmed_x.extent.x == [20.0, 30.0]
-    assert trimmed_x.extent.y == [15.0, 25.0]
-    assert trimmed_x.payload.value == ["b", "c"]
+    assert trimmed_x.extent.x.to_pylist() == pytest.approx([20.0, 30.0])
+    assert trimmed_x.extent.y.to_pylist() == pytest.approx([15.0, 25.0])
+    assert trimmed_x.payload.value.to_pylist() == ["b", "c"]
 
     trimmed_y_reset = trim(
         ann_pixel, start=15.0, end=35.0, target_field="y", reset=True
     )
-    assert trimmed_y_reset.extent.y == [0.0, 10.0, 20.0]
-    assert trimmed_y_reset.payload.value == ["b", "c", "d"]
+    assert trimmed_y_reset.extent.y.to_pylist() == pytest.approx([0.0, 10.0, 20.0])
+    assert trimmed_y_reset.payload.value.to_pylist() == ["b", "c", "d"]
 
     # Trim text along offset
     ann_text = create(
@@ -622,8 +622,8 @@ def test_trim_new_extents():
         value=["w0", "w1", "w2", "w3"],
     )
     trimmed_text = trim(ann_text, start=8, end=25)
-    assert trimmed_text.extent.offset == [10, 20]
-    assert trimmed_text.payload.value == ["w1", "w2"]
+    assert trimmed_text.extent.offset.to_pylist() == [10, 20]
+    assert trimmed_text.payload.value.to_pylist() == ["w1", "w2"]
 
     # Trim text_interval
     ann_ti = create(
@@ -636,7 +636,7 @@ def test_trim_new_extents():
     )
     trimmed_ti = trim(ann_ti, start=5, end=25)
     # span0 [0, 5] overlaps at boundary -> clipped to [5, 5] (len 0) or span1 [10, 18] included
-    assert "span1" in trimmed_ti.payload.value
+    assert "span1" in trimmed_ti.payload.value.to_pylist()
 
     # Trim spherical along azimuth
     ann_sph = create(
@@ -649,8 +649,8 @@ def test_trim_new_extents():
         value=["s1", "s2", "s3", "s4"],
     )
     trimmed_sph = trim(ann_sph, start=-10.0, end=50.0, target_field="azimuth")
-    assert trimmed_sph.extent.azimuth == [0.0, 45.0]
-    assert trimmed_sph.payload.value == ["s2", "s3"]
+    assert trimmed_sph.extent.azimuth.to_pylist() == pytest.approx([0.0, 45.0])
+    assert trimmed_sph.payload.value.to_pylist() == ["s2", "s3"]
 
     # Trim cartesian_time along default 'time'
     ann_ct = create(
@@ -664,8 +664,8 @@ def test_trim_new_extents():
         value=["c0", "c1", "c2", "c3"],
     )
     trimmed_ct = trim(ann_ct, start=0.5, end=2.5)
-    assert trimmed_ct.extent.time == [1.0, 2.0]
-    assert trimmed_ct.payload.value == ["c1", "c2"]
+    assert trimmed_ct.extent.time.to_pylist() == [1.0, 2.0]
+    assert trimmed_ct.payload.value.to_pylist() == ["c1", "c2"]
 
     # Trim time_uniform
     ann_tu = create(
@@ -680,12 +680,12 @@ def test_trim_new_extents():
     trimmed_tu = trim(ann_tu, start=0.15, end=0.35)
     assert trimmed_tu.extent.start_time == 0.2
     assert trimmed_tu.extent.sampling_period == 0.1
-    assert trimmed_tu.payload.value == ["u2", "u3"]
+    assert trimmed_tu.payload.value.to_pylist() == ["u2", "u3"]
 
     # Trim time_uniform with reset=True
     trimmed_tu_reset = trim(ann_tu, start=0.15, end=0.35, reset=True)
     assert np.isclose(trimmed_tu_reset.extent.start_time, 0.05)
-    assert trimmed_tu_reset.payload.value == ["u2", "u3"]
+    assert trimmed_tu_reset.payload.value.to_pylist() == ["u2", "u3"]
 
 
 def test_to_times_new_extents():
@@ -700,8 +700,8 @@ def test_to_times_new_extents():
     )
     # Timestamps: 1.0, 1.5, 2.0
     resampled = to_times(ann_tu, times=[1.1, 1.6, 2.1], method="previous")
-    assert resampled.extent.time == [1.1, 1.6, 2.1]
-    assert resampled.payload.value == ["t1", "t2", "t3"]
+    assert resampled.extent.time.to_pylist() == [1.1, 1.6, 2.1]
+    assert resampled.payload.value.to_pylist() == ["t1", "t2", "t3"]
 
     # to_times with sample_rate on time_uniform
     resampled_rate = to_times(ann_tu, sample_rate=2.0)
@@ -719,7 +719,7 @@ def test_to_times_new_extents():
         value=["v1", "v2"],
     )
     resampled_st = to_times(ann_st, times=[0.5, 1.9], method="nearest")
-    assert resampled_st.payload.value == ["v1", "v2"]
+    assert resampled_st.payload.value.to_pylist() == ["v1", "v2"]
 
     # to_times on cartesian_time_interval
     ann_cti = create(
@@ -734,7 +734,7 @@ def test_to_times_new_extents():
         value=["i1", "i2"],
     )
     resampled_cti = to_times(ann_cti, times=[0.5, 2.5])
-    assert resampled_cti.payload.value == ["i1", "i2"]
+    assert resampled_cti.payload.value.to_pylist() == ["i1", "i2"]
 
 
 def test_evaluation_helpers_new_extents():
@@ -796,8 +796,8 @@ def test_filter_by_and_errors_new_extents():
         value=["c0", "c1", "c2"],
     )
     filtered = filter_by(ann_cart, lambda x: x > 2.0, target="x", facet="extent")
-    assert filtered.extent.x == [5.0, 10.0]
-    assert filtered.payload.value == ["c1", "c2"]
+    assert filtered.extent.x.to_pylist() == pytest.approx([5.0, 10.0])
+    assert filtered.payload.value.to_pylist() == ["c1", "c2"]
 
     # Trim cartesian without specifying target_field raises BoppArgumentError
     with pytest.raises(BoppArgumentError, match="does not have a default target field"):

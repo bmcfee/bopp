@@ -3,21 +3,24 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type ConfidenceItem = Annotated[float, Meta(ge=0.0, le=1.0)]
 
 
-type NumAnnotator = Annotated[int, Meta(ge=1)]
+type NumAnnotator = Annotated[int, Meta(ge=1, le=65535)]
 
 
 class ConfidenceByInterAnnotatorAgreement(
-    Struct, tag_field="confidence_type", tag="agreement"
+    ArrowStructBase, tag_field="confidence_type", tag="agreement"
 ):
     confidence: Annotated[
-        list[ConfidenceItem],
+        ArrowArray[Literal["float32"], ConfidenceItem],
         Meta(description="The fraction of annotators agreeing on this measurement"),
     ]
     num_annotators_common: (
@@ -32,7 +35,7 @@ class ConfidenceByInterAnnotatorAgreement(
     ) = UNSET
     num_annotators: (
         Annotated[
-            list[NumAnnotator],
+            ArrowArray[Literal["uint16"], NumAnnotator],
             Meta(description="The number of annotators who produced each observation"),
         ]
         | UnsetType

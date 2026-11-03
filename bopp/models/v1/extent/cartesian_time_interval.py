@@ -3,29 +3,41 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 
 class CartesianTimeIntervalExtent(
-    Struct, tag_field="extent_type", tag="cartesian_time_interval"
+    ArrowStructBase, tag_field="extent_type", tag="cartesian_time_interval"
 ):
-    """
-    Spatiotemporal interval coordinates in Cartesian space with start times and durations.
-    """
+    """Spatiotemporal interval coordinates in Cartesian space with start times and durations."""
 
     time: Annotated[
-        list[float], Meta(description="Array of interval start times in seconds.")
+        ArrowArray[Literal["float64"], float],
+        Meta(description="Array of interval start times in seconds."),
     ]
     duration: Annotated[
-        list[DurationItem], Meta(description="Array of interval durations in seconds.")
+        ArrowArray[Literal["float64"], DurationItem],
+        Meta(description="Array of interval durations in seconds."),
     ]
-    x: Annotated[list[float], Meta(description="Array of x-coordinates in space.")]
-    y: Annotated[list[float], Meta(description="Array of y-coordinates in space.")]
-    z: Annotated[list[float], Meta(description="Array of z-coordinates in space.")]
+    x: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of x-coordinates in space."),
+    ]
+    y: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of y-coordinates in space."),
+    ]
+    z: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of z-coordinates in space."),
+    ]
     disjoint: Annotated[
         bool,
         Meta(

@@ -9,7 +9,7 @@
       "const": "text_interval"
     },
     "offset": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/UInt32Array",
       "description": "Array of 0-based character start offsets in text.",
       "items": {
         "type": "integer",
@@ -17,7 +17,7 @@
       }
     },
     "length": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/UInt32Array",
       "description": "Array of character span lengths (number of characters).",
       "items": {
         "type": "integer",

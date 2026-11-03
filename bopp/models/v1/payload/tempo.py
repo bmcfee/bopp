@@ -3,15 +3,18 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type ValueItem = Annotated[float, Meta(ge=0.0)]
 
 
-class TempoPayload(Struct, tag_field="payload_type", tag="tempo"):
+class TempoPayload(ArrowStructBase, tag_field="payload_type", tag="tempo"):
     value: Annotated[
-        list[ValueItem],
+        ArrowArray[Literal["float32"], ValueItem],
         Meta(description="Tempo measurements, in beats per minute (BPM)"),
     ]

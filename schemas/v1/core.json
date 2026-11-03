@@ -7,6 +7,78 @@
       "type": "array",
       "description": "A dense columnar array buffer."
     },
+    "Float32Array": {
+      "type": "array",
+      "description": "A dense columnar 32-bit floating-point array buffer.",
+      "items": {
+        "type": "number"
+      },
+      "x-arrow-dtype": "float32"
+    },
+    "Float64Array": {
+      "type": "array",
+      "description": "A dense columnar 64-bit floating-point array buffer.",
+      "items": {
+        "type": "number"
+      },
+      "x-arrow-dtype": "float64"
+    },
+    "UInt8Array": {
+      "type": "array",
+      "description": "A dense columnar 8-bit unsigned integer array buffer.",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "x-arrow-dtype": "uint8"
+    },
+    "UInt16Array": {
+      "type": "array",
+      "description": "A dense columnar 16-bit unsigned integer array buffer.",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "x-arrow-dtype": "uint16"
+    },
+    "UInt32Array": {
+      "type": "array",
+      "description": "A dense columnar 32-bit unsigned integer array buffer.",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "x-arrow-dtype": "uint32"
+    },
+    "Int32Array": {
+      "type": "array",
+      "description": "A dense columnar 32-bit signed integer array buffer.",
+      "items": {
+        "type": "integer",
+        "minimum": -2147483648,
+        "maximum": 2147483647
+      },
+      "x-arrow-dtype": "int32"
+    },
+    "BoolArray": {
+      "type": "array",
+      "description": "A dense columnar boolean array buffer.",
+      "items": {
+        "type": "boolean"
+      },
+      "x-arrow-dtype": "bool"
+    },
+    "StringArray": {
+      "type": "array",
+      "description": "A dense columnar UTF-8 string array buffer.",
+      "items": {
+        "type": "string"
+      },
+      "x-arrow-dtype": "string"
+    },
     "Fraction": {
         "type": "array",
         "description": "Rational number encoded as numerator and non-zero denominator",

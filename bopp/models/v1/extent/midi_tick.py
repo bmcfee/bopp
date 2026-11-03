@@ -3,13 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class MidiTicks(Struct, tag_field="extent_type", tag="midi_tick"):
-    tick: Annotated[list[float], Meta(description="An array of MIDI tick values.")]
+class MidiTicks(ArrowStructBase, tag_field="extent_type", tag="midi_tick"):
+    tick: Annotated[
+        ArrowArray[Literal["float64"], float],
+        Meta(description="An array of MIDI tick values."),
+    ]
     disjoint: Annotated[
         bool, Meta(description="Indicates whether all MIDI tick values are unique.")
     ]

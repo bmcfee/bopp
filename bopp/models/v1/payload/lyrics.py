@@ -3,13 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class LyricsPayload(Struct, tag_field="payload_type", tag="lyrics"):
-    value: Annotated[list[str], Meta(description="Open strings for lyrics annotations")]
+class LyricsPayload(ArrowStructBase, tag_field="payload_type", tag="lyrics"):
+    value: Annotated[
+        ArrowArray[Literal["string"], str],
+        Meta(description="Open strings for lyrics annotations"),
+    ]
     language: Annotated[
         str,
         Meta(

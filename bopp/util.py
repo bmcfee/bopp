@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args, get_origin
 
 import msgspec
 import polars as pl
+import pyarrow as pa
 
+from ._arrow import arrow_dec_hook, unwrap_arrow_array
 from ._version import get_current_schema_version
 from .base import BoppBase
 from .exceptions import (
@@ -230,16 +232,22 @@ def _union_arms(hint: Any) -> list[Any]:
 
 def _column_item_type(field_type: Any) -> Any | None:
     """
-    Return the item type ``T`` of a columnar field ``list[T]``.
+    Return the item type ``T`` of a columnar field ``list[T]`` or ``ArrowArray[DType, T]``.
 
-    Optional columns (``list[T] | UnsetType``, ``list[T] | None``) are accepted.
-    Returns None if the field is not a list column.
+    Optional columns (``list[T] | UnsetType``, ``ArrowArray[...] | None``) are accepted.
+    Returns None if the field is not a list/array column.
     """
     arms = _union_arms(field_type)
-    if len(arms) != 1 or get_origin(arms[0]) is not list:
+    if len(arms) != 1:
         return None
-    args = get_args(arms[0])
-    return args[0] if args else Any
+    origin = get_origin(arms[0])
+    if origin is list:
+        args = get_args(arms[0])
+        return args[0] if args else Any
+    if getattr(origin, "__name__", "") == "ArrowArray":
+        args = get_args(arms[0])
+        return args[1] if len(args) >= 2 else Any
+    return None
 
 
 def _scalar_kind(tp: Any) -> str | None:
@@ -281,12 +289,39 @@ def _polars_item_dtype(item_type: Any, pl: Any) -> Any | None:
 
 def _polars_column_dtype(field_type: Any, pl: Any) -> Any | None:
     """
-    Map a columnar struct field type (e.g. ``list[float]``) to a Polars DataType.
+    Map a columnar struct field type (e.g. ``list[float]`` or ``ArrowArray[Literal['float32'], float]``) to a Polars DataType.
 
     Shared by DataFrame construction and CSV reading, so that a column is written and
     read back with the same dtype. Returns None for non-list fields and for items
     without a single scalar dtype.
     """
+    arms = _union_arms(field_type)
+    if len(arms) == 1:
+        origin = get_origin(arms[0])
+        if getattr(origin, "__name__", "") == "ArrowArray":
+            args = get_args(arms[0])
+            if args:
+                dtype_arg = args[0]
+                dtype_name = (
+                    get_args(dtype_arg)[0]
+                    if get_origin(dtype_arg) is not None
+                    else str(dtype_arg)
+                )
+                if isinstance(dtype_name, str):
+                    dtype_name = dtype_name.strip("'\"")
+                mapping = {
+                    "float32": pl.Float32,
+                    "float64": pl.Float64,
+                    "uint8": pl.UInt8,
+                    "uint16": pl.UInt16,
+                    "uint32": pl.UInt32,
+                    "int32": pl.Int32,
+                    "bool": pl.Boolean,
+                    "string": pl.String,
+                }
+                if dtype_name in mapping:
+                    return mapping[dtype_name]
+
     item_type = _column_item_type(field_type)
     if item_type is None:
         return None
@@ -351,7 +386,7 @@ def _extract_facet_data(
             facet_attrs[field.name] = msgspec.to_builtins(val)
             continue
 
-        if isinstance(val, list):
+        if isinstance(val, (list, pa.Array, pa.ChunkedArray)):
             has_list_fields = True
             col_key = f"{facet_name}:{tag}:{field.name}"
             is_complex = False
@@ -360,15 +395,16 @@ def _extract_facet_data(
                     complex_fields is not None and field.name in complex_fields
                 ) or any(
                     isinstance(item, (list, dict, tuple, msgspec.Struct))
-                    for item in val
+                    for item in (val.to_pylist() if hasattr(val, "to_pylist") else val)
                     if item is not None
                 )
                 if is_complex:
+                    items = val.to_pylist() if hasattr(val, "to_pylist") else val
                     target_dict[col_key] = [
                         msgspec.json.encode(item).decode("utf-8")
                         if item is not None and item is not msgspec.UNSET
                         else None
-                        for item in val
+                        for item in items
                     ]
                 else:
                     target_dict[col_key] = val
@@ -530,9 +566,22 @@ def to_dataframe(
                     "pyarrow is required for backend='pandas-pyarrow'"
                 ) from err
 
-            df_pd = pd.DataFrame(data).convert_dtypes(dtype_backend="pyarrow")
+            pd_data = {
+                k: pd.Series(pd.arrays.ArrowExtensionArray(v))
+                if isinstance(v, (pa.Array, pa.ChunkedArray))
+                else v
+                for k, v in data.items()
+            }
+            df_pd = pd.DataFrame(pd_data).convert_dtypes(dtype_backend="pyarrow")
         else:
-            df_pd = pd.DataFrame(data)
+            pd_data = {
+                k: v.to_numpy(zero_copy_only=False)
+                if isinstance(v, (pa.Array, pa.ChunkedArray))
+                and not pa.types.is_string(v.type)
+                else (v.to_pylist() if hasattr(v, "to_pylist") else v)
+                for k, v in data.items()
+            }
+            df_pd = pd.DataFrame(pd_data)
 
         return AnnotationDataFrame(df=df_pd, header=header)
 
@@ -642,10 +691,26 @@ def from_dataframe(
         if key in header:
             bopp_data[key] = header[key]
 
-    def _get_column_list(col_name: str) -> list[Any]:
+    complex_registry: dict[str, dict[str, list[str]]] = registry.get(
+        "COMPLEX_FIELDS_REGISTRY", {}
+    )
+
+    def _get_column_data(col_name: str, is_complex: bool, as_arrow: bool = False) -> Any:
         col_series = df[col_name]
-        extractor = getattr(col_series, "to_list", getattr(col_series, "tolist", None))
-        return extractor() if extractor is not None else list(col_series)
+        if is_complex or not as_arrow:
+            extractor = getattr(
+                col_series, "to_list", getattr(col_series, "tolist", None)
+            )
+            return extractor() if extractor is not None else list(col_series)
+        if hasattr(col_series, "to_arrow"):
+            return col_series.to_arrow()
+        try:
+            return pa.array(col_series)
+        except Exception:
+            extractor = getattr(
+                col_series, "to_list", getattr(col_series, "tolist", None)
+            )
+            return extractor() if extractor is not None else list(col_series)
 
     for facet, cols in grouped_cols.items():
         facet_header = header.get(facet)
@@ -660,8 +725,30 @@ def from_dataframe(
         if isinstance(facet_header, dict):
             facet_dict.update(facet_header)
 
+        facet_registry_key = FACET_REGISTRY_KEYS.get(facet)
+        struct_cls = (
+            registry.get(facet_registry_key, {}).get(facet_type)
+            if facet_registry_key
+            else None
+        )
+        try:
+            hints = (
+                get_type_hints(struct_cls, include_extras=True)
+                if struct_cls
+                else {}
+            )
+        except Exception:
+            hints = getattr(struct_cls, "__annotations__", {}) if struct_cls else {}
+
         for _, field_name, full_col_name in cols:
-            facet_dict[field_name] = _get_column_list(full_col_name)
+            is_complex = field_name in complex_registry.get(
+                f"{facet}_type", {}
+            ).get(facet_type, [])
+            hint = hints.get(field_name)
+            is_arrow = unwrap_arrow_array(hint) is not None if hint is not None else False
+            facet_dict[field_name] = _get_column_data(
+                full_col_name, is_complex, as_arrow=is_arrow
+            )
 
         if facet == "extent":
             facet_dict.setdefault("disjoint", facet_type == "time_uniform")
@@ -680,7 +767,7 @@ def from_dataframe(
             )
             g_dict = {
                 "name": g_meta.get("name", f"group_{g_idx}"),
-                "ids": _get_column_list(col_name),
+                "ids": _get_column_data(col_name, is_complex=False, as_arrow=True),
                 "disjoint": g_meta.get("disjoint", False),
                 "exhaustive": g_meta.get("exhaustive", False),
             }
@@ -689,7 +776,7 @@ def from_dataframe(
             grouping_items.append(g_dict)
         bopp_data["groupings"] = grouping_items
 
-    return msgspec.convert(bopp_data, type=annotation_cls)
+    return msgspec.convert(bopp_data, type=annotation_cls, dec_hook=arrow_dec_hook)
 
 
 # ==========================================
@@ -1038,15 +1125,19 @@ def _to_coord(val: Any) -> Any:
     return val
 
 
-def _normalize_coords(vals: list[Any], is_fraction: bool) -> list[Any]:
+def _normalize_coords(vals: Any, is_fraction: bool) -> list[Any]:
     """Normalize coordinate array elements only if the extent uses rational fractions."""
+    if hasattr(vals, "to_pylist"):
+        vals = vals.to_pylist()
     if not is_fraction:
-        return vals
+        return vals if isinstance(vals, list) else list(vals)
     return [Fraction(v[0], v[1]) if isinstance(v, (list, tuple)) else v for v in vals]
 
 
-def _partition_group_indices(ids: list[int]) -> dict[int, list[int]]:
+def _partition_group_indices(ids: Any) -> dict[int, list[int]]:
     """Partition observation indices by non-negative group ID in a single O(N) pass."""
+    if hasattr(ids, "to_pylist"):
+        ids = ids.to_pylist()
     groups: dict[int, list[int]] = defaultdict(list)
     for i, gid in enumerate(ids):
         if gid >= 0:
@@ -1110,6 +1201,8 @@ def infer_extent_bounds(
 
         if kind == "point":
             raw_vals = getattr(extent, spec["field"], [])
+            if hasattr(raw_vals, "to_pylist"):
+                raw_vals = raw_vals.to_pylist()
             if indices is not None:
                 raw_vals = [raw_vals[i] for i in indices]
             if not raw_vals:
@@ -1121,6 +1214,10 @@ def infer_extent_bounds(
         elif kind == "origin_span":
             raw_starts = getattr(extent, spec["origin"], [])
             raw_spans = getattr(extent, spec["span"], [])
+            if hasattr(raw_starts, "to_pylist"):
+                raw_starts = raw_starts.to_pylist()
+            if hasattr(raw_spans, "to_pylist"):
+                raw_spans = raw_spans.to_pylist()
             if indices is not None:
                 raw_starts = [raw_starts[i] for i in indices]
                 raw_spans = [raw_spans[i] for i in indices]
@@ -1137,6 +1234,10 @@ def infer_extent_bounds(
         elif kind == "min_max":
             raw_mins = getattr(extent, spec["min_field"], [])
             raw_maxs = getattr(extent, spec["max_field"], [])
+            if hasattr(raw_mins, "to_pylist"):
+                raw_mins = raw_mins.to_pylist()
+            if hasattr(raw_maxs, "to_pylist"):
+                raw_maxs = raw_maxs.to_pylist()
             if indices is not None:
                 raw_mins = [raw_mins[i] for i in indices]
                 raw_maxs = [raw_maxs[i] for i in indices]
@@ -1295,6 +1396,8 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
     # 1D Point extents
     if len(specs) == 1 and specs[0]["kind"] == "point":
         vals = getattr(extent, specs[0]["field"], [])
+        if hasattr(vals, "to_pylist"):
+            vals = vals.to_pylist()
         if indices is not None:
             vals = [vals[i] for i in indices]
         coords = _normalize_coords(vals, is_fraction)
@@ -1304,6 +1407,10 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
     if len(specs) == 1 and specs[0]["kind"] == "origin_span":
         raw_starts = getattr(extent, specs[0]["origin"], [])
         raw_spans = getattr(extent, specs[0]["span"], [])
+        if hasattr(raw_starts, "to_pylist"):
+            raw_starts = raw_starts.to_pylist()
+        if hasattr(raw_spans, "to_pylist"):
+            raw_spans = raw_spans.to_pylist()
         if indices is not None:
             raw_starts = [raw_starts[i] for i in indices]
             raw_spans = [raw_spans[i] for i in indices]
@@ -1328,6 +1435,8 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
         col_lists = []
         for s in specs:
             arr = getattr(extent, s["field"], [])
+            if hasattr(arr, "to_pylist"):
+                arr = arr.to_pylist()
             if indices is not None:
                 arr = [arr[i] for i in indices]
             col_lists.append(arr)
@@ -1341,6 +1450,14 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
             ws = getattr(extent, "width", [])
             ys = getattr(extent, "y", [])
             hs = getattr(extent, "height", [])
+            if hasattr(xs, "to_pylist"):
+                xs = xs.to_pylist()
+            if hasattr(ws, "to_pylist"):
+                ws = ws.to_pylist()
+            if hasattr(ys, "to_pylist"):
+                ys = ys.to_pylist()
+            if hasattr(hs, "to_pylist"):
+                hs = hs.to_pylist()
             if indices is not None:
                 xs = [xs[i] for i in indices]
                 ws = [ws[i] for i in indices]
@@ -1352,6 +1469,14 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
             ds = getattr(extent, "duration", [])
             f_mins = getattr(extent, "freq_min", [])
             f_maxs = getattr(extent, "freq_max", [])
+            if hasattr(ts, "to_pylist"):
+                ts = ts.to_pylist()
+            if hasattr(ds, "to_pylist"):
+                ds = ds.to_pylist()
+            if hasattr(f_mins, "to_pylist"):
+                f_mins = f_mins.to_pylist()
+            if hasattr(f_maxs, "to_pylist"):
+                f_maxs = f_maxs.to_pylist()
             if indices is not None:
                 ts = [ts[i] for i in indices]
                 ds = [ds[i] for i in indices]
@@ -1387,8 +1512,22 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
         ts = getattr(extent, "time", [])
         ds = getattr(extent, "duration", [])
         c0, c1, c2 = (getattr(extent, f, []) for f in spatial_fields)
+        if hasattr(ts, "to_pylist"):
+            ts = ts.to_pylist()
+        if hasattr(ds, "to_pylist"):
+            ds = ds.to_pylist()
+        if hasattr(c0, "to_pylist"):
+            c0 = c0.to_pylist()
+        if hasattr(c1, "to_pylist"):
+            c1 = c1.to_pylist()
+        if hasattr(c2, "to_pylist"):
+            c2 = c2.to_pylist()
         if indices is not None:
             ts = [ts[i] for i in indices]
+            ds = [ds[i] for i in indices]
+            c0 = [c0[i] for i in indices]
+            c1 = [c1[i] for i in indices]
+            c2 = [c2[i] for i in indices]
             ds = [ds[i] for i in indices]
             c0 = [c0[i] for i in indices]
             c1 = [c1[i] for i in indices]
@@ -1446,6 +1585,8 @@ def is_disjoint(
         ids = getattr(grouping, "ids", None)
         if ids is None or ids is msgspec.UNSET:
             return True
+        if hasattr(ids, "to_pylist"):
+            ids = ids.to_pylist()
         if group_id is not None:
             indices = [i for i, gid in enumerate(ids) if gid == group_id]
             return _is_disjoint_indices(extent, indices)
@@ -1516,6 +1657,10 @@ def _is_exhaustive_indices(
         b_min, b_max = bounds.get(dim, (None, None))
         raw_starts = getattr(extent, specs[0]["origin"], [])
         raw_spans = getattr(extent, specs[0]["span"], [])
+        if hasattr(raw_starts, "to_pylist"):
+            raw_starts = raw_starts.to_pylist()
+        if hasattr(raw_spans, "to_pylist"):
+            raw_spans = raw_spans.to_pylist()
         if indices is not None:
             raw_starts = [raw_starts[i] for i in indices]
             raw_spans = [raw_spans[i] for i in indices]
@@ -1548,6 +1693,8 @@ def _is_exhaustive_indices(
     if tag == "text":
         b_min, b_max = bounds.get("offset", (None, None))
         raw_vals = getattr(extent, "offset", [])
+        if hasattr(raw_vals, "to_pylist"):
+            raw_vals = raw_vals.to_pylist()
         if indices is not None:
             raw_vals = [raw_vals[i] for i in indices]
         if b_min is None:
@@ -1570,6 +1717,14 @@ def _is_exhaustive_indices(
             ws = getattr(extent, "width", [])
             ys = getattr(extent, "y", [])
             hs = getattr(extent, "height", [])
+            if hasattr(xs, "to_pylist"):
+                xs = xs.to_pylist()
+            if hasattr(ws, "to_pylist"):
+                ws = ws.to_pylist()
+            if hasattr(ys, "to_pylist"):
+                ys = ys.to_pylist()
+            if hasattr(hs, "to_pylist"):
+                hs = hs.to_pylist()
             if indices is not None:
                 xs = [xs[i] for i in indices]
                 ws = [ws[i] for i in indices]
@@ -1583,6 +1738,14 @@ def _is_exhaustive_indices(
             ds = getattr(extent, "duration", [])
             f_mins = getattr(extent, "freq_min", [])
             f_maxs = getattr(extent, "freq_max", [])
+            if hasattr(ts, "to_pylist"):
+                ts = ts.to_pylist()
+            if hasattr(ds, "to_pylist"):
+                ds = ds.to_pylist()
+            if hasattr(f_mins, "to_pylist"):
+                f_mins = f_mins.to_pylist()
+            if hasattr(f_maxs, "to_pylist"):
+                f_maxs = f_maxs.to_pylist()
             if indices is not None:
                 ts = [ts[i] for i in indices]
                 ds = [ds[i] for i in indices]
@@ -1616,6 +1779,10 @@ def _is_exhaustive_indices(
         b_time = bounds.get("time", (None, None))
         ts = getattr(extent, "time", [])
         ds = getattr(extent, "duration", [])
+        if hasattr(ts, "to_pylist"):
+            ts = ts.to_pylist()
+        if hasattr(ds, "to_pylist"):
+            ds = ds.to_pylist()
         if indices is not None:
             ts = [ts[i] for i in indices]
             ds = [ds[i] for i in indices]
@@ -1642,6 +1809,8 @@ def _is_exhaustive_indices(
         dim = spec["dim"]
         b_min, b_max = bounds.get(dim, (None, None))
         raw_vals = getattr(extent, spec["field"], [])
+        if hasattr(raw_vals, "to_pylist"):
+            raw_vals = raw_vals.to_pylist()
         if indices is not None:
             raw_vals = [raw_vals[i] for i in indices]
         vals = _normalize_coords(raw_vals, is_fraction)
@@ -1704,6 +1873,8 @@ def is_exhaustive(
             return _is_exhaustive_indices(
                 extent, indices=[], bounds=effective_bounds, N=0
             )
+        if hasattr(ids, "to_pylist"):
+            ids = ids.to_pylist()
         if group_id is not None:
             indices = [i for i, gid in enumerate(ids) if gid == group_id]
             return _is_exhaustive_indices(

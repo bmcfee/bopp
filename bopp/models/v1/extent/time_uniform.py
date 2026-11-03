@@ -5,13 +5,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp.base import ArrowStructBase
 
 
-class UniformTimeExtent(Struct, tag_field="extent_type", tag="time_uniform"):
-    """
-    Uniformly sampled timesteps implicitly defined by scalar start_time and sampling_period without explicit columnar data.
-    """
+class UniformTimeExtent(ArrowStructBase, tag_field="extent_type", tag="time_uniform"):
+    """Uniformly sampled timesteps implicitly defined by scalar start_time and sampling_period without explicit columnar data."""
 
     start_time: Annotated[
         float, Meta(description="Start time of the first observation in seconds.")

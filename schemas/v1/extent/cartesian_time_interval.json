@@ -9,14 +9,14 @@
       "const": "cartesian_time_interval"
     },
     "time": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "Array of interval start times in seconds.",
       "items": {
         "type": "number"
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "Array of interval durations in seconds.",
       "items": {
         "type": "number",
@@ -24,21 +24,21 @@
       }
     },
     "x": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of x-coordinates in space.",
       "items": {
         "type": "number"
       }
     },
     "y": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of y-coordinates in space.",
       "items": {
         "type": "number"
       }
     },
     "z": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of z-coordinates in space.",
       "items": {
         "type": "number"

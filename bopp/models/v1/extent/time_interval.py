@@ -3,19 +3,24 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 
-class TimeIntervalExtent(Struct, tag_field="extent_type", tag="time_interval"):
+class TimeIntervalExtent(ArrowStructBase, tag_field="extent_type", tag="time_interval"):
     time: Annotated[
-        list[float], Meta(description="Array of interval start times in seconds.")
+        ArrowArray[Literal["float64"], float],
+        Meta(description="Array of interval start times in seconds."),
     ]
     duration: Annotated[
-        list[DurationItem], Meta(description="Array of interval durations in seconds.")
+        ArrowArray[Literal["float64"], DurationItem],
+        Meta(description="Array of interval durations in seconds."),
     ]
     disjoint: Annotated[
         bool,

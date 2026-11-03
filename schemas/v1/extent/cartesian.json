@@ -9,21 +9,21 @@
       "const": "cartesian"
     },
     "x": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of x-coordinates in space.",
       "items": {
         "type": "number"
       }
     },
     "y": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of y-coordinates in space.",
       "items": {
         "type": "number"
       }
     },
     "z": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of z-coordinates in space.",
       "items": {
         "type": "number"

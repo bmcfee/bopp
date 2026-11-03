@@ -8,7 +8,7 @@
       "const": "time"
     },
     "time": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float64Array",
       "description": "An array of time values.",
       "items": {
         "type": "number"

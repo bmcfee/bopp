@@ -313,7 +313,7 @@ def test_resolve_extensions_non_extension_payload():
     )
     # Should be a no-op without error
     resolve_extensions(ann)
-    assert ann.payload.value == [1]
+    assert ann.payload.value.to_pylist() == [1]
 
 
 def test_resolve_extensions_missing_schema_warning():

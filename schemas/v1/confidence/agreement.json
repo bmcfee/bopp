@@ -8,12 +8,12 @@
       "const": "agreement"
     },
     "num_annotators_common": {
-        "type": "integer",
-        "minimum": 1,
-        "description": "The number of annotators who produced all observations"
+      "type": "integer",
+      "minimum": 1,
+      "description": "The number of annotators who produced all observations"
     },
     "confidence": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "The fraction of annotators agreeing on this measurement",
       "items": {
         "type": "number",
@@ -22,13 +22,16 @@
       }
     },
     "num_annotators": {
-        "$ref": "../core.json#/$defs/Array",
-        "description": "The number of annotators who produced each observation",
-        "items": {
-            "type": "integer",
-            "minimum": 1
-        }
+      "$ref": "../core.json#/$defs/UInt16Array",
+      "description": "The number of annotators who produced each observation",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
     }
   },
-  "required": ["confidence_type", "confidence"]
+  "required": [
+    "confidence_type",
+    "confidence"
+  ]
 }

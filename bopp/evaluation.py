@@ -144,6 +144,9 @@ def _extract_labels(ann: BoppBase, field_name: str = "value") -> list[Any]:
     if raw_labels is None:
         raise BoppArgumentError(f"Payload has no field '{field_name}'.")
 
+    if hasattr(raw_labels, "to_pylist"):
+        raw_labels = raw_labels.to_pylist()
+
     if (
         extent_tag in ("time", "spherical_time", "cartesian_time", "time_uniform")
         and len(raw_labels) > 1
@@ -165,7 +168,12 @@ def _extract_note_pitches_in_hz(ann: BoppBase) -> Any:
         midi_nums = np.asarray(payload.value, dtype=np.float64)  # type: ignore[union-attr]
         return 440.0 * (2.0 ** ((midi_nums - 69.0) / 12.0))
     if payload_tag == "note":
-        return np.asarray([_spn_to_hz(n) for n in payload.value], dtype=np.float64)  # type: ignore[union-attr]
+        notes = (
+            payload.value.to_pylist()
+            if hasattr(payload.value, "to_pylist")
+            else payload.value
+        )
+        return np.asarray([_spn_to_hz(n) for n in notes], dtype=np.float64)  # type: ignore[union-attr]
 
     raise BoppArgumentError(
         f"Unsupported payload tag '{payload_tag}' for note transcription pitch extraction. "
@@ -354,6 +362,7 @@ def _extract_multilevel_intervals_and_labels(
         )
 
     g = groupings[0]
+    g_ids = g.ids.to_pylist() if hasattr(g.ids, "to_pylist") else list(g.ids)
     if not getattr(g, "disjoint", False):
         raise BoppArgumentError(
             f"Hierarchy evaluation requires grouping disjoint=True for {role}, found disjoint=False on grouping '{g.name}'."
@@ -374,7 +383,7 @@ def _extract_multilevel_intervals_and_labels(
             f"Hierarchy evaluation requires non-empty intervals for {role}."
         )
 
-    levels = sorted({gid for gid in g.ids if gid >= 0})
+    levels = sorted({gid for gid in g_ids if gid >= 0})
     if not levels:
         raise BoppArgumentError(
             f"Hierarchy grouping '{g.name}' on {role} contains no non-negative group IDs."
@@ -384,7 +393,7 @@ def _extract_multilevel_intervals_and_labels(
     multilevel_labels: list[list[str]] = []
 
     for lvl in levels:
-        idx = [i for i, gid in enumerate(g.ids) if gid == lvl]
+        idx = [i for i, gid in enumerate(g_ids) if gid == lvl]
         lvl_starts = raw_starts[idx]
         lvl_durs = raw_durs[idx]
         lvl_labs = [raw_labels[i] for i in idx]
@@ -498,7 +507,8 @@ def _extract_melody_series(
                 f"Melody evaluation requires at most one grouping on {role} annotation, found {len(groupings)}."
             )
         g = groupings[0]
-        valid_contours = sorted({gid for gid in g.ids if gid >= 0})
+        g_ids = g.ids.to_pylist() if hasattr(g.ids, "to_pylist") else list(g.ids)
+        valid_contours = sorted({gid for gid in g_ids if gid >= 0})
         if not valid_contours:
             raise BoppArgumentError(
                 f"Grouping '{g.name}' on {role} contains no non-negative group IDs."
@@ -512,7 +522,7 @@ def _extract_melody_series(
                     f"Contour '{target_contour}' not found in grouping '{g.name}' on {role}; available contours: {valid_contours}."
                 )
 
-        idx = [i for i, gid in enumerate(g.ids) if gid == target_contour]
+        idx = [i for i, gid in enumerate(g_ids) if gid == target_contour]
         times = raw_times[idx]
         freqs = raw_freqs[idx]
         voiced = voiced_flags[idx]

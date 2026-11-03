@@ -5,10 +5,12 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp.base import ArrowStructBase
 
 
-class ObjectPayload(Struct, tag_field="payload_type", tag="object"):
+class ObjectPayload(ArrowStructBase, tag_field="payload_type", tag="object"):
     value: Annotated[
         list[dict[str, Any]],
         Meta(description="Annotations consisting of structured object data"),

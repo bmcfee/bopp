@@ -8,7 +8,7 @@
       "const": "lyrics"
     },
     "value": {
-      "$ref": "../core.json#/$defs/Array",
+      "$ref": "../core.json#/$defs/StringArray",
       "description": "Open strings for lyrics annotations",
       "items": {
         "type": "string"

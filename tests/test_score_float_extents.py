@@ -7,6 +7,7 @@ import msgspec
 import pytest
 
 import bopp
+from bopp._arrow import arrow_dec_hook
 from bopp.io import (
     load_bopp_csv,
     load_bopp_json,
@@ -38,9 +39,10 @@ def test_decode_valid_score_float(tag, cls, columns):
             {"extent_type": tag, "disjoint": False, "exhaustive": False, **columns}
         ),
         type=cls,
+        dec_hook=arrow_dec_hook,
     )
     for name, expected in columns.items():
-        assert getattr(decoded, name) == expected
+        assert getattr(decoded, name).to_pylist() == expected
     ann = bopp.create(
         media_id="test:score",
         payload_type="tag",
@@ -59,18 +61,25 @@ def test_score_float_rejects_fraction_columns(tag, cls, columns):
     for name in columns:
         invalid = copy.deepcopy(columns)
         invalid[name][0] = [1, 2]
-        with pytest.raises(msgspec.ValidationError, match=rf"\$\.{name}"):
+        with pytest.raises(
+            msgspec.ValidationError,
+            match=rf"(\$\.{name}|Expected float for float64 array)",
+        ):
             msgspec.json.decode(
                 msgspec.json.encode({"extent_type": tag, **invalid}),
                 type=cls,
+                dec_hook=arrow_dec_hook,
             )
 
 
 def test_score_float_rejects_negative_duration():
-    with pytest.raises(msgspec.ValidationError, match=r"\$\.duration"):
+    with pytest.raises(
+        msgspec.ValidationError, match=r"(\$\.duration|Array element -0.5 < minimum 0.0)"
+    ):
         msgspec.json.decode(
             b'{"extent_type":"score_interval_float","quarter":[-1.0],"duration":[-0.5]}',
             type=ScoreIntervalFloat,
+            dec_hook=arrow_dec_hook,
         )
     with pytest.raises(bopp.BoppValidationError):
         bopp.validate(
@@ -110,7 +119,7 @@ def test_score_float_roundtrip(
     assert loaded.media_id == ann.media_id
     assert loaded.payload == ann.payload
     for name, expected in columns.items():
-        assert getattr(loaded.extent, name) == expected
+        assert getattr(loaded.extent, name).to_pylist() == expected
     if keeps_id:
         assert loaded.id == ann.id
 

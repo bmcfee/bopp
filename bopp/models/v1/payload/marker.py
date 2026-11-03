@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-from msgspec import Struct
+from bopp.base import ArrowStructBase
 
 
-class MarkerPayload(Struct, tag_field="payload_type", tag="marker"):
+class MarkerPayload(ArrowStructBase, tag_field="payload_type", tag="marker"):
     description: str

@@ -3,16 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 type ValueItem = Annotated[str, Meta(pattern="^[A-G]([b♭]*|𝄫|[#♯]*|𝄪|♮)-?[0-9]+$")]
 
 
-class NotePayload(Struct, tag_field="payload_type", tag="note"):
+class NotePayload(ArrowStructBase, tag_field="payload_type", tag="note"):
     value: Annotated[
-        list[ValueItem],
+        ArrowArray[Literal["string"], ValueItem],
         Meta(
             description="Musical notes in scientific pitch notation (e.g. C4, A4, C♯4, E♭3, F𝄪5, B𝄫2, D♮4, C-1)"
         ),

@@ -3,22 +3,35 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class CartesianTimeExtent(Struct, tag_field="extent_type", tag="cartesian_time"):
-    """
-    Spatiotemporal point coordinates in Cartesian space with timestamps.
-    """
+class CartesianTimeExtent(
+    ArrowStructBase, tag_field="extent_type", tag="cartesian_time"
+):
+    """Spatiotemporal point coordinates in Cartesian space with timestamps."""
 
     time: Annotated[
-        list[float], Meta(description="Array of point timestamps in seconds.")
+        ArrowArray[Literal["float64"], float],
+        Meta(description="Array of point timestamps in seconds."),
     ]
-    x: Annotated[list[float], Meta(description="Array of x-coordinates in space.")]
-    y: Annotated[list[float], Meta(description="Array of y-coordinates in space.")]
-    z: Annotated[list[float], Meta(description="Array of z-coordinates in space.")]
+    x: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of x-coordinates in space."),
+    ]
+    y: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of y-coordinates in space."),
+    ]
+    z: Annotated[
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of z-coordinates in space."),
+    ]
     disjoint: Annotated[
         bool,
         Meta(

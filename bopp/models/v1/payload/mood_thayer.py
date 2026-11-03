@@ -3,11 +3,18 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import Meta, Struct
+from msgspec import Meta
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class MoodThayerPayload(Struct, tag_field="payload_type", tag="mood_thayer"):
-    valence: Annotated[list[float], Meta(description="Valence")]
-    arousal: Annotated[list[float], Meta(description="Arousal")]
+class MoodThayerPayload(ArrowStructBase, tag_field="payload_type", tag="mood_thayer"):
+    valence: Annotated[
+        ArrowArray[Literal["float32"], float], Meta(description="Valence")
+    ]
+    arousal: Annotated[
+        ArrowArray[Literal["float32"], float], Meta(description="Arousal")
+    ]

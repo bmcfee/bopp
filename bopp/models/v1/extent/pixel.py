@@ -3,21 +3,24 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class Pixel(Struct, tag_field="extent_type", tag="pixel"):
-    """
-    2D point coordinates (x, y) in pixel space.
-    """
+class Pixel(ArrowStructBase, tag_field="extent_type", tag="pixel"):
+    """2D point coordinates (x, y) in pixel space."""
 
     x: Annotated[
-        list[float], Meta(description="Array of horizontal x-coordinates in pixels.")
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of horizontal x-coordinates in pixels."),
     ]
     y: Annotated[
-        list[float], Meta(description="Array of vertical y-coordinates in pixels.")
+        ArrowArray[Literal["float32"], float],
+        Meta(description="Array of vertical y-coordinates in pixels."),
     ]
     disjoint: Annotated[
         bool, Meta(description="Indicates whether all pixel coordinates are unique.")

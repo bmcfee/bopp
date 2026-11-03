@@ -3,13 +3,19 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from msgspec import UNSET, Meta, Struct, UnsetType
+from msgspec import UNSET, Meta, UnsetType
+
+from bopp._arrow import ArrowArray
+from bopp.base import ArrowStructBase
 
 
-class Time(Struct, tag_field="extent_type", tag="time"):
-    time: Annotated[list[float], Meta(description="An array of time values.")]
+class Time(ArrowStructBase, tag_field="extent_type", tag="time"):
+    time: Annotated[
+        ArrowArray[Literal["float64"], float],
+        Meta(description="An array of time values."),
+    ]
     disjoint: Annotated[
         bool, Meta(description="Indicates whether all time values are unique.")
     ]

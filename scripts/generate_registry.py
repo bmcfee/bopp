@@ -73,7 +73,7 @@ def _is_string_type(tp: Any) -> bool:
 
 
 def _is_complex_field(type_hint: Any) -> bool:
-    """Check if the inner element type of a list array field is complex."""
+    """Check if the inner element type of a list or ArrowArray field is complex."""
     type_hint = _unwrap_type(type_hint)
     origin = get_origin(type_hint)
 
@@ -83,11 +83,16 @@ def _is_complex_field(type_hint: Any) -> bool:
             inner_type = args[0]
             return _is_complex_type(inner_type)
 
+    if getattr(origin, "__name__", "") == "ArrowArray":
+        args = get_args(type_hint)
+        if len(args) >= 2:
+            return _is_complex_type(args[1])
+
     return _is_complex_type(type_hint)
 
 
 def _is_string_field(type_hint: Any) -> bool:
-    """Check if the inner element type of a list array field is a string."""
+    """Check if the inner element type of a list or ArrowArray field is a string."""
     type_hint = _unwrap_type(type_hint)
     origin = get_origin(type_hint)
 
@@ -96,6 +101,11 @@ def _is_string_field(type_hint: Any) -> bool:
         if args:
             inner_type = args[0]
             return _is_string_type(inner_type)
+
+    if getattr(origin, "__name__", "") == "ArrowArray":
+        args = get_args(type_hint)
+        if len(args) >= 2:
+            return _is_string_type(args[1])
 
     return _is_string_type(type_hint)
 

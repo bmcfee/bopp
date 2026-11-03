@@ -2,14 +2,67 @@ from __future__ import annotations
 
 import base64
 import warnings
-from typing import Any
+from typing import Any, get_type_hints
 
 import msgspec
+import pyarrow as pa
 
 from .exceptions import BoppArrayError, BoppValidationError
 
+_STRUCT_ARROW_FIELDS: dict[type, tuple[tuple[str, str, Any], ...]] = {}
 
-class BoppBase(msgspec.Struct):
+
+def _get_struct_arrow_fields(cls: type) -> tuple[tuple[str, str, Any], ...]:
+    fields = _STRUCT_ARROW_FIELDS.get(cls)
+    if fields is not None:
+        return fields
+
+    resolved_fields = []
+    from ._arrow import unwrap_arrow_array
+
+    try:
+        hints = get_type_hints(cls, include_extras=True)
+    except Exception:
+        hints = getattr(cls, "__annotations__", {})
+
+    for field_name in getattr(cls, "__struct_fields__", ()):
+        hint = hints.get(field_name)
+        if hint is not None:
+            unwrapped = unwrap_arrow_array(hint)
+            if unwrapped is not None:
+                dtype_name, item_type = unwrapped
+                resolved_fields.append((field_name, dtype_name, item_type))
+
+    tup = tuple(resolved_fields)
+    _STRUCT_ARROW_FIELDS[cls] = tup
+    return tup
+
+
+class ArrowStructBase(msgspec.Struct):
+    """Base class for BOPP facet structs that auto-coerces ArrowArray fields on construction."""
+
+    def __post_init__(self) -> None:
+        arrow_fields = _get_struct_arrow_fields(type(self))
+        if not arrow_fields:
+            return
+        from ._arrow import coerce_arrow_array
+
+        for field_name, dtype_name, item_type in arrow_fields:
+            val = getattr(self, field_name, msgspec.UNSET)
+            if val is not msgspec.UNSET and val is not None:
+                try:
+                    setattr(
+                        self,
+                        field_name,
+                        coerce_arrow_array(
+                            val, dtype_name, item_type, validate_constraints=False
+                        ),
+                    )
+                except Exception:
+                    pass
+
+
+class BoppBase(ArrowStructBase):
     """Base class for BOPP models.
 
     Dynamically validates parallel columnar arrays on the root Annotation node,
@@ -17,6 +70,7 @@ class BoppBase(msgspec.Struct):
     """
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         all_lengths: list[int] = []
 
         for attr_name, label in (
@@ -40,7 +94,7 @@ class BoppBase(msgspec.Struct):
                         )
                     seen_names.add(g_name)
                 ids = getattr(g, "ids", None)
-                if isinstance(ids, list):
+                if isinstance(ids, (list, pa.Array, pa.ChunkedArray)):
                     all_lengths.append(len(ids))
 
         # Ensure all found arrays have the same length
@@ -126,7 +180,7 @@ class BoppBase(msgspec.Struct):
                 continue
             val = getattr(facet_struct, field_name)
 
-            if isinstance(val, list):
+            if isinstance(val, (list, pa.Array, pa.ChunkedArray)):
                 lengths.append(len(val))
 
         return lengths
@@ -156,16 +210,18 @@ class BoppBase(msgspec.Struct):
             A MIME bundle dictionary mapping MIME type strings to their
             serialized representations.
         """
+        from ._arrow import arrow_msgpack_enc_hook
+
         bundle: dict[str, Any] = {}
 
         bundle["application/vnd.bopp+msgpack"] = base64.b64encode(
-            msgspec.msgpack.encode(self)
+            msgspec.msgpack.encode(self, enc_hook=arrow_msgpack_enc_hook)
         ).decode("ascii")
 
         return bundle
 
 
-class GroupingBase(msgspec.Struct):
+class GroupingBase(ArrowStructBase):
     """Base class for BOPP Grouping objects.
 
     This primarily exists to implement a post-init check on distinctness of values
@@ -174,6 +230,7 @@ class GroupingBase(msgspec.Struct):
     """
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         labels = getattr(self, "labels", msgspec.UNSET)
         if labels is msgspec.UNSET or labels is None:
             return
@@ -187,7 +244,10 @@ class GroupingBase(msgspec.Struct):
         ids = getattr(self, "ids", msgspec.UNSET)
         if ids is not msgspec.UNSET and ids is not None:
             mapped_ids = set(labels.values())
-            unmapped_non_negative = {i for i in ids if i >= 0 and i not in mapped_ids}
+            id_list = ids.to_pylist() if hasattr(ids, "to_pylist") else ids
+            unmapped_non_negative = {
+                i for i in id_list if i >= 0 and i not in mapped_ids
+            }
             if unmapped_non_negative:
                 warnings.warn(
                     f"Grouping '{getattr(self, 'name', '')}' contains non-negative group IDs "
