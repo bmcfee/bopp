@@ -11,6 +11,7 @@ dependencies = [
     "mir_eval>=0.8.0",
     "numpy>=2.2.0",
     "polars>=2.0.0",
+    "tomli-w>=1.0.0",
 ]
 python_requires = "3.13"
 
@@ -34,7 +35,9 @@ test = [
     "pyarrow>=18.0.0",
 ]
 benchmark = [
-    "pytest-benchmark"
+    "pytest-benchmark",
+    "jams",
+    "tabulate",
 ]
 
 [tool.hatch.version]
@@ -75,15 +78,23 @@ exclude_files = [
     '.*/models/*/*/*.py'
 ]
 
+[tool.hatch.envs.default]
+features = [
+    "test",
+    "benchmark",
+]
+
 [tool.hatch.envs.default.scripts]
 bench = """
 pytest tests/benchmark.py \
     -o addopts='' \
     -p no:cov \
     --benchmark-group-by=param:prefix \
-    --benchmark-columns=min,mean,stddev,rounds \
+    --benchmark-columns=min,mean,stddev \
+    --benchmark-warmup=on \
     --benchmark-json=benchmark.json \
     --benchmark-min-rounds=5
+python scripts/bench_to_md.py
 """
 
 [tool.hatch.build.targets.wheel]

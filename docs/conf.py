@@ -29,7 +29,7 @@ extensions = [
 myst_enable_extensions = ["colon_fence", "attrs_inline", "linkify", "tasklist"]
 
 templates_path = ['templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'templates/bopp-extension-template']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'templates/bopp-extension-template', 'benchmarks']
 
 # -- Options for intersphinx -------------------------------------------------
 intersphinx_mapping = {
