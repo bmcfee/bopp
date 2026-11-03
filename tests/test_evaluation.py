@@ -85,11 +85,6 @@ def test_evaluate_beat():
     ref_times = [5.0, 5.5, 6.0, 6.5, 7.0]
     est_times = [5.01, 5.49, 6.02, 6.51, 6.99]
 
-    expected = mir_eval.beat.evaluate(
-        np.asarray(ref_times, dtype=float),
-        np.asarray(est_times, dtype=float),
-    )
-
     ref = create(
         media_id="audio",
         payload_type="beat",
@@ -103,6 +98,11 @@ def test_evaluate_beat():
         extent_type="time",
         time=est_times,
         value=[1, 2, 3, 4, 1],
+    )
+
+    expected = mir_eval.beat.evaluate(
+        np.asarray(ref.extent.time, dtype=float),
+        np.asarray(est.extent.time, dtype=float),
     )
 
     actual = evaluate(ref, est)
@@ -473,7 +473,7 @@ def test_evaluate_transcription():
     )
 
     actual = evaluate(ref, est)
-    assert actual == expected
+    assert actual == pytest.approx(expected)
     assert actual["Precision"] == 1.0
 
 
@@ -509,7 +509,7 @@ def test_evaluate_transcription_midi_notes():
     )
 
     actual = evaluate(ref, est, task="transcription")
-    assert actual == expected
+    assert actual == pytest.approx(expected)
     assert actual["Precision"] == 1.0
 
 
@@ -544,7 +544,7 @@ def test_evaluate_transcription_spn_notes():
     )
 
     actual = evaluate(ref, est)
-    assert actual == expected
+    assert actual == pytest.approx(expected)
     assert actual["Precision"] == 1.0
 
 

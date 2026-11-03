@@ -8,14 +8,14 @@
       "const": "time_frequency_box"
     },
     "time": {
-      "$ref": "../core.json#/$defs/Float64Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of start times in seconds.",
       "items": {
         "type": "number"
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/Float64Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of box durations in seconds.",
       "items": {
         "type": "number",

@@ -15,7 +15,7 @@ class ScoreQuarterNotesFloat(
     ArrowStructBase, tag_field="extent_type", tag="score_quarter_float"
 ):
     quarter: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="An array of quarter values as floating-point numbers."),
     ]
     disjoint: Annotated[

@@ -15,11 +15,11 @@ type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 class MidiInterval(ArrowStructBase, tag_field="extent_type", tag="midi_interval"):
     tick: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="Array of interval start times in MIDI ticks."),
     ]
     duration: Annotated[
-        ArrowArray[Literal["float64"], DurationItem],
+        ArrowArray[Literal["float32"], DurationItem],
         Meta(description="Array of interval durations in MIDI ticks."),
     ]
     disjoint: Annotated[

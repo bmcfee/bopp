@@ -13,7 +13,7 @@ from bopp.base import ArrowStructBase
 
 class Time(ArrowStructBase, tag_field="extent_type", tag="time"):
     time: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="An array of time values."),
     ]
     disjoint: Annotated[

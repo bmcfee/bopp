@@ -28,11 +28,11 @@ class SphericalTimeIntervalExtent(
     """Spatiotemporal interval coordinates in spherical space with start times and durations."""
 
     time: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="Array of interval start times in seconds."),
     ]
     duration: Annotated[
-        ArrowArray[Literal["float64"], DurationItem],
+        ArrowArray[Literal["float32"], DurationItem],
         Meta(description="Array of interval durations in seconds."),
     ]
     azimuth: Annotated[

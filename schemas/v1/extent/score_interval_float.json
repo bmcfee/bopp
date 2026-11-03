@@ -8,14 +8,14 @@
       "const": "score_interval_float"
     },
     "quarter": {
-      "$ref": "../core.json#/$defs/Float64Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of interval start times in quarter notes, as floating-point numbers.",
       "items": {
         "type": "number"
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/Float64Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of interval durations in quarter notes, as floating-point numbers.",
       "items": {
         "type": "number",

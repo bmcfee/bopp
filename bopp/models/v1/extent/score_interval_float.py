@@ -17,13 +17,13 @@ class ScoreIntervalFloat(
     ArrowStructBase, tag_field="extent_type", tag="score_interval_float"
 ):
     quarter: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(
             description="Array of interval start times in quarter notes, as floating-point numbers."
         ),
     ]
     duration: Annotated[
-        ArrowArray[Literal["float64"], DurationItem],
+        ArrowArray[Literal["float32"], DurationItem],
         Meta(
             description="Array of interval durations in quarter notes, as floating-point numbers."
         ),

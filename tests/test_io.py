@@ -671,7 +671,7 @@ def test_load_bopp_csv_crlf_newlines(tmp_path):
     loaded = load_bopp_csv(file_path, validate_id=False)
     assert loaded.media_id == "track:crlf_test"
     assert loaded.payload.value.to_pylist() == [1, 2]
-    assert loaded.extent.time.to_pylist() == [0.1, 0.5]
+    assert loaded.extent.time.to_pylist() == pytest.approx([0.1, 0.5])
 
 
 def test_parse_complex_and_str_cell():
@@ -833,7 +833,7 @@ def test_load_bopp_csv_non_seekable_stream():
     loaded = load_bopp_csv(stream, validate_id=False)  # type: ignore[arg-type]
     assert loaded.media_id == "track:non_seekable"
     assert loaded.payload.value.to_pylist() == [1, 2]
-    assert loaded.extent.time.to_pylist() == [0.1, 0.5]
+    assert loaded.extent.time.to_pylist() == pytest.approx([0.1, 0.5])
 
 
 def test_load_bopp_csv_unsupported_backend():
@@ -888,7 +888,7 @@ def test_csv_roundtrip_marker_payload(tmp_path):
         loaded = load_bopp_csv(file_path, backend=backend)
         assert loaded.media_id == ann.media_id
         assert loaded.payload.description == "cues"
-        assert loaded.extent.time.to_pylist() == [0.1, 0.5, 1.2]
+        assert loaded.extent.time.to_pylist() == pytest.approx([0.1, 0.5, 1.2])
         assert loaded.id == ann.id
 
 

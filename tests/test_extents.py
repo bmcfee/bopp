@@ -700,7 +700,7 @@ def test_to_times_new_extents():
     )
     # Timestamps: 1.0, 1.5, 2.0
     resampled = to_times(ann_tu, times=[1.1, 1.6, 2.1], method="previous")
-    assert resampled.extent.time.to_pylist() == [1.1, 1.6, 2.1]
+    assert resampled.extent.time.to_pylist() == pytest.approx([1.1, 1.6, 2.1])
     assert resampled.payload.value.to_pylist() == ["t1", "t2", "t3"]
 
     # to_times with sample_rate on time_uniform

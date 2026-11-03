@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import math
 import types
 import typing
 from collections import defaultdict
@@ -1422,10 +1423,16 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
         prev_s, prev_sp = pairs[0]
         max_end = prev_s + prev_sp
         for s, sp in pairs[1:]:
-            if s < max_end:
-                return False
-            if s == max_end and sp == 0 and prev_sp == 0:
-                return False
+            if is_fraction or isinstance(s, int):
+                if s < max_end:
+                    return False
+                if s == max_end and sp == 0 and prev_sp == 0:
+                    return False
+            else:
+                if s < max_end and not math.isclose(s, max_end, rel_tol=1e-5, abs_tol=1e-5):
+                    return False
+                if math.isclose(s, max_end, rel_tol=1e-5, abs_tol=1e-5) and sp == 0 and prev_sp == 0:
+                    return False
             max_end = max(max_end, s + sp)
             prev_sp = sp
         return True
@@ -1545,7 +1552,7 @@ def _is_disjoint_indices(extent: msgspec.Struct, indices: list[int] | None) -> b
             intervals.sort()
             max_end = intervals[0][1]
             for s, e in intervals[1:]:
-                if s < max_end:
+                if s < max_end and not math.isclose(s, max_end, rel_tol=1e-5, abs_tol=1e-5):
                     return False
                 max_end = max(max_end, e)
         return True
@@ -1682,12 +1689,22 @@ def _is_exhaustive_indices(
 
         covered_until = b_min
         for s, sp in pairs:
-            if s > covered_until:
-                return False
+            if is_fraction or isinstance(s, int):
+                if s > covered_until:
+                    return False
+            else:
+                if s > covered_until and not math.isclose(s, covered_until, rel_tol=1e-5, abs_tol=1e-5):
+                    return False
             covered_until = max(covered_until, s + sp)
-            if covered_until >= b_max:
-                break
-        return bool(covered_until >= b_max)
+            if is_fraction or isinstance(covered_until, int):
+                if covered_until >= b_max:
+                    break
+            else:
+                if covered_until >= b_max or math.isclose(covered_until, b_max, rel_tol=1e-5, abs_tol=1e-5):
+                    break
+        if is_fraction or isinstance(covered_until, int):
+            return bool(covered_until >= b_max)
+        return bool(covered_until >= b_max or math.isclose(covered_until, b_max, rel_tol=1e-5, abs_tol=1e-5))
 
     # Discrete point extent (text)
     if tag == "text":
@@ -1797,12 +1814,22 @@ def _is_exhaustive_indices(
             return False
         covered_until = b_min
         for s, sp in pairs:
-            if s > covered_until:
-                return False
+            if is_fraction or isinstance(s, int):
+                if s > covered_until:
+                    return False
+            else:
+                if s > covered_until and not math.isclose(s, covered_until, rel_tol=1e-5, abs_tol=1e-5):
+                    return False
             covered_until = max(covered_until, s + sp)
-            if covered_until >= b_max:
-                break
-        return bool(covered_until >= b_max)
+            if is_fraction or isinstance(covered_until, int):
+                if covered_until >= b_max:
+                    break
+            else:
+                if covered_until >= b_max or math.isclose(covered_until, b_max, rel_tol=1e-5, abs_tol=1e-5):
+                    break
+        if is_fraction or isinstance(covered_until, int):
+            return bool(covered_until >= b_max)
+        return bool(covered_until >= b_max or math.isclose(covered_until, b_max, rel_tol=1e-5, abs_tol=1e-5))
 
     # Continuous point extents
     for spec in specs:

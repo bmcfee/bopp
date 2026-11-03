@@ -9,7 +9,7 @@
       "const": "spherical_time"
     },
     "time": {
-      "$ref": "../core.json#/$defs/Float64Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of point timestamps in seconds.",
       "items": {
         "type": "number"

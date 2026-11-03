@@ -17,7 +17,7 @@ class CartesianTimeExtent(
     """Spatiotemporal point coordinates in Cartesian space with timestamps."""
 
     time: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="Array of point timestamps in seconds."),
     ]
     x: Annotated[

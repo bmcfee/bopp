@@ -23,11 +23,11 @@ class TimeFrequencyBoxExtent(
     ArrowStructBase, tag_field="extent_type", tag="time_frequency_box"
 ):
     time: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="Array of start times in seconds."),
     ]
     duration: Annotated[
-        ArrowArray[Literal["float64"], DurationItem],
+        ArrowArray[Literal["float32"], DurationItem],
         Meta(description="Array of box durations in seconds."),
     ]
     freq_min: Annotated[

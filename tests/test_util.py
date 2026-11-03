@@ -201,7 +201,7 @@ def test_to_dataframe_filters_tag_discriminators_and_unset_metadata():
     df, header = to_dataframe(ann, backend="pandas")
 
     # Verify parallel array data columns are created correctly
-    assert list(df["extent:time:time"]) == [0.1, 0.2]
+    assert list(df["extent:time:time"]) == pytest.approx([0.1, 0.2])
     assert list(df["payload:beat:value"]) == [1, 1]
     assert list(df["confidence:likelihood:confidence"]) == pytest.approx([0.8, 0.9])
 
@@ -611,9 +611,9 @@ def test_polars_column_dtypes_match_csv_reader():
 @pytest.mark.parametrize(
     "column, expected_dtype",
     [
-        ("extent:time:time", pl.Float64),
-        ("extent:time_interval:duration", pl.Float64),
-        ("extent:midi_interval:duration", pl.Float64),
+        ("extent:time:time", pl.Float32),
+        ("extent:time_interval:duration", pl.Float32),
+        ("extent:midi_interval:duration", pl.Float32),
         ("extent:time_frequency_box:freq_min", pl.Float32),
         ("extent:pixel_box:width", pl.Float32),
         ("payload:tempo:value", pl.Float32),
@@ -675,7 +675,7 @@ def test_to_and_from_dataframe_marker_payload():
         assert reconstructed.media_id == ann.media_id
         assert isinstance(reconstructed.payload, MarkerPayload)
         assert reconstructed.payload.description == "cues"
-        assert reconstructed.extent.time.to_pylist() == [0.1, 0.5, 1.2]
+        assert reconstructed.extent.time.to_pylist() == pytest.approx([0.1, 0.5, 1.2])
         assert reconstructed.id == ann.id
 
 

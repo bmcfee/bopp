@@ -13,7 +13,7 @@ from bopp.base import ArrowStructBase
 
 class MidiTicks(ArrowStructBase, tag_field="extent_type", tag="midi_tick"):
     tick: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="An array of MIDI tick values."),
     ]
     disjoint: Annotated[

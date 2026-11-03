@@ -8,14 +8,14 @@
       "const": "midi_interval"
     },
     "tick": {
-      "$ref": "../core.json#/$defs/Float64Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of interval start times in MIDI ticks.",
       "items": {
         "type": "number"
       }
     },
     "duration": {
-      "$ref": "../core.json#/$defs/Float64Array",
+      "$ref": "../core.json#/$defs/Float32Array",
       "description": "Array of interval durations in MIDI ticks.",
       "items": {
         "type": "number",

@@ -15,11 +15,11 @@ type DurationItem = Annotated[float, Meta(ge=0.0)]
 
 class TimeIntervalExtent(ArrowStructBase, tag_field="extent_type", tag="time_interval"):
     time: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="Array of interval start times in seconds."),
     ]
     duration: Annotated[
-        ArrowArray[Literal["float64"], DurationItem],
+        ArrowArray[Literal["float32"], DurationItem],
         Meta(description="Array of interval durations in seconds."),
     ]
     disjoint: Annotated[

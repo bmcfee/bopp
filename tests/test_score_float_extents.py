@@ -63,7 +63,7 @@ def test_score_float_rejects_fraction_columns(tag, cls, columns):
         invalid[name][0] = [1, 2]
         with pytest.raises(
             msgspec.ValidationError,
-            match=rf"(\$\.{name}|Expected float for float64 array)",
+            match=rf"(\$\.{name}|Expected float for float(32|64) array)",
         ):
             msgspec.json.decode(
                 msgspec.json.encode({"extent_type": tag, **invalid}),

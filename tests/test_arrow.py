@@ -332,7 +332,7 @@ def test_arrow_annotation_dataframe_roundtrip():
     adf_pl = to_dataframe(ann, backend="polars")
     df_pl = adf_pl.df
     assert isinstance(df_pl, pl.DataFrame)
-    assert df_pl["extent:time:time"].dtype == pl.Float64
+    assert df_pl["extent:time:time"].dtype == pl.Float32
     assert df_pl["payload:tag:value"].dtype == pl.String
 
     recovered_pl = from_dataframe(df_pl, header=adf_pl.header)

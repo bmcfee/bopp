@@ -25,7 +25,7 @@ class SphericalTimeExtent(
     """Spatiotemporal point coordinates in spherical space with timestamps."""
 
     time: Annotated[
-        ArrowArray[Literal["float64"], float],
+        ArrowArray[Literal["float32"], float],
         Meta(description="Array of point timestamps in seconds."),
     ]
     azimuth: Annotated[
