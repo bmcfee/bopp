@@ -46,6 +46,9 @@ coverage.xml
 tmp/
 benchmark.json
 .benchmarks/
+tests/bench/*.bopp.csv
+tests/bench/*.bopp.msgpack
+tests/bench/*.jams
 
 # Miscellaneous
 pip-log.txt # Installer logs
