@@ -8,31 +8,78 @@ import pytest
 import bopp.io
 from bopp.util import _get_tag
 
-PREFIXES = ["longbeats", "drive"]
+PREFIXES = [
+    "longbeats",
+    "drive",
+    "uniform_pitch",
+    "explicit_pitch",
+    "hierarchical",
+    "lyrics",
+]
 
 
 def _bopp_to_jams(ann) -> jams.JAMS:
     """Convert a BOPP Annotation to a JAMS object for benchmarking."""
     jam = jams.JAMS()
-    namespace = _get_tag(ann.payload)
-    jann = jams.Annotation(namespace=namespace)
+    payload_tag = _get_tag(ann.payload)
+    extent_tag = _get_tag(ann.extent) if ann.extent is not None else None
 
-    times = getattr(ann.extent, "time", None)
-    durations = getattr(ann.extent, "duration", None)
-    values = getattr(ann.payload, "value", None)
+    # Determine JAMS namespace and values
+    has_groupings = bool(getattr(ann, "groupings", None))
+    if payload_tag == "frequency_hz":
+        namespace = "pitch_hz"
+        values = ann.payload.value
+    elif payload_tag == "tag" and has_groupings:
+        namespace = "multi_segment"
+        level_ids = ann.groupings[0].ids
+        values = [
+            {"label": v, "level": int(lvl)}
+            for v, lvl in zip(ann.payload.value, level_ids)
+        ]
+    elif payload_tag == "beat":
+        namespace = "beat"
+        values = ann.payload.value
+    elif payload_tag == "chord":
+        namespace = "chord"
+        values = ann.payload.value
+    elif payload_tag == "lyrics":
+        namespace = "lyrics"
+        values = ann.payload.value
+    else:
+        namespace = payload_tag
+        values = getattr(ann.payload, "value", None)
+
+    jann = jams.Annotation(namespace=namespace)
+    n = len(values) if values is not None else 0
+
+    if extent_tag == "time_uniform":
+        times = [
+            float(ann.extent.start_time + i * ann.extent.sampling_period)
+            for i in range(n)
+        ]
+        durations = [0.0] * n
+    elif extent_tag == "time":
+        times = [float(t) for t in ann.extent.time]
+        durations = [0.0] * n
+    elif extent_tag == "time_interval":
+        times = [float(t) for t in ann.extent.time]
+        durations = [float(d) for d in ann.extent.duration]
+    else:
+        times = [0.0] * n
+        durations = [0.0] * n
+
     confidences = (
         getattr(ann.confidence, "confidence", None)
-        if ann.confidence is not None
+        if getattr(ann, "confidence", None) is not None
         else None
     )
 
-    n = len(values) if values is not None else (len(times) if times is not None else 0)
     max_t = 0.0
     for i in range(n):
-        t = float(times[i]) if times is not None else 0.0
-        d = float(durations[i]) if durations is not None else 0.0
+        t = times[i]
+        d = durations[i]
         max_t = max(max_t, t + d)
-        v = values[i] if values is not None else None
+        v = values[i]
         c = (
             float(confidences[i])
             if confidences is not None
@@ -40,7 +87,7 @@ def _bopp_to_jams(ann) -> jams.JAMS:
         )
         jann.append(time=t, duration=d, value=v, confidence=c)
 
-    jam.file_metadata.duration = max_t
+    jam.file_metadata.duration = max(max_t, 1.0)
     jam.annotations.append(jann)
     return jam
 
@@ -89,9 +136,23 @@ LOADERS = {
     ),
 }
 
+LOADER_FILES = {
+    "jams_val": lambda p: Path(f"tests/bench/{p}.jams"),
+    "jams_no_val": lambda p: Path(f"tests/bench/{p}.jams"),
+    "pd_csv": lambda p: Path(f"tests/bench/{p}.bopp.csv"),
+    "pl_csv": lambda p: Path(f"tests/bench/{p}.bopp.csv"),
+    "bopp_csv": lambda p: Path(f"tests/bench/{p}.bopp.csv"),
+    "bopp_json": lambda p: Path(f"tests/bench/{p}.bopp"),
+    "bopp_msgpack": lambda p: Path(f"tests/bench/{p}.bopp.msgpack"),
+}
+
 
 @pytest.mark.parametrize("prefix", PREFIXES)
 @pytest.mark.parametrize("loader_name", LOADERS.keys())
 def test_io_throughput(benchmark, prefix, loader_name):
+    # Record file size in benchmark.extra_info
+    file_path = LOADER_FILES[loader_name](prefix)
+    benchmark.extra_info["file_size"] = file_path.stat().st_size
+
     # Benchmark runs the target function dynamically scaled
     benchmark(LOADERS[loader_name], prefix)
