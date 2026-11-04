@@ -680,7 +680,8 @@ def trim(
         tu_period = float(getattr(extent, "sampling_period", 0.0))
 
         payload_cols = _get_facet_list_fields(payload)
-        n_obs = len(next(iter(payload_cols.values()))) if payload_cols else 0
+        confidence_cols = _get_facet_list_fields(confidence)
+        n_obs = len(next(iter((payload_cols or confidence_cols).values()), []))
 
         tu_shift = float(new_start) if (reset and new_start is not None) else 0.0
         tu_kept_indices: list[int] = []
@@ -1129,11 +1130,8 @@ def filter_by(
         for g in groupings:
             groupings_cols[g.name] = g.ids
 
-    n_obs = (
-        len(next(iter(payload_cols.values())))
-        if payload_cols
-        else (len(next(iter(extent_cols.values()))) if extent_cols else 0)
-    )
+    source_cols = payload_cols or extent_cols or confidence_cols or groupings_cols
+    n_obs = len(next(iter(source_cols.values()), []))
 
     if n_obs == 0:
         return _rebuild_annotation(
@@ -1471,8 +1469,10 @@ def to_times(
         first_extent_col = next(iter(_get_facet_list_fields(extent).values()), [])
         n_source_obs = len(first_extent_col)
     else:
-        first_payload_col = next(iter(payload_cols.values()), [])
-        n_source_obs = len(first_payload_col)
+        source_cols = payload_cols or confidence_cols
+        n_source_obs = len(next(iter(source_cols.values()), []))
+        if not source_cols and groupings not in (None, msgspec.UNSET):
+            n_source_obs = len(groupings[0].ids) if groupings else 0
 
     # Setup fill_value map
     payload_fill_map: dict[str, Any] = {}
@@ -1781,6 +1781,11 @@ def sort(
 
     payload_cols = _get_facet_list_fields(payload)
     extent_cols = _get_facet_list_fields(extent)
+    if extent not in (None, msgspec.UNSET) and _get_tag(extent) in FRACTION_EXTENT_TAGS:
+        extent_cols = {
+            name: [_to_coord(value) for value in values]
+            for name, values in extent_cols.items()
+        }
     confidence_cols = _get_facet_list_fields(confidence)
 
     groupings_list: list[Any] = []
@@ -1790,7 +1795,8 @@ def sort(
         for g in groupings_list:
             groupings_cols[g.name] = g.ids
 
-    n_obs = len(next(iter(payload_cols.values()))) if payload_cols else 0
+    source_cols = payload_cols or extent_cols or confidence_cols or groupings_cols
+    n_obs = len(next(iter(source_cols.values()), []))
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Sorting")
     derived_metadata = DerivedAnnotationMetadata(
@@ -2429,10 +2435,29 @@ def union(
 
     first_payload_struct = cast(msgspec.Struct, first_payload)
     p_updates: dict[str, list[Any]] = {}
-    for fname in _get_facet_list_fields(first_payload_struct):
+    payload_fields = _get_facet_list_fields(first_payload_struct)
+    for idx, a in enumerate(anns[1:], start=1):
+        incoming_fields = _get_facet_list_fields(a.payload)
+        if incoming_fields.keys() != payload_fields.keys():
+            raise BoppArgumentError(
+                f"Payload column mismatch at index {idx}: optional columns must have matching presence."
+            )
+    for fname in payload_fields:
         p_updates[fname] = [
-            x for a in anns for x in getattr(getattr(a, "payload", None), fname)
+            x for a in anns for x in getattr(a.payload, fname)
         ]
+    for a in anns[1:]:
+        for fname in first_payload_struct.__struct_fields__:
+            original = getattr(first_payload_struct, fname)
+            incoming = getattr(a.payload, fname)
+            if (
+                not isinstance(original, list)
+                and not isinstance(incoming, list)
+                and original != incoming
+            ):
+                raise BoppArgumentError(
+                    f"Scalar payload field '{fname}' must match across union operands."
+                )
     new_payload: msgspec.Struct = msgspec.structs.replace(
         first_payload_struct, **p_updates
     )
@@ -2441,10 +2466,29 @@ def union(
     if first_c_tag is not None:
         first_conf_struct = cast(msgspec.Struct, first_conf)
         c_updates: dict[str, list[Any]] = {}
-        for fname in _get_facet_list_fields(first_conf_struct):
+        confidence_fields = _get_facet_list_fields(first_conf_struct)
+        for idx, a in enumerate(anns[1:], start=1):
+            incoming_fields = _get_facet_list_fields(a.confidence)
+            if incoming_fields.keys() != confidence_fields.keys():
+                raise BoppArgumentError(
+                    f"Confidence column mismatch at index {idx}: optional columns must have matching presence."
+                )
+        for fname in confidence_fields:
             c_updates[fname] = [
-                x for a in anns for x in getattr(getattr(a, "confidence", None), fname)
+                x for a in anns for x in getattr(a.confidence, fname)
             ]
+        for a in anns[1:]:
+            for fname in first_conf_struct.__struct_fields__:
+                original = getattr(first_conf_struct, fname)
+                incoming = getattr(a.confidence, fname)
+                if (
+                    not isinstance(original, list)
+                    and not isinstance(incoming, list)
+                    and original != incoming
+                ):
+                    raise BoppArgumentError(
+                        f"Scalar confidence field '{fname}' must match across union operands."
+                    )
         new_confidence = msgspec.structs.replace(first_conf_struct, **c_updates)
 
     new_extent: msgspec.Struct | msgspec.UnsetType = msgspec.UNSET
@@ -2500,9 +2544,8 @@ def union(
         total_obs = len(next(iter(p_updates.values()), []))
         final_groupings = []
         for g in merged_groupings:
-            g_disj = is_disjoint(
-                new_extent if new_extent is not msgspec.UNSET else None,
-                grouping=g,
+            g_disj = new_extent is not msgspec.UNSET and is_disjoint(
+                new_extent, grouping=g
             )
             g_exh = is_exhaustive(
                 new_extent if new_extent is not msgspec.UNSET else None,
@@ -2671,11 +2714,13 @@ def to_uniform_times(
     payload_cols = _get_facet_list_fields(payload)
     confidence_cols = _get_facet_list_fields(confidence)
 
-    n_source_obs = (
-        len(next(iter(_get_facet_list_fields(extent).values()), []))
-        if extent_tag != "time_uniform"
-        else len(next(iter(payload_cols.values()), []))
-    )
+    if extent_tag != "time_uniform":
+        n_source_obs = len(next(iter(_get_facet_list_fields(extent).values()), []))
+    else:
+        source_cols = payload_cols or confidence_cols
+        n_source_obs = len(next(iter(source_cols.values()), []))
+        if not source_cols and groupings not in (None, msgspec.UNSET):
+            n_source_obs = len(groupings[0].ids) if groupings else 0
 
     if n_source_obs == 0 and (start_time is None or end_time is None):
         raise BoppArgumentError(
@@ -2769,9 +2814,9 @@ def to_uniform_times(
             if not covers:
                 matched_indices.append(None)
             elif overlap == "first":
-                matched_indices.append(covers[0])
+                matched_indices.append(min(covers, key=lambda i: t_starts[i]))
             else:  # overlap == "latest"
-                matched_indices.append(covers[-1])
+                matched_indices.append(max(covers, key=lambda i: t_starts[i]))
     else:
         if extent_tag == "time_uniform":
             st_val = float(extent.start_time)  # type: ignore[union-attr]
@@ -2785,7 +2830,9 @@ def to_uniform_times(
                 if not prev_candidates:
                     matched_indices.append(None)
                 else:
-                    matched_indices.append(prev_candidates[-1])
+                    matched_indices.append(
+                        max(prev_candidates, key=lambda i: src_times[i])
+                    )
             else:  # method == "nearest"
                 best_idx = min(
                     range(len(src_times)), key=lambda i: abs(src_times[i] - t)
@@ -2946,11 +2993,13 @@ def to_pixels(
     payload_cols = _get_facet_list_fields(payload)
     confidence_cols = _get_facet_list_fields(confidence)
 
-    n_source_obs = (
-        len(extent.x)  # type: ignore[union-attr]
-        if extent_tag in ("pixel_box", "pixel")
-        else len(next(iter(payload_cols.values()), []))
-    )
+    if extent_tag in ("pixel_box", "pixel"):
+        n_source_obs = len(extent.x)  # type: ignore[union-attr]
+    else:
+        source_cols = payload_cols or confidence_cols
+        n_source_obs = len(next(iter(source_cols.values()), []))
+        if not source_cols and groupings not in (None, msgspec.UNSET):
+            n_source_obs = len(groupings[0].ids) if groupings else 0
 
     payload_fill_map: dict[str, Any] = {}
     confidence_fill_map: dict[str, Any] = {}
