@@ -16,9 +16,14 @@ from ._version import (
     get_registry_version,
 )
 from .core import (
+    append,
     compute_annotation_id,
     create,
+    create_grouping,
+    create_metadata,
+    create_sandbox,
     ensure_annotation_id,
+    extend,
     validate,
     validate_annotation_id,
 )
@@ -32,6 +37,15 @@ from .exceptions import (
     BoppValidationError,
 )
 from .extensions import resolve_extensions
+from .registries import (
+    get_annotation_class,
+    get_confidence_class,
+    get_extent_class,
+    get_grouping_class,
+    get_metadata_class,
+    get_payload_class,
+    get_registry,
+)
 from .transforms import (
     filter_by,
     shift,
@@ -62,15 +76,27 @@ __all__ = [
     "BoppRegistryError",
     "BoppValidationError",
     "__version__",
+    "append",
     "compute_annotation_id",
     "create",
+    "create_grouping",
+    "create_metadata",
+    "create_sandbox",
     "ensure_annotation_id",
     "evaluate",
     "evaluation",
+    "extend",
     "extensions",
     "filter_by",
+    "get_annotation_class",
+    "get_confidence_class",
     "get_current_schema_version",
     "get_extent_bounds",
+    "get_extent_class",
+    "get_grouping_class",
+    "get_metadata_class",
+    "get_payload_class",
+    "get_registry",
     "get_registry_version",
     "infer_extent_bounds",
     "io",

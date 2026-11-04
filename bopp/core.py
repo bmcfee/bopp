@@ -1,26 +1,51 @@
 from __future__ import annotations
 
+import copy
 import uuid
-from typing import Any, TypeVar, cast
+import warnings
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import msgspec
 
-from ._version import get_current_schema_version
+from ._version import __version__, get_current_schema_version
 from .exceptions import (
     BoppArgumentError,
+    BoppArrayError,
     BoppRegistryError,
     BoppValidationError,
 )
 from .extensions import resolve_extensions
-from .registries import get_registry
+from .registries import (
+    get_grouping_class,
+    get_metadata_class,
+    get_registry,
+)
+from .util import (
+    EXTENT_AXES_METADATA,
+    FRACTION_EXTENT_TAGS,
+    _column_item_type,
+    _derive_parents_and_sandbox,
+    _get_facet_list_fields,
+    _get_tag,
+    _to_coord,
+)
+
+if TYPE_CHECKING:
+    from .base import BoppBase
 
 BOPP_NAMESPACE = uuid.UUID("a9b3e1c0-42f8-4e89-8d62-b9123456789a")
 
 __all__ = [
     "BOPP_NAMESPACE",
+    "append",
     "compute_annotation_id",
     "create",
+    "create_grouping",
+    "create_metadata",
+    "create_sandbox",
     "ensure_annotation_id",
+    "extend",
     "resolve_extensions",
     "validate",
     "validate_annotation_id",
@@ -134,6 +159,209 @@ def _extract_kwargs(
     return {k: kwargs.pop(k) for k in list(kwargs.keys()) if k in valid_keys}
 
 
+def create_metadata(
+    metadata_type: str | dict[str, Any],
+    *,
+    bopp_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """
+    Create an AnnotationMetadata Struct instance via registry lookup.
+
+    Parameters
+    ----------
+    metadata_type : str or dict of str to Any
+        The metadata discriminator tag (e.g. 'human', 'algorithm', 'derived', 'crowd', 'sensor', 'other')
+        or a dictionary containing metadata fields.
+    bopp_version : str or None, optional
+        Schema version string to select the registry. Defaults to current version.
+    **kwargs : Any
+        Keyword arguments matching the fields of the target metadata Struct.
+
+    Returns
+    -------
+    msgspec.Struct
+        An instantiated metadata struct.
+
+    Raises
+    ------
+    BoppRegistryError
+        If metadata_type is unrecognized.
+    BoppArgumentError
+        If metadata arguments are missing, invalid, or contradictory.
+    """
+    if isinstance(metadata_type, dict):
+        meta_dict = dict(metadata_type)
+        meta_dict.update(kwargs)
+        tag = meta_dict.pop("metadata_type", None)
+        if tag is None:
+            raise BoppArgumentError(
+                "Metadata dictionary must contain 'metadata_type' key."
+            )
+        cls = get_metadata_class(tag, version=bopp_version)
+        try:
+            return msgspec.convert(meta_dict, cls)
+        except (msgspec.ValidationError, TypeError) as err:
+            raise BoppValidationError(
+                f"Validation failed for metadata '{tag}': {err}"
+            ) from err
+
+    cls = get_metadata_class(metadata_type, version=bopp_version)
+    try:
+        return cls(**kwargs)
+    except TypeError as err:
+        raise BoppArgumentError(
+            f"Failed to instantiate metadata '{metadata_type}': {err}"
+        ) from err
+
+
+def create_grouping(
+    name: str,
+    ids: Sequence[int] | Sequence[str] | None = None,
+    *,
+    labels: dict[str, int] | Sequence[str] | None = None,
+    disjoint: bool = False,
+    exhaustive: bool = False,
+    bopp_version: str | None = None,
+) -> Any:
+    """
+    Create a Grouping Struct instance without importing from schema-versioned modules.
+
+    Supports integer IDs with optional dictionary label mapping, string category
+    labels (auto-enumerating unique IDs), or a sequence of labels passed via
+    the ``labels`` parameter.
+
+    Parameters
+    ----------
+    name : str
+        Name of the grouping layer.
+    ids : Sequence of int, Sequence of str, or None, optional
+        Parallel array of group IDs or string category labels.
+    labels : dict of str to int, Sequence of str, or None, optional
+        Mapping from string labels to integer group IDs, or a sequence of string
+        labels corresponding to each observation.
+    disjoint : bool, default False
+        Indicates whether observations within each group are non-overlapping.
+    exhaustive : bool, default False
+        Indicates whether observations within each group cover the extent without gaps.
+    bopp_version : str or None, optional
+        Schema version string to select the underlying Grouping class.
+
+    Returns
+    -------
+    msgspec.Struct
+        An instantiated Grouping struct.
+
+    Raises
+    ------
+    BoppArgumentError
+        If inputs are contradictory or invalid.
+    BoppValidationError
+        If Grouping validation fails.
+    """
+    Grouping_cls = get_grouping_class(version=bopp_version)
+
+    # Case: labels is a sequence of strings and ids is None
+    if (
+        ids is None
+        and isinstance(labels, Sequence)
+        and not isinstance(labels, (dict, str, bytes))
+    ):
+        ids = labels
+        labels = None
+
+    int_ids: list[int]
+    labels_val: dict[str, int] | msgspec.UnsetType
+
+    if ids is not None and len(ids) > 0 and all(isinstance(x, str) for x in ids):
+        # String categorical labels in ids
+        if isinstance(labels, dict):
+            int_ids = []
+            for s in ids:
+                if s not in labels:
+                    raise BoppArgumentError(
+                        f"Label '{s}' in ids was not found in the provided labels mapping."
+                    )
+                int_ids.append(labels[s])
+            labels_val = labels
+        else:
+            # Auto-assign IDs 0, 1, 2... in order of appearance
+            unique_map: dict[str, int] = {}
+            int_ids = []
+            for s in ids:
+                if s not in unique_map:
+                    unique_map[s] = len(unique_map)
+                int_ids.append(unique_map[s])
+            labels_val = unique_map
+    elif ids is not None:
+        try:
+            int_ids = [int(x) for x in ids]
+        except (ValueError, TypeError) as err:
+            raise BoppArgumentError(
+                f"Grouping ids must be integers or strings: {err}"
+            ) from err
+        labels_val = labels if isinstance(labels, dict) else msgspec.UNSET
+    else:
+        int_ids = []
+        labels_val = labels if isinstance(labels, dict) else msgspec.UNSET
+
+    try:
+        return Grouping_cls(
+            name=name,
+            ids=int_ids,
+            disjoint=disjoint,
+            exhaustive=exhaustive,
+            labels=labels_val,
+        )
+    except (msgspec.ValidationError, TypeError) as err:
+        raise BoppValidationError(f"Failed to create Grouping '{name}': {err}") from err
+
+
+def create_sandbox(
+    data: dict[str, Any] | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """
+    Create and validate a sandbox dictionary for unstructured user-defined data.
+
+    Parameters
+    ----------
+    data : dict of str to Any or None, optional
+        Initial dictionary of sandbox key-value pairs.
+    **kwargs : Any
+        Additional key-value pairs to store in the sandbox.
+
+    Returns
+    -------
+    dict of str to Any
+        Validated sandbox dictionary.
+
+    Raises
+    ------
+    BoppArgumentError
+        If data is not a dictionary.
+    BoppValidationError
+        If values cannot be encoded to JSON.
+    """
+    sandbox_dict: dict[str, Any] = {}
+    if data is not None:
+        if not isinstance(data, dict):
+            raise BoppArgumentError(
+                f"sandbox data must be a dictionary, got {type(data).__name__}."
+            )
+        sandbox_dict.update(data)
+    sandbox_dict.update(kwargs)
+
+    try:
+        msgspec.json.encode(sandbox_dict)
+    except (msgspec.EncodeError, TypeError) as err:
+        raise BoppValidationError(
+            f"Sandbox data cannot be serialized to JSON: {err}"
+        ) from err
+
+    return sandbox_dict
+
+
 def create(
     *,
     media_id: str,
@@ -143,9 +371,11 @@ def create(
     metadata_type: str | None = None,
     metadata: Any = msgspec.UNSET,
     groupings: list[Any] | Any = msgspec.UNSET,
+    grouping: Any = None,
     parents: list[str] | Any = msgspec.UNSET,
     bopp_version: str | None = None,
     sandbox: Any = msgspec.UNSET,
+    empty: bool = False,
     generate_id: bool = True,
     resolve_ext: bool = True,
     **kwargs: Any,
@@ -165,12 +395,13 @@ def create(
         Type identifier registered for the confidence struct, if applicable.
     metadata_type : str or None, optional
         Type identifier registered for the metadata struct, if applicable.
-        Mutually exclusive with `metadata`.
     metadata : msgspec.Struct or dict, optional
         Explicit metadata struct instance or dictionary representation.
-        Mutually exclusive with `metadata_type`.
-    groupings : list of Grouping or list of dict, optional
-        List of Grouping struct instances or dictionary representations.
+    groupings : list of Grouping, list of dict, Grouping, or dict, optional
+        One or more Grouping struct instances or dictionary representations.
+    grouping : Grouping or dict, optional
+        Convenience alias for specifying a single grouping layer. Mutually exclusive
+        with `groupings`.
     parents : list of str, optional
         List of parent annotation UUIDs from which this annotation was derived.
     bopp_version : str or None, optional
@@ -178,6 +409,9 @@ def create(
         If None, defaults to the current default schema version.
     sandbox : Any, optional
         Unstructured storage area for arbitrary user-defined data.
+    empty : bool, default False
+        If True, unprovided columnar array fields on payload, extent, and confidence
+        facets are automatically initialized to empty lists (`[]`).
     generate_id : bool, default True
         If True, computes and assigns deterministic UUIDv5 `id` to the annotation.
     resolve_ext : bool, default True
@@ -197,14 +431,19 @@ def create(
         If an unrecognized `payload_type`, `extent_type`, `confidence_type`, or
         `metadata_type` is provided.
     BoppArgumentError
-        If unused keyword arguments remain or both `metadata` and `metadata_type`
-        are specified.
+        If unused keyword arguments remain, conflicting parameters are passed, or
+        required fields are missing.
     """
     if bopp_version is None:
         bopp_version = get_current_schema_version()
 
-    if metadata_type is not None and metadata is not msgspec.UNSET:
-        raise BoppArgumentError("Cannot specify both 'metadata' and 'metadata_type'.")
+    if grouping is not None:
+        if groupings is not msgspec.UNSET and groupings is not None:
+            raise BoppArgumentError("Cannot specify both 'grouping' and 'groupings'.")
+        groupings = [grouping]
+    elif groupings is not msgspec.UNSET and groupings is not None:
+        if isinstance(groupings, (dict, msgspec.Struct)):
+            groupings = [groupings]
 
     registry = get_registry(bopp_version)
 
@@ -221,6 +460,10 @@ def create(
         raise BoppRegistryError(f"Unrecognized payload type: {e}") from e
 
     payload_args = _extract_kwargs(payload_cls, kwargs)
+    if empty:
+        for f in msgspec.structs.fields(payload_cls):
+            if f.name not in payload_args and _column_item_type(f.type) is not None:
+                payload_args[f.name] = []
     payload_obj = payload_cls(**payload_args)
 
     # Extract kwargs by mutating the dictionary
@@ -234,6 +477,10 @@ def create(
         extent_args = _extract_kwargs(extent_cls, kwargs)
         extent_args.setdefault("disjoint", extent_type == "time_uniform")
         extent_args.setdefault("exhaustive", False)
+        if empty and extent_type != "time_uniform":
+            for f in msgspec.structs.fields(extent_cls):
+                if f.name not in extent_args and _column_item_type(f.type) is not None:
+                    extent_args[f.name] = []
         extent_obj = extent_cls(**extent_args)
 
     confidence_obj = msgspec.UNSET
@@ -244,6 +491,13 @@ def create(
             raise BoppRegistryError(f"Unrecognized confidence type: {e}") from e
 
         confidence_args = _extract_kwargs(confidence_cls, kwargs)
+        if empty:
+            for f in msgspec.structs.fields(confidence_cls):
+                if (
+                    f.name not in confidence_args
+                    and _column_item_type(f.type) is not None
+                ):
+                    confidence_args[f.name] = []
         confidence_obj = confidence_cls(**confidence_args)
 
     metadata_obj = metadata
@@ -253,13 +507,31 @@ def create(
         except KeyError as e:
             raise BoppRegistryError(f"Unrecognized metadata type: {e}") from e
 
-        metadata_args = _extract_kwargs(metadata_cls, kwargs)
-        metadata_obj = metadata_cls(**metadata_args)
+        if metadata is not msgspec.UNSET and metadata is not None:
+            if isinstance(metadata, dict):
+                meta_dict = dict(metadata)
+                meta_tag = meta_dict.pop("metadata_type", None)
+                if meta_tag is not None and meta_tag != metadata_type:
+                    raise BoppArgumentError(
+                        f"Conflicting metadata_type: '{metadata_type}' vs dict '{meta_tag}'."
+                    )
+                metadata_args = _extract_kwargs(metadata_cls, kwargs)
+                meta_dict.update(metadata_args)
+                try:
+                    metadata_obj = metadata_cls(**meta_dict)
+                except TypeError as err:
+                    raise BoppArgumentError(
+                        f"Failed to instantiate metadata '{metadata_type}': {err}"
+                    ) from err
+            else:
+                raise BoppArgumentError(
+                    "Cannot specify both 'metadata' and 'metadata_type'."
+                )
+        else:
+            metadata_args = _extract_kwargs(metadata_cls, kwargs)
+            metadata_obj = metadata_cls(**metadata_args)
     elif isinstance(metadata, dict):
-        meta_type = metadata.get("metadata_type")
-        if meta_type not in METADATA_TYPE_REGISTRY:
-            raise BoppRegistryError(f"Unrecognized metadata type: {meta_type!r}")
-        metadata_obj = msgspec.convert(metadata, METADATA_TYPE_REGISTRY[meta_type])
+        metadata_obj = create_metadata(metadata, bopp_version=bopp_version)
 
     groupings_obj = groupings
     if (
@@ -270,13 +542,17 @@ def create(
         groupings_list = []
         for g in groupings:
             if isinstance(g, dict):
-                g_copy = dict(g)
-                g_copy.setdefault("disjoint", False)
-                g_copy.setdefault("exhaustive", False)
-                groupings_list.append(msgspec.convert(g_copy, Grouping))
+                groupings_list.append(create_grouping(**g, bopp_version=bopp_version))
             else:
                 groupings_list.append(g)
         groupings_obj = groupings_list
+
+    if (
+        sandbox is not msgspec.UNSET
+        and sandbox is not None
+        and isinstance(sandbox, dict)
+    ):
+        sandbox = create_sandbox(sandbox)
 
     # Any remaining kwargs indicate a user typo or a schema mismatch
     if kwargs:
@@ -301,6 +577,555 @@ def create(
         ensure_annotation_id(ann)
 
     return ann
+
+
+def _get_annotation_columns(
+    annotation: Any,
+) -> tuple[
+    dict[str, list[Any]],
+    dict[str, list[Any]],
+    dict[str, list[Any]],
+    list[Any],
+]:
+    payload = getattr(annotation, "payload", None)
+    payload_cols = _get_facet_list_fields(payload)
+
+    extent = getattr(annotation, "extent", None)
+    extent_tag = _get_tag(extent) if extent is not None else None
+    if extent_tag == "time_uniform":
+        extent_cols = {}
+    else:
+        extent_cols = _get_facet_list_fields(extent)
+
+    confidence = getattr(annotation, "confidence", None)
+    confidence_cols = _get_facet_list_fields(confidence)
+
+    raw_groupings = getattr(annotation, "groupings", None)
+    groupings_list = (
+        [] if raw_groupings in (None, msgspec.UNSET) else list(raw_groupings)
+    )
+
+    return payload_cols, extent_cols, confidence_cols, groupings_list
+
+
+def append(
+    annotation: BoppBase,
+    observation: dict[str, Any] | None = None,
+    *,
+    inplace: bool = False,
+    groupings: dict[str, Any] | Sequence[Any] | None = None,
+    update_bounds: bool = False,
+    derive: bool = True,
+    **kwargs: Any,
+) -> BoppBase:
+    """
+    Append a single observation to an existing Annotation.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        The Annotation struct instance to append to.
+    observation : dict of str to Any or None, optional
+        Key-value mapping of observation values for payload, extent, and confidence facets.
+    inplace : bool, default False
+        If True, mutates the annotation's columnar lists in place and voids `annotation.id`
+        (setting it to UNSET). Preserves original metadata and parents.
+        If False, returns a new derived annotation with updated parents, derived metadata,
+        and a recomputed UUIDv5 id.
+    groupings : dict or sequence, optional
+        Group assignments for each grouping layer in the annotation.
+        Can be a dict mapping `{layer_name: group_id_or_label}` or a sequence of IDs
+        matching the order of `annotation.groupings`.
+    update_bounds : bool, default False
+        If True, updates explicit min/max bounds on the extent if the new observation
+        falls outside them. If False and bounds are exceeded, emits a UserWarning.
+    derive : bool, default True
+        Used when inplace=False. If True, sets metadata to DerivedAnnotationMetadata;
+        if False, preserves a copy of the parent metadata.
+    **kwargs : Any
+        Observation fields passed as keyword arguments. Grouping layer names can also
+        be passed directly as kwargs if they do not collide with facet column names.
+
+    Returns
+    -------
+    BoppBase
+        The mutated annotation (if inplace=True) or a new derived annotation (if inplace=False).
+
+    Raises
+    ------
+    BoppArgumentError
+        If required facet fields are missing, unconsumed fields are passed, or grouping
+        values cannot be resolved.
+    """
+    (
+        payload_cols,
+        extent_cols,
+        confidence_cols,
+        groupings_list,
+    ) = _get_annotation_columns(annotation)
+
+    all_cols = (
+        list(payload_cols.values())
+        + list(extent_cols.values())
+        + list(confidence_cols.values())
+        + [g.ids for g in groupings_list if getattr(g, "ids", None) is not None]
+    )
+    n_obs = len(all_cols[0]) if all_cols else 0
+
+    obs = dict(observation) if observation is not None else {}
+    obs.update(kwargs)
+
+    group_assignments: dict[str, Any] = {}
+    if groupings is not None:
+        if isinstance(groupings, dict):
+            group_assignments.update(groupings)
+        elif isinstance(groupings, Sequence) and not isinstance(
+            groupings, (str, bytes)
+        ):
+            if len(groupings) != len(groupings_list):
+                raise BoppArgumentError(
+                    f"Expected {len(groupings_list)} grouping values, got {len(groupings)}."
+                )
+            for idx, g in enumerate(groupings_list):
+                group_assignments[g.name] = groupings[idx]
+        else:
+            raise BoppArgumentError(
+                "groupings must be a dictionary or sequence of group assignments."
+            )
+
+    for g in groupings_list:
+        if g.name in obs and g.name not in group_assignments:
+            group_assignments[g.name] = obs.pop(g.name)
+
+    # Check required facet fields
+    missing: list[str] = []
+    for fname in payload_cols:
+        if fname not in obs:
+            missing.append(f"payload:{fname}")
+    for fname in extent_cols:
+        if fname not in obs:
+            missing.append(f"extent:{fname}")
+    for fname in confidence_cols:
+        if fname not in obs:
+            missing.append(f"confidence:{fname}")
+    for g in groupings_list:
+        if g.name not in group_assignments:
+            missing.append(f"grouping:{g.name}")
+
+    if missing:
+        raise BoppArgumentError(f"Missing required field(s) for append: {missing}")
+
+    valid_keys = (
+        set(payload_cols.keys()) | set(extent_cols.keys()) | set(confidence_cols.keys())
+    )
+    extra = set(obs.keys()) - valid_keys
+    if extra:
+        raise BoppArgumentError(f"Unconsumed argument(s) for append: {sorted(extra)}")
+
+    # Resolve grouping values to IDs
+    resolved_gids: list[tuple[Any, int]] = []
+    for g in groupings_list:
+        val = group_assignments[g.name]
+        labels = getattr(g, "labels", msgspec.UNSET)
+        if isinstance(val, str):
+            if labels not in (None, msgspec.UNSET) and isinstance(labels, dict):
+                if val in labels:
+                    gid = labels[val]
+                else:
+                    gid = max(labels.values(), default=-1) + 1
+                    labels[val] = gid
+            else:
+                g.labels = {val: 0}
+                gid = 0
+        else:
+            try:
+                gid = int(val)
+            except (ValueError, TypeError) as err:
+                raise BoppArgumentError(
+                    f"Grouping '{g.name}' group ID must be an integer: {err}"
+                ) from err
+        resolved_gids.append((g, gid))
+
+    # Cheap Sanity Checks
+    extent = getattr(annotation, "extent", None)
+    extent_tag = _get_tag(extent) if extent is not None else None
+    if (
+        extent is not None
+        and extent is not msgspec.UNSET
+        and extent_tag != "time_uniform"
+    ):
+        is_fraction = extent_tag in FRACTION_EXTENT_TAGS
+        specs = EXTENT_AXES_METADATA.get(extent_tag, [])
+        for spec in specs:
+            dim = spec["dim"]
+            min_attr = spec["min_attr"]
+            max_attr = spec["max_attr"]
+            kind = spec["kind"]
+            if kind == "point":
+                coord = _to_coord(obs[spec["field"]])
+                obs_min, obs_max = coord, coord
+            elif kind == "origin_span":
+                orig = _to_coord(obs[spec["origin"]])
+                span = _to_coord(obs[spec["span"]])
+                obs_min, obs_max = orig, orig + span
+            else:  # kind == "min_max"
+                obs_min = _to_coord(obs[spec["min_field"]])
+                obs_max = _to_coord(obs[spec["max_field"]])
+
+            curr_min = getattr(extent, min_attr, msgspec.UNSET)
+            if curr_min not in (None, msgspec.UNSET):
+                min_coord = _to_coord(curr_min)
+                if obs_min < min_coord:
+                    if update_bounds:
+                        new_val = (
+                            [obs_min.numerator, obs_min.denominator]
+                            if is_fraction
+                            else obs_min
+                        )
+                        setattr(extent, min_attr, new_val)
+                    else:
+                        warnings.warn(
+                            f"Appended observation on dimension '{dim}' ({obs_min}) is below explicit {min_attr} ({min_coord}).",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+
+            curr_max = getattr(extent, max_attr, msgspec.UNSET)
+            if curr_max not in (None, msgspec.UNSET):
+                max_coord = _to_coord(curr_max)
+                if obs_max > max_coord:
+                    if update_bounds:
+                        new_val = (
+                            [obs_max.numerator, obs_max.denominator]
+                            if is_fraction
+                            else obs_max
+                        )
+                        setattr(extent, max_attr, new_val)
+                    else:
+                        warnings.warn(
+                            f"Appended observation on dimension '{dim}' ({obs_max}) exceeds explicit {max_attr} ({max_coord}).",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+
+        # Disjoint check against preceding observation
+        if getattr(extent, "disjoint", False) is True and n_obs > 0:
+            if extent_tag == "time_interval":
+                prev_end = extent.time[-1] + extent.duration[-1]
+                if obs["time"] < prev_end:
+                    warnings.warn(
+                        f"Appended observation (time={obs['time']}) overlaps with preceding observation (end={prev_end}), violating disjoint=True.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+            elif extent_tag == "time":
+                if obs["time"] <= extent.time[-1]:
+                    warnings.warn(
+                        f"Appended observation (time={obs['time']}) is not strictly after preceding observation (time={extent.time[-1]}), violating disjoint=True.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+            elif extent_tag == "score_interval":
+                prev_end = _to_coord(extent.quarter[-1]) + _to_coord(
+                    extent.duration[-1]
+                )
+                cur_start = _to_coord(obs["quarter"])
+                if cur_start < prev_end:
+                    warnings.warn(
+                        f"Appended observation (quarter={cur_start}) overlaps with preceding observation (end={prev_end}), violating disjoint=True.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+            elif extent_tag == "score_quarter":
+                prev_start = _to_coord(extent.quarter[-1])
+                cur_start = _to_coord(obs["quarter"])
+                if cur_start <= prev_start:
+                    warnings.warn(
+                        f"Appended observation (quarter={cur_start}) is not strictly after preceding observation (quarter={prev_start}), violating disjoint=True.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+
+        # Exhaustiveness check
+        if getattr(extent, "exhaustive", False) is True and n_obs > 0:
+            if extent_tag == "time_interval":
+                prev_end = extent.time[-1] + extent.duration[-1]
+                if obs["time"] > prev_end:
+                    warnings.warn(
+                        f"Gap detected before appended observation (prev_end={prev_end}, cur_start={obs['time']}), violating exhaustive=True.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+            elif extent_tag == "score_interval":
+                prev_end = _to_coord(extent.quarter[-1]) + _to_coord(
+                    extent.duration[-1]
+                )
+                cur_start = _to_coord(obs["quarter"])
+                if cur_start > prev_end:
+                    warnings.warn(
+                        f"Gap detected before appended observation (prev_end={prev_end}, cur_start={cur_start}), violating exhaustive=True.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+
+    # Grouping layer disjoint check against preceding observation of same group
+    for g, gid in resolved_gids:
+        if (
+            getattr(g, "disjoint", False) is True
+            and extent is not None
+            and extent_tag == "time_interval"
+        ):
+            for idx in range(len(g.ids) - 1, -1, -1):
+                if g.ids[idx] == gid:
+                    prev_end = extent.time[idx] + extent.duration[idx]
+                    if obs["time"] < prev_end:
+                        warnings.warn(
+                            f"Appended observation in grouping '{g.name}' (group {gid}) overlaps with previous group member (end={prev_end}), violating disjoint=True.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                    break
+
+    if inplace:
+        for fname in payload_cols:
+            payload_cols[fname].append(obs[fname])
+        for fname in extent_cols:
+            extent_cols[fname].append(obs[fname])
+        for fname in confidence_cols:
+            confidence_cols[fname].append(obs[fname])
+        for g, gid in resolved_gids:
+            g.ids.append(gid)
+        annotation.id = msgspec.UNSET
+        return annotation
+
+    # Out-of-place derivation
+    new_ann = copy.deepcopy(annotation)
+    (
+        p_cols,
+        e_cols,
+        c_cols,
+        g_list,
+    ) = _get_annotation_columns(new_ann)
+    for fname in p_cols:
+        p_cols[fname].append(obs[fname])
+    for fname in e_cols:
+        e_cols[fname].append(obs[fname])
+    for fname in c_cols:
+        c_cols[fname].append(obs[fname])
+    for idx, (_, gid) in enumerate(resolved_gids):
+        g_list[idx].ids.append(gid)
+
+    new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Appending to")
+    new_ann.parents = new_parents
+    new_ann.sandbox = new_sandbox
+
+    if derive:
+        Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
+        new_ann.metadata = Derived_cls(
+            transform="append",
+            parameters={"observation_index": n_obs},
+            software=f"bopp=={__version__}",
+        )
+
+    new_ann.id = msgspec.UNSET
+    ensure_annotation_id(new_ann)
+    return new_ann
+
+
+def extend(
+    annotation: BoppBase,
+    observations: BoppBase | Sequence[dict[str, Any]] | dict[str, Sequence[Any]] | Any,
+    *,
+    inplace: bool = False,
+    update_bounds: bool = False,
+    derive: bool = True,
+) -> BoppBase:
+    """
+    Extend an Annotation with multiple observations.
+
+    Parameters
+    ----------
+    annotation : BoppBase
+        The Annotation struct instance to extend.
+    observations : BoppBase, sequence of dict, dict of sequences, or DataFrame
+        Observations to append. Can be:
+        1. Another compatible Annotation instance (matching media_id, version, facet types).
+        2. A sequence of observation dictionaries.
+        3. A dictionary of column lists.
+        4. A pandas or polars DataFrame with compatible column names.
+    inplace : bool, default False
+        If True, mutates arrays in place and voids `annotation.id`.
+        If False, returns a new derived Annotation with recomputed ID.
+    update_bounds : bool, default False
+        Whether to expand explicit extent bounds to encompass new observations.
+    derive : bool, default True
+        Whether to set metadata to DerivedAnnotationMetadata when inplace=False.
+
+    Returns
+    -------
+    BoppBase
+        The extended annotation (either mutated or newly derived).
+
+    Raises
+    ------
+    BoppArgumentError
+        If operands are incompatible or observation formats are invalid.
+    BoppArrayError
+        If columnar observation dictionaries contain mismatched lengths.
+    """
+    # 1. Compatibility check if observations is another Annotation
+    if isinstance(observations, msgspec.Struct) and hasattr(observations, "media_id"):
+        if observations.media_id != annotation.media_id:
+            raise BoppArgumentError(
+                f"media_id mismatch: '{observations.media_id}' != '{annotation.media_id}'."
+            )
+        if observations.bopp_version != annotation.bopp_version:
+            raise BoppArgumentError(
+                f"bopp_version mismatch: '{observations.bopp_version}' != '{annotation.bopp_version}'."
+            )
+
+        p1 = getattr(annotation, "payload", None)
+        p2 = getattr(observations, "payload", None)
+        if _get_tag(p1) != _get_tag(p2):
+            raise BoppArgumentError(
+                f"Payload type mismatch: '{_get_tag(p1)}' != '{_get_tag(p2)}'."
+            )
+
+        e1 = getattr(annotation, "extent", None)
+        e2 = getattr(observations, "extent", None)
+        t1 = _get_tag(e1) if e1 is not None else None
+        t2 = _get_tag(e2) if e2 is not None else None
+        if t1 != t2:
+            raise BoppArgumentError(f"Extent type mismatch: '{t1}' != '{t2}'.")
+
+        c1 = getattr(annotation, "confidence", None)
+        c2 = getattr(observations, "confidence", None)
+        ct1 = _get_tag(c1) if c1 is not None else None
+        ct2 = _get_tag(c2) if c2 is not None else None
+        if ct1 != ct2:
+            raise BoppArgumentError(f"Confidence type mismatch: '{ct1}' != '{ct2}'.")
+
+        g1_raw = getattr(annotation, "groupings", None)
+        g1 = [] if g1_raw in (None, msgspec.UNSET) else list(g1_raw)
+        g2_raw = getattr(observations, "groupings", None)
+        g2 = [] if g2_raw in (None, msgspec.UNSET) else list(g2_raw)
+        if len(g1) != len(g2):
+            raise BoppArgumentError(
+                f"Grouping layer count mismatch: {len(g1)} != {len(g2)}."
+            )
+        for idx in range(len(g1)):
+            if g1[idx].name != g2[idx].name:
+                raise BoppArgumentError(
+                    f"Grouping name mismatch at index {idx}: '{g1[idx].name}' != '{g2[idx].name}'."
+                )
+
+        target = annotation if inplace else copy.deepcopy(annotation)
+        (
+            p_cols_target,
+            e_cols_target,
+            c_cols_target,
+            g_target,
+        ) = _get_annotation_columns(target)
+        p_cols_src, e_cols_src, c_cols_src, g_src = _get_annotation_columns(
+            observations
+        )
+
+        for fname in p_cols_target:
+            p_cols_target[fname].extend(p_cols_src[fname])
+        for fname in e_cols_target:
+            e_cols_target[fname].extend(e_cols_src[fname])
+        for fname in c_cols_target:
+            c_cols_target[fname].extend(c_cols_src[fname])
+
+        for idx in range(len(g_target)):
+            gt = g_target[idx]
+            gs = g_src[idx]
+            lbls_t = getattr(gt, "labels", msgspec.UNSET)
+            lbls_s = getattr(gs, "labels", msgspec.UNSET)
+            if lbls_s not in (None, msgspec.UNSET) and isinstance(lbls_s, dict):
+                if lbls_t in (None, msgspec.UNSET):
+                    gt.labels = dict(lbls_s)
+                else:
+                    for k, v in lbls_s.items():
+                        if k in lbls_t and lbls_t[k] != v:
+                            raise BoppArgumentError(
+                                f"Conflicting label mapping for '{k}' in grouping '{gt.name}': {lbls_t[k]} vs {v}."
+                            )
+                        lbls_t[k] = v
+            gt.ids.extend(gs.ids)
+
+        if inplace:
+            annotation.id = msgspec.UNSET
+            return annotation
+
+        new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Extending")
+        if getattr(observations, "id", msgspec.UNSET) not in (None, msgspec.UNSET):
+            new_parents.append(observations.id)
+        target.parents = new_parents
+        target.sandbox = new_sandbox
+        if derive:
+            Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
+            src_len = len(next(iter(p_cols_src.values()), []))
+            target.metadata = Derived_cls(
+                transform="extend",
+                parameters={"count": src_len},
+                software=f"bopp=={__version__}",
+            )
+        target.id = msgspec.UNSET
+        ensure_annotation_id(target)
+        return target
+
+    # 2. DataFrame conversion
+    if hasattr(observations, "to_dict"):
+        try:
+            observations = observations.to_dict(orient="list")
+        except TypeError:
+            observations = observations.to_dict(as_series=False)
+
+    # 3. Columnar dictionary conversion
+    if isinstance(observations, dict):
+        lens = [
+            len(v)
+            for v in observations.values()
+            if isinstance(v, (list, tuple, Sequence))
+            and not isinstance(v, (str, bytes))
+        ]
+        if len(set(lens)) > 1:
+            raise BoppArrayError(
+                f"Mismatched array lengths in observations dict: {set(lens)}"
+            )
+        K = lens[0] if lens else 0
+        observations = [{k: observations[k][i] for k in observations} for i in range(K)]
+
+    # 4. Sequence of observation dicts
+    if isinstance(observations, Sequence) and not isinstance(
+        observations, (str, bytes)
+    ):
+        if inplace:
+            for obs_item in observations:
+                append(annotation, obs_item, inplace=True, update_bounds=update_bounds)
+            return annotation
+
+        target = copy.deepcopy(annotation)
+        for obs_item in observations:
+            append(target, obs_item, inplace=True, update_bounds=update_bounds)
+        new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Extending")
+        target.parents = new_parents
+        target.sandbox = new_sandbox
+        if derive:
+            Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
+            target.metadata = Derived_cls(
+                transform="extend",
+                parameters={"count": len(observations)},
+                software=f"bopp=={__version__}",
+            )
+        target.id = msgspec.UNSET
+        ensure_annotation_id(target)
+        return target
+
+    raise BoppArgumentError(
+        f"Unsupported observations type for extend: {type(observations).__name__}."
+    )
 
 
 T = TypeVar("T")

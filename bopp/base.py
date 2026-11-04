@@ -164,6 +164,54 @@ class BoppBase(msgspec.Struct):
 
         return bundle
 
+    def append(
+        self,
+        observation: dict[str, Any] | None = None,
+        *,
+        inplace: bool = False,
+        groupings: dict[str, Any] | Any = None,
+        update_bounds: bool = False,
+        derive: bool = True,
+        **kwargs: Any,
+    ) -> BoppBase:
+        """Append a single observation to this Annotation.
+
+        See :func:`bopp.core.append` for detailed parameter documentation.
+        """
+        from .core import append
+
+        return append(
+            self,
+            observation,
+            inplace=inplace,
+            groupings=groupings,
+            update_bounds=update_bounds,
+            derive=derive,
+            **kwargs,
+        )
+
+    def extend(
+        self,
+        observations: Any,
+        *,
+        inplace: bool = False,
+        update_bounds: bool = False,
+        derive: bool = True,
+    ) -> BoppBase:
+        """Extend this Annotation with multiple observations.
+
+        See :func:`bopp.core.extend` for detailed parameter documentation.
+        """
+        from .core import extend
+
+        return extend(
+            self,
+            observations,
+            inplace=inplace,
+            update_bounds=update_bounds,
+            derive=derive,
+        )
+
 
 class GroupingBase(msgspec.Struct):
     """Base class for BOPP Grouping objects.

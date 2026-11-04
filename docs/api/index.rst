@@ -11,10 +11,15 @@ Core
     :toctree: generated/
     :nosignatures:
 
-    create
-    validate
+    append
     compute_annotation_id
+    create
+    create_grouping
+    create_metadata
+    create_sandbox
     ensure_annotation_id
+    extend
+    validate
     validate_annotation_id
 
 Input / Output
@@ -98,6 +103,24 @@ Exceptions
     BoppRegistryError
     BoppArgumentError
     BoppIOError
+
+Registries
+----------
+
+.. automodule:: bopp.registries
+    :no-members:
+.. currentmodule:: bopp.registries
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    get_registry
+    get_payload_class
+    get_extent_class
+    get_confidence_class
+    get_metadata_class
+    get_grouping_class
+    get_annotation_class
 
 
 Schema-generated objects

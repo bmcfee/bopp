@@ -23,6 +23,8 @@ DerivedAnnotationMetadata = _DEFAULT_REGISTRY["METADATA_TYPE_REGISTRY"]["derived
 from .util import (
     EXTENT_AXES_METADATA,
     FRACTION_EXTENT_TAGS,
+    _derive_parents_and_sandbox,
+    _get_facet_list_fields,
     _get_tag,
     _to_coord,
     get_extent_bounds,
@@ -134,45 +136,6 @@ class FilterRecord(dict):
 
     def __setattr__(self, name: str, value: Any) -> None:
         self[name] = value
-
-
-def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]]:
-    """Return dictionary of field name -> list value for all list fields in a struct."""
-    if struct is None or struct is msgspec.UNSET:
-        return {}
-    result = {}
-    for field_name in struct.__struct_fields__:
-        if field_name.startswith(("min_", "max_")) or field_name in (
-            "disjoint",
-            "exhaustive",
-        ):
-            continue
-        val = getattr(struct, field_name)
-        if isinstance(val, list):
-            result[field_name] = val
-    return result
-
-
-def _derive_parents_and_sandbox(
-    annotation: BoppBase, action_name: str
-) -> tuple[list[str], Any]:
-    """Extract parent lineage and deep copy sandbox for a derived annotation."""
-    existing_parents = getattr(annotation, "parents", None)
-    if existing_parents is None or existing_parents is msgspec.UNSET:
-        new_parents = []
-    else:
-        new_parents = list(existing_parents)
-
-    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
-        warnings.warn(
-            f"{action_name} an annotation with no ID. The resulting annotation will have no parent lineage.",
-            UserWarning,
-        )
-    else:
-        new_parents.append(annotation.id)  # type: ignore[attr-defined]
-
-    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
-    return new_parents, new_sandbox
 
 
 def _rebuild_annotation(
