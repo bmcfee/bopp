@@ -4577,3 +4577,134 @@ def test_more_coverage_remaining_branches():
     # 5. to_times on time_uniform with times and method previous
     res_prev = to_times(ann_tu, times=[0.5, 1.5], method="previous")
     assert res_prev.payload.value == ["a", "b"]
+
+
+def test_copilot_bounds_and_drift_fixes():
+    from bopp.core import create
+    from bopp.exceptions import BoppArgumentError
+    from bopp.transforms import to_pixels, to_times, to_uniform_times, union
+
+    # 1. Union aggregating effective bounds from unbounded operands
+    ann1 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        min_time=0.0,
+        max_time=1.0,
+        exhaustive=True,
+        disjoint=True,
+        value=["a"],
+    )
+    assert ann1.extent.exhaustive is True
+
+    ann2 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[10.0],
+        duration=[1.0],
+        value=["b"],
+    )
+    u_ann = union(ann1, ann2)
+    assert getattr(u_ann.extent, "min_time", None) == 0.0
+    assert getattr(u_ann.extent, "max_time", None) == 11.0
+    assert u_ann.extent.exhaustive is False
+
+    # 2. Recomputing grouping disjointness after resampling in to_pixels and to_times
+    ann_group = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="pixel",
+        x=[0.0, 1.0],
+        y=[0.0, 1.0],
+        value=["a", "b"],
+        groupings=[{"name": "layer1", "ids": [0, 0], "disjoint": True}],
+    )
+    res_px_dup = to_pixels(ann_group, pixels=[(0.0, 0.0), (0.0, 0.0)])
+    assert res_px_dup.extent.disjoint is False
+    assert res_px_dup.groupings[0].disjoint is False
+
+    ann_t_group = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0, 1.0],
+        value=["a", "b"],
+        groupings=[{"name": "layer1", "ids": [0, 0], "disjoint": True}],
+    )
+    res_t_dup = to_times(ann_t_group, times=[0.0, 0.0])
+    assert res_t_dup.extent.disjoint is False
+    assert res_t_dup.groupings[0].disjoint is False
+
+    # 3. Marker resampling without column carriers rejected
+    ann_marker = create(
+        media_id="t1",
+        payload_type="marker",
+        extent_type="time",
+        time=[0.0, 2.0],
+        description="label",
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="to_uniform_times requires at least one columnar field",
+    ):
+        to_uniform_times(ann_marker, sampling_period=1.0)
+
+    # 4. Reject non-finite bounds in to_uniform_times
+    ann_time = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0, 1.0],
+        value=["a", "b"],
+    )
+    with pytest.raises(BoppArgumentError, match="must be finite numbers"):
+        to_uniform_times(ann_time, sampling_period=1.0, start_time=float("nan"))
+    with pytest.raises(BoppArgumentError, match="must be finite numbers"):
+        to_uniform_times(ann_time, sampling_period=1.0, end_time=float("inf"))
+
+    # 5. Floating point endpoint drift in to_uniform_times
+    ann_drift = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[0.3],
+        value=["drift"],
+    )
+    res_drift = to_uniform_times(ann_drift, sampling_period=0.1)
+    # 0.0, 0.1, 0.2, 0.3 should all be matched to "drift" without gap/fill_value
+    assert res_drift.payload.value == ["drift", "drift", "drift", "drift"]
+
+    # 6. Global resampling with multiple rows under overlap strategies
+    ann_global_multi = create(
+        media_id="t1",
+        payload_type="tag",
+        value=["a", "b"],
+    )
+    # to_times
+    res_gt_first = to_times(ann_global_multi, times=[1.0, 2.0], overlap="first")
+    assert res_gt_first.payload.value == ["a", "a"]
+    res_gt_latest = to_times(ann_global_multi, times=[1.0, 2.0], overlap="latest")
+    assert res_gt_latest.payload.value == ["b", "b"]
+    res_gt_multi = to_times(ann_global_multi, times=[1.0, 2.0], overlap="multiple")
+    assert res_gt_multi.payload.value == ["a", "b", "a", "b"]
+    assert res_gt_multi.extent.time == [1.0, 1.0, 2.0, 2.0]
+
+    # to_pixels
+    res_gp_first = to_pixels(
+        ann_global_multi, pixels=[(0.0, 0.0), (1.0, 1.0)], overlap="first"
+    )
+    assert res_gp_first.payload.value == ["a", "a"]
+    res_gp_latest = to_pixels(
+        ann_global_multi, pixels=[(0.0, 0.0), (1.0, 1.0)], overlap="latest"
+    )
+    assert res_gp_latest.payload.value == ["b", "b"]
+    res_gp_multi = to_pixels(
+        ann_global_multi, pixels=[(0.0, 0.0), (1.0, 1.0)], overlap="multiple"
+    )
+    assert res_gp_multi.payload.value == ["a", "b", "a", "b"]
+    assert res_gp_multi.extent.x == [0.0, 0.0, 1.0, 1.0]
+    assert res_gp_multi.extent.y == [0.0, 0.0, 1.0, 1.0]

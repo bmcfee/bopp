@@ -23,6 +23,7 @@ from .util import (
     FRACTION_EXTENT_TAGS,
     _get_tag,
     _to_coord,
+    get_extent_bounds,
     is_disjoint,
     is_exhaustive,
 )
@@ -1568,9 +1569,18 @@ def to_times(
         out_times = list(target_times)
         matched_indices = [None] * len(out_times)
     elif extent_tag is None:
-        # Global annotation: broadcast the single observation across all query times
-        out_times = list(target_times)
-        matched_indices = [0] * len(out_times)
+        all_indices = list(range(n_source_obs))
+        for t in target_times:
+            if overlap == "multiple":
+                for idx in all_indices:
+                    out_times.append(t)
+                    matched_indices.append(idx)
+            elif overlap == "first":
+                out_times.append(t)
+                matched_indices.append(all_indices[0])
+            else:  # overlap == "latest"
+                out_times.append(t)
+                matched_indices.append(all_indices[-1])
     elif extent_tag in (
         "time_interval",
         "time_frequency_box",
@@ -1585,7 +1595,7 @@ def to_times(
             covers = [
                 i
                 for i, (ts, dur) in enumerate(zip(t_starts, durations))
-                if ts <= t <= ts + dur
+                if ts - 1e-9 <= t <= ts + dur + 1e-9
             ]
             if not covers:
                 out_times.append(t)
@@ -1596,10 +1606,10 @@ def to_times(
                     matched_indices.append(idx)
             elif overlap == "first":
                 out_times.append(t)
-                matched_indices.append(covers[0])
+                matched_indices.append(min(covers, key=lambda i: t_starts[i]))
             else:  # overlap == "latest"
                 out_times.append(t)
-                matched_indices.append(covers[-1])
+                matched_indices.append(max(covers, key=lambda i: t_starts[i]))
 
     else:
         if extent_tag == "time_uniform":
@@ -1640,6 +1650,12 @@ def to_times(
     new_groupings = _resample_groupings(groupings, matched_indices, grouping_fill_map)
     is_disj = len(set(out_times)) == len(out_times)
     new_extent = Time(time=out_times, disjoint=is_disj, exhaustive=False)
+
+    if new_groupings not in (None, msgspec.UNSET):
+        new_groupings = [
+            msgspec.structs.replace(g, disjoint=is_disjoint(new_extent, grouping=g))
+            for g in new_groupings
+        ]
 
     return _rebuild_annotation(
         annotation,
@@ -2509,27 +2525,38 @@ def union(
         for spec in specs:
             min_attr = spec["min_attr"]
             max_attr = spec["max_attr"]
-            vals_min = [
-                getattr(getattr(a, "extent", None), min_attr)
-                for a in anns
-                if getattr(getattr(a, "extent", None), min_attr, msgspec.UNSET)
+            dim = spec["dim"]
+            has_explicit_min = any(
+                getattr(getattr(a, "extent", None), min_attr, msgspec.UNSET)
                 not in (None, msgspec.UNSET)
-            ]
-            if vals_min:
-                coord_vals = [_to_coord(v) for v in vals_min]
-                min_val = min(coord_vals)
+                for a in anns
+            )
+            has_explicit_max = any(
+                getattr(getattr(a, "extent", None), max_attr, msgspec.UNSET)
+                not in (None, msgspec.UNSET)
+                for a in anns
+            )
+            if has_explicit_min:
+                eff_mins = [
+                    get_extent_bounds(getattr(a, "extent", None)).get(
+                        dim, (None, None)
+                    )[0]
+                    for a in anns
+                    if getattr(a, "extent", None) not in (None, msgspec.UNSET)
+                ]
+                min_val = min(_to_coord(v) for v in eff_mins if v is not None)
                 e_updates[min_attr] = (
                     _fraction_pair(min_val) if is_fraction else min_val
                 )
-            vals_max = [
-                getattr(getattr(a, "extent", None), max_attr)
-                for a in anns
-                if getattr(getattr(a, "extent", None), max_attr, msgspec.UNSET)
-                not in (None, msgspec.UNSET)
-            ]
-            if vals_max:
-                coord_vals = [_to_coord(v) for v in vals_max]
-                max_val = max(coord_vals)
+            if has_explicit_max:
+                eff_maxs = [
+                    get_extent_bounds(getattr(a, "extent", None)).get(
+                        dim, (None, None)
+                    )[1]
+                    for a in anns
+                    if getattr(a, "extent", None) not in (None, msgspec.UNSET)
+                ]
+                max_val = max(_to_coord(v) for v in eff_maxs if v is not None)
                 e_updates[max_attr] = (
                     _fraction_pair(max_val) if is_fraction else max_val
                 )
@@ -2718,6 +2745,17 @@ def to_uniform_times(
     payload_cols = _get_facet_list_fields(payload)
     confidence_cols = _get_facet_list_fields(confidence)
 
+    has_column_facet = (
+        bool(payload_cols)
+        or bool(confidence_cols)
+        or (groupings not in (None, msgspec.UNSET) and bool(groupings))
+    )
+    if not has_column_facet:
+        raise BoppArgumentError(
+            "to_uniform_times requires at least one columnar field in payload, "
+            "confidence, or groupings to preserve observation counts under UniformTimeExtent."
+        )
+
     if extent_tag != "time_uniform":
         n_source_obs = len(next(iter(_get_facet_list_fields(extent).values()), []))
     else:
@@ -2752,6 +2790,11 @@ def to_uniform_times(
 
     actual_start = inferred_min if start_time is None else float(start_time)
     actual_end = inferred_max if end_time is None else float(end_time)
+
+    if not (math.isfinite(actual_start) and math.isfinite(actual_end)):
+        raise BoppArgumentError(
+            f"start_time ({actual_start}) and end_time ({actual_end}) must be finite numbers."
+        )
 
     if actual_start > actual_end:
         raise BoppArgumentError(
@@ -2813,7 +2856,7 @@ def to_uniform_times(
             covers = [
                 i
                 for i, (ts, dur) in enumerate(zip(t_starts, durations))
-                if ts <= t <= ts + dur
+                if ts - 1e-9 <= t <= ts + dur + 1e-9
             ]
             if not covers:
                 matched_indices.append(None)
@@ -3051,9 +3094,21 @@ def to_pixels(
         out_y = list(target_y)
         matched_indices = [None] * len(target_x)
     elif extent_tag is None:
-        out_x = list(target_x)
-        out_y = list(target_y)
-        matched_indices = [0] * len(target_x)
+        all_indices = list(range(n_source_obs))
+        for qx, qy in zip(target_x, target_y):
+            if overlap == "multiple":
+                for idx in all_indices:
+                    out_x.append(qx)
+                    out_y.append(qy)
+                    matched_indices.append(idx)
+            elif overlap == "first":
+                out_x.append(qx)
+                out_y.append(qy)
+                matched_indices.append(all_indices[0])
+            else:  # overlap == "latest"
+                out_x.append(qx)
+                out_y.append(qy)
+                matched_indices.append(all_indices[-1])
     elif extent_tag == "pixel_box":
         bx_list = extent.x  # type: ignore[union-attr]
         bw_list = extent.width  # type: ignore[union-attr]
@@ -3065,7 +3120,8 @@ def to_pixels(
                 for i, (bx, bw, by, bh) in enumerate(
                     zip(bx_list, bw_list, by_list, bh_list)
                 )
-                if bx <= qx <= bx + bw and by <= qy <= by + bh
+                if bx - 1e-9 <= qx <= bx + bw + 1e-9
+                and by - 1e-9 <= qy <= by + bh + 1e-9
             ]
             if not covers:
                 out_x.append(qx)
@@ -3126,6 +3182,12 @@ def to_pixels(
 
     is_disj = len(set(zip(out_x, out_y))) == len(out_x)
     new_extent = Pixel(x=out_x, y=out_y, disjoint=is_disj, exhaustive=False)
+
+    if new_groupings not in (None, msgspec.UNSET):
+        new_groupings = [
+            msgspec.structs.replace(g, disjoint=is_disjoint(new_extent, grouping=g))
+            for g in new_groupings
+        ]
 
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Converting")
     derived_metadata = DerivedAnnotationMetadata(
