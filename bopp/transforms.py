@@ -5,7 +5,7 @@ import math
 import warnings
 from collections.abc import Callable, Sequence
 from fractions import Fraction
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import msgspec
 
@@ -389,10 +389,9 @@ def _rebuild_converted_extent(
     extent_cls = get_registry(version)["EXTENT_TYPE_REGISTRY"][target_tag]
     parents, sandbox = _derive_parents_and_sandbox(annotation, "Converting")
     extent_kwargs: dict[str, Any] = dict(columns)
-    extent_kwargs.setdefault("disjoint", getattr(annotation.extent, "disjoint", False))
-    extent_kwargs.setdefault(
-        "exhaustive", getattr(annotation.extent, "exhaustive", False)
-    )
+    old_extent = getattr(annotation, "extent", None)
+    extent_kwargs.setdefault("disjoint", getattr(old_extent, "disjoint", False))
+    extent_kwargs.setdefault("exhaustive", getattr(old_extent, "exhaustive", False))
     return _rebuild_annotation(
         annotation,
         parents=parents,
@@ -676,6 +675,7 @@ def trim(
     groupings = getattr(annotation, "groupings", msgspec.UNSET)
 
     if extent_tag == "time_uniform":
+        tu_extent = cast(msgspec.Struct, extent)
         tu_start_time = float(getattr(extent, "start_time", 0.0))
         tu_period = float(getattr(extent, "sampling_period", 0.0))
 
@@ -744,13 +744,13 @@ def trim(
             and not strict
         ):
             candidate_tu = msgspec.structs.replace(
-                extent, exhaustive=False, **tu_updates
+                tu_extent, exhaustive=False, **tu_updates
             )
             if is_exhaustive(candidate_tu, N=len(tu_kept_indices)):
                 tu_exhaustive = True
 
         tu_updates["exhaustive"] = tu_exhaustive
-        tu_new_extent = msgspec.structs.replace(extent, **tu_updates)
+        tu_new_extent = msgspec.structs.replace(tu_extent, **tu_updates)
         new_payload = _subset_struct_lists(payload, tu_kept_indices)
         new_confidence = _subset_struct_lists(confidence, tu_kept_indices)
         new_groupings = _subset_groupings(groupings, tu_kept_indices)
@@ -1535,7 +1535,7 @@ def to_times(
             t_min = min(time_arr)
             t_max = max(t + d for t, d in zip(time_arr, dur_arr))
 
-        step = 1.0 / sample_rate
+        step = 1.0 / cast(float, sample_rate)
         # Calculate number of steps with float tolerance
         n_steps = math.floor((t_max - t_min) / step + 1e-9) + 1
         target_times = [t_min + i * step for i in range(n_steps)]
@@ -1852,7 +1852,7 @@ def sort(
                         f"Field '{field_part}' not found in extent columns: {list(extent_cols.keys())}."
                     )
                 vals = extent_cols[field_part]
-                extent_tag = _get_tag(extent)
+                extent_tag = _get_tag(cast(msgspec.Struct, extent))
                 if (extent_tag, field_part) in FRACTION_AXES:
                     return [
                         (Fraction(*v) if isinstance(v, (list, tuple)) else Fraction(v))
@@ -1875,7 +1875,7 @@ def sort(
             matching_sources.append(("payload", payload_cols[key]))
         if key in extent_cols:
             vals = extent_cols[key]
-            extent_tag = _get_tag(extent)
+            extent_tag = _get_tag(cast(msgspec.Struct, extent))
             if (extent_tag, key) in FRACTION_AXES:
                 vals = [
                     Fraction(*v) if isinstance(v, (list, tuple)) else Fraction(v)
@@ -2182,10 +2182,11 @@ def shift(
                 old_origins = getattr(extent, field_a)
                 extent_updates[field_a] = [float(v + disp_num) for v in old_origins]
             else:  # kind == "min_max"
+                field_b_str = cast(str, field_b)
                 old_mins = getattr(extent, field_a)
-                old_maxs = getattr(extent, field_b)
+                old_maxs = getattr(extent, field_b_str)
                 extent_updates[field_a] = [float(v + disp_num) for v in old_mins]
-                extent_updates[field_b] = [float(v + disp_num) for v in old_maxs]
+                extent_updates[field_b_str] = [float(v + disp_num) for v in old_maxs]
 
             min_attr, max_attr = _get_extent_axis_bound_attrs(extent_tag, fld)
             old_min = getattr(extent, min_attr, msgspec.UNSET)
@@ -2284,6 +2285,7 @@ def union(
     >>> combined.payload.value
     ['intro', 'verse', 'chorus']
     """
+    anns: list[Any]
     if isinstance(annotation, Sequence) and not isinstance(annotation, BoppBase):
         anns = list(annotation) + list(annotations)
     else:
@@ -2305,13 +2307,15 @@ def union(
     first_version = getattr(first, "bopp_version", None)
 
     for idx, a in enumerate(anns[1:], start=1):
-        if a.media_id != first_media_id:
+        a_mid = getattr(a, "media_id", None)
+        if a_mid != first_media_id:
             raise BoppArgumentError(
-                f"Annotation at index {idx} has media_id '{a.media_id}', matching '{first_media_id}' required."
+                f"Annotation at index {idx} has media_id '{a_mid}', matching '{first_media_id}' required."
             )
-        if a.bopp_version != first_version:
+        a_ver = getattr(a, "bopp_version", None)
+        if a_ver != first_version:
             raise BoppArgumentError(
-                f"Annotation at index {idx} has bopp_version '{a.bopp_version}', matching '{first_version}' required."
+                f"Annotation at index {idx} has bopp_version '{a_ver}', matching '{first_version}' required."
             )
 
     first_payload = getattr(first, "payload", None)
@@ -2368,24 +2372,30 @@ def union(
             raise BoppArgumentError(
                 f"Groupings mismatch: annotation at index {idx} has_groupings={a_has_g}, but first operand has_groupings={first_has_g}."
             )
-        if first_has_g and len(first_groupings) != len(a_g):
-            raise BoppArgumentError(
-                f"Groupings count mismatch at index {idx}: {len(a_g)} layers != {len(first_groupings)} layers."
-            )
         if first_has_g:
-            for layer_idx, (g1, g2) in enumerate(zip(first_groupings, a_g)):
+            first_g_list = cast(list[Any], first_groupings)
+            a_g_list = cast(list[Any], a_g)
+            if len(first_g_list) != len(a_g_list):
+                raise BoppArgumentError(
+                    f"Groupings count mismatch at index {idx}: {len(a_g_list)} layers != {len(first_g_list)} layers."
+                )
+            for layer_idx, (g1, g2) in enumerate(zip(first_g_list, a_g_list)):
                 if g1.name != g2.name:
                     raise BoppArgumentError(
                         f"Grouping layer name mismatch at index {idx}, layer {layer_idx}: '{g2.name}' != '{g1.name}'."
                     )
 
-    merged_groupings = []
+    merged_groupings: list[Any] = []
     if first_has_g:
-        for layer_idx in range(len(first_groupings)):
-            combined_ids = [x for a in anns for x in a.groupings[layer_idx].ids]
+        first_g_list = cast(list[Any], first_groupings)
+        for layer_idx in range(len(first_g_list)):
+            combined_ids = [
+                x for a in anns for x in getattr(a, "groupings", [])[layer_idx].ids
+            ]
             merged_labels: dict[str, int] = {}
             for a in anns:
-                lbls = getattr(a.groupings[layer_idx], "labels", msgspec.UNSET)
+                a_groupings = getattr(a, "groupings", [])
+                lbls = getattr(a_groupings[layer_idx], "labels", msgspec.UNSET)
                 if lbls not in (None, msgspec.UNSET):
                     for label_str, gid in lbls.items():
                         if (
@@ -2393,23 +2403,23 @@ def union(
                             and merged_labels[label_str] != gid
                         ):
                             raise BoppArgumentError(
-                                f"Conflicting label mapping in grouping layer '{first_groupings[layer_idx].name}': "
+                                f"Conflicting label mapping in grouping layer '{first_g_list[layer_idx].name}': "
                                 f"label '{label_str}' maps to both {merged_labels[label_str]} and {gid}."
                             )
                         merged_labels[label_str] = gid
 
-            id_to_label = {}
+            id_to_label: dict[int, str] = {}
             for l_str, gid in merged_labels.items():
                 if gid in id_to_label and id_to_label[gid] != l_str:
                     raise BoppArgumentError(
-                        f"Conflicting label mapping in grouping layer '{first_groupings[layer_idx].name}': "
+                        f"Conflicting label mapping in grouping layer '{first_g_list[layer_idx].name}': "
                         f"ID {gid} is assigned to both '{id_to_label[gid]}' and '{l_str}'."
                     )
                 id_to_label[gid] = l_str
 
             lbl_val = merged_labels if merged_labels else msgspec.UNSET
             g_candidate = msgspec.structs.replace(
-                first_groupings[layer_idx],
+                first_g_list[layer_idx],
                 ids=combined_ids,
                 labels=lbl_val,
                 disjoint=False,
@@ -2417,23 +2427,34 @@ def union(
             )
             merged_groupings.append(g_candidate)
 
+    first_payload_struct = cast(msgspec.Struct, first_payload)
     p_updates: dict[str, list[Any]] = {}
-    for fname in _get_facet_list_fields(first_payload):
-        p_updates[fname] = [x for a in anns for x in getattr(a.payload, fname)]
-    new_payload = msgspec.structs.replace(first_payload, **p_updates)
+    for fname in _get_facet_list_fields(first_payload_struct):
+        p_updates[fname] = [
+            x for a in anns for x in getattr(getattr(a, "payload", None), fname)
+        ]
+    new_payload: msgspec.Struct = msgspec.structs.replace(
+        first_payload_struct, **p_updates
+    )
 
-    new_confidence = msgspec.UNSET
+    new_confidence: msgspec.Struct | msgspec.UnsetType = msgspec.UNSET
     if first_c_tag is not None:
+        first_conf_struct = cast(msgspec.Struct, first_conf)
         c_updates: dict[str, list[Any]] = {}
-        for fname in _get_facet_list_fields(first_conf):
-            c_updates[fname] = [x for a in anns for x in getattr(a.confidence, fname)]
-        new_confidence = msgspec.structs.replace(first_conf, **c_updates)
+        for fname in _get_facet_list_fields(first_conf_struct):
+            c_updates[fname] = [
+                x for a in anns for x in getattr(getattr(a, "confidence", None), fname)
+            ]
+        new_confidence = msgspec.structs.replace(first_conf_struct, **c_updates)
 
-    new_extent = msgspec.UNSET
+    new_extent: msgspec.Struct | msgspec.UnsetType = msgspec.UNSET
     if first_e_tag is not None:
+        first_extent_struct = cast(msgspec.Struct, first_extent)
         e_updates: dict[str, Any] = {}
-        for fname in _get_facet_list_fields(first_extent):
-            e_updates[fname] = [x for a in anns for x in getattr(a.extent, fname)]
+        for fname in _get_facet_list_fields(first_extent_struct):
+            e_updates[fname] = [
+                x for a in anns for x in getattr(getattr(a, "extent", None), fname)
+            ]
 
         specs = EXTENT_AXES_METADATA.get(first_e_tag, [])
         is_fraction = first_e_tag in FRACTION_EXTENT_TAGS
@@ -2441,9 +2462,9 @@ def union(
             min_attr = spec["min_attr"]
             max_attr = spec["max_attr"]
             vals_min = [
-                getattr(a.extent, min_attr)
+                getattr(getattr(a, "extent", None), min_attr)
                 for a in anns
-                if getattr(a.extent, min_attr, msgspec.UNSET)
+                if getattr(getattr(a, "extent", None), min_attr, msgspec.UNSET)
                 not in (None, msgspec.UNSET)
             ]
             if vals_min:
@@ -2453,9 +2474,9 @@ def union(
                     _fraction_pair(min_val) if is_fraction else min_val
                 )
             vals_max = [
-                getattr(a.extent, max_attr)
+                getattr(getattr(a, "extent", None), max_attr)
                 for a in anns
-                if getattr(a.extent, max_attr, msgspec.UNSET)
+                if getattr(getattr(a, "extent", None), max_attr, msgspec.UNSET)
                 not in (None, msgspec.UNSET)
             ]
             if vals_max:
@@ -2466,7 +2487,7 @@ def union(
                 )
 
         candidate_extent = msgspec.structs.replace(
-            first_extent, disjoint=False, exhaustive=False, **e_updates
+            first_extent_struct, disjoint=False, exhaustive=False, **e_updates
         )
         total_n = len(next(iter(e_updates.values()), []))
         new_disjoint = is_disjoint(candidate_extent)
