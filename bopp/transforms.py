@@ -2261,9 +2261,12 @@ def union(
 
     All operands must share the same `media_id`, `bopp_version`, and facet type
     discriminators across payload, extent, and confidence facets. Grouping layer counts
-    and names must also match. Columnar array fields are concatenated across operands,
-    while top-level structural fields (`sandbox`, `metadata`) are propagated from the
-    first given operand. Derivation lineage records the IDs of all input operands in `parents`.
+    and names must also match. Columnar array fields are concatenated across operands.
+    The resulting annotation's metadata is a DerivedAnnotationMetadata record with
+    transform="union". The sandbox is formed by unioning sandboxes across all operands;
+    if key collisions occur, a warning is emitted and the value from the earliest
+    operand containing that key is preserved. Derivation lineage records the IDs of all
+    input operands in `parents`.
 
     Parameters
     ----------
@@ -2606,14 +2609,36 @@ def union(
         elif a_id not in all_parents:
             all_parents.append(a_id)
 
-    new_sandbox = copy.deepcopy(getattr(first, "sandbox", msgspec.UNSET))
-    new_metadata = copy.deepcopy(getattr(first, "metadata", msgspec.UNSET))
+    has_sandbox = any(
+        getattr(a, "sandbox", msgspec.UNSET) not in (None, msgspec.UNSET) for a in anns
+    )
+    if has_sandbox:
+        merged_sandbox: dict[str, Any] = {}
+        for a in anns:
+            s = getattr(a, "sandbox", msgspec.UNSET)
+            if s not in (None, msgspec.UNSET):
+                for k, v in s.items():
+                    if k in merged_sandbox:
+                        warnings.warn(
+                            f"Sandbox key collision for key '{k}': keeping value from earlier operand.",
+                            UserWarning,
+                        )
+                    else:
+                        merged_sandbox[k] = copy.deepcopy(v)
+        new_sandbox: dict[str, Any] | msgspec.UnsetType = merged_sandbox
+    else:
+        new_sandbox = msgspec.UNSET
+
+    derived_metadata = DerivedAnnotationMetadata(
+        transform="union",
+        parameters={},
+    )
 
     return _rebuild_annotation(
         first,
         parents=all_parents,
         sandbox=new_sandbox,
-        metadata=new_metadata,
+        metadata=derived_metadata,
         payload=new_payload,
         extent=new_extent,
         confidence=new_confidence,

@@ -3142,14 +3142,18 @@ def test_union_two_compatible_annotations():
         time=[4.0],
         duration=[3.0],
         value=["outro"],
-        sandbox={"custom": "ignored"},
+        sandbox={"custom": "ignored", "extra": "added"},
     )
-    res = union(ann1, ann2)
+    with pytest.warns(UserWarning, match="Sandbox key collision for key 'custom'"):
+        res = union(ann1, ann2)
     assert res.extent.time == [0.0, 2.0, 4.0]
     assert res.extent.duration == [2.0, 2.0, 3.0]
     assert res.payload.value == ["verse", "chorus", "outro"]
-    assert res.sandbox == {"custom": "keep"}  # First operand propagated
+    assert res.sandbox == {"custom": "keep", "extra": "added"}
     assert res.parents == [ann1.id, ann2.id]
+    assert isinstance(res.metadata, DerivedAnnotationMetadata)
+    assert res.metadata.transform == "union"
+    assert res.metadata.parameters == {}
 
 
 def test_union_sequence_input_and_three_annotations():
@@ -4708,3 +4712,56 @@ def test_copilot_bounds_and_drift_fixes():
     assert res_gp_multi.payload.value == ["a", "b", "a", "b"]
     assert res_gp_multi.extent.x == [0.0, 0.0, 1.0, 1.0]
     assert res_gp_multi.extent.y == [0.0, 0.0, 1.0, 1.0]
+
+
+def test_union_sandbox_and_metadata_behavior():
+    ann1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        sandbox={"foo": "bar", "shared": 1},
+    )
+    ann2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+    )
+    ann3 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0],
+        value=["c"],
+        sandbox={"shared": 2, "baz": 42},
+    )
+    with pytest.warns(UserWarning, match="Sandbox key collision for key 'shared'"):
+        res = union(ann1, ann2, ann3)
+
+    assert res.sandbox == {"foo": "bar", "shared": 1, "baz": 42}
+    assert isinstance(res.metadata, DerivedAnnotationMetadata)
+    assert res.metadata.transform == "union"
+    assert res.metadata.parameters == {}
+
+    # Verify union with no sandboxes on any operand
+    ann_no_s1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    ann_no_s2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+    )
+    res_no_s = union(ann_no_s1, ann_no_s2)
+    assert res_no_s.sandbox is msgspec.UNSET
+    assert isinstance(res_no_s.metadata, DerivedAnnotationMetadata)
+    assert res_no_s.metadata.transform == "union"
