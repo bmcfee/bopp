@@ -13,11 +13,13 @@ from ._version import DEFAULT_SCHEMA_VERSION
 from .base import BoppBase
 from .core import ensure_annotation_id
 from .exceptions import BoppArgumentError, BoppValidationError
-from .models.v1.extent.pixel import Pixel
-from .models.v1.extent.time import Time
-from .models.v1.extent.time_uniform import UniformTimeExtent
-from .models.v1.metadata.derived import DerivedAnnotationMetadata
 from .registries import get_registry
+
+_DEFAULT_REGISTRY = get_registry(DEFAULT_SCHEMA_VERSION)
+Pixel = _DEFAULT_REGISTRY["EXTENT_TYPE_REGISTRY"]["pixel"]
+Time = _DEFAULT_REGISTRY["EXTENT_TYPE_REGISTRY"]["time"]
+UniformTimeExtent = _DEFAULT_REGISTRY["EXTENT_TYPE_REGISTRY"]["time_uniform"]
+DerivedAnnotationMetadata = _DEFAULT_REGISTRY["METADATA_TYPE_REGISTRY"]["derived"]
 from .util import (
     EXTENT_AXES_METADATA,
     FRACTION_EXTENT_TAGS,
