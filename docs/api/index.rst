@@ -45,12 +45,17 @@ Transforms
     :nosignatures:
 
     filter_by
+    shift
+    sort
+    to_pixels
     to_score_interval
     to_score_interval_float
     to_score_quarter
     to_score_quarter_float
     to_times
+    to_uniform_times
     trim
+    union
 
 Evaluation
 ----------

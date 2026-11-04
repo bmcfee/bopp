@@ -104,7 +104,7 @@ force-include = { "bopp/py.typed" = "bopp/py.typed" }
 [tool.hatch.envs.codegen]
 # Isolate the generator dependencies from your main app
 dependencies = [
-  "datamodel-code-generator>=0.66.0",
+  "datamodel-code-generator>=0.66.0,<0.89.0",
   "ruff",
 ]
 

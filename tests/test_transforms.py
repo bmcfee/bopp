@@ -32,8 +32,13 @@ from bopp.transforms import (
     _subset_groupings,
     _subset_struct_lists,
     filter_by,
+    shift,
+    sort,
+    to_pixels,
     to_times,
+    to_uniform_times,
     trim,
+    union,
 )
 
 
@@ -701,6 +706,20 @@ def test_trim_transitive_parents_and_immutability():
     assert ann2 == ann2_copy
 
 
+def test_trim_extent_without_bounds(monkeypatch):
+    ann = create(
+        media_id="test",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0, 2.0],
+        value=["a", "b"],
+    )
+    with monkeypatch.context() as m:
+        m.setattr("bopp.transforms._get_extent_axis_bound_attrs", lambda *args: None)
+        res = trim(ann, start=1.5)
+        assert res.extent.time == [2.0]
+
+
 def test_filter_record_attribute_access():
     rec = FilterRecord({"a": 1, "b": "hello"})
     assert rec.a == 1
@@ -765,6 +784,9 @@ def test_filter_by_target_on_extent():
     assert filtered.extent.time == [3.0, 4.0]
     assert filtered.payload.value == ["c", "d"]
     assert filtered.confidence.confidence == [0.3, 0.4]
+
+    filtered_notarget = filter_by(ann, lambda t: t > 2.0, facet="extent")
+    assert filtered_notarget.extent.time == [3.0, 4.0]
 
 
 def test_filter_by_confidence_facet():
@@ -2647,9 +2669,11 @@ def test_format_bound_value_and_metadata_helpers():
     assert _format_bound_value(3, fraction_axis=False, integer_axis=False) == 3.0
     assert _format_bound_value(4.5, fraction_axis=False, integer_axis=False) == 4.5
 
-    # Unsupported axis metadata returns None
-    assert _get_extent_axis_bound_attrs("time", "nonexistent_field") is None
-    assert _get_extent_axis_bound_attrs("nonexistent_tag", "time") is None
+    # Unsupported axis metadata raises BoppArgumentError
+    with pytest.raises(BoppArgumentError):
+        _get_extent_axis_bound_attrs("time", "nonexistent_field")
+    with pytest.raises(BoppArgumentError):
+        _get_extent_axis_bound_attrs("nonexistent_tag", "time")
 
 
 def test_to_times_resamples_groupings_exhaustive_false():
@@ -2667,3 +2691,2077 @@ def test_to_times_resamples_groupings_exhaustive_false():
     res = to_times(ann, times=[0.0, 5.0, 15.0])
     assert res.extent.exhaustive is False
     assert res.groupings[0].exhaustive is False
+
+
+# ==============================================================================
+# Tests for sort
+# ==============================================================================
+
+
+def test_sort_payload_ascending_and_descending():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0, 1.0, 2.0],
+        value=["c", "a", "b"],
+    )
+    res_asc = sort(ann, by="value")
+    assert res_asc.payload.value == ["a", "b", "c"]
+    assert res_asc.extent.time == [1.0, 2.0, 3.0]
+    assert res_asc.metadata.transform == "sort"
+    assert res_asc.metadata.parameters == {"by": ["value"], "ascending": True}
+    assert res_asc.parents == [ann.id]
+
+    res_desc = sort(ann, by="value", ascending=False)
+    assert res_desc.payload.value == ["c", "b", "a"]
+    assert res_desc.extent.time == [3.0, 2.0, 1.0]
+    assert res_desc.metadata.parameters == {"by": ["value"], "ascending": False}
+
+
+def test_sort_qualified_facets():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
+        time=[10.0, 30.0, 20.0],
+        value=["x", "y", "z"],
+        confidence=[0.5, 0.1, 0.9],
+    )
+    res_extent = sort(ann, by="extent.time")
+    assert res_extent.extent.time == [10.0, 20.0, 30.0]
+    assert res_extent.confidence.confidence == [0.5, 0.9, 0.1]
+
+    res_conf = sort(ann, by="confidence.confidence")
+    assert res_conf.confidence.confidence == [0.1, 0.5, 0.9]
+    assert res_conf.extent.time == [30.0, 10.0, 20.0]
+
+    res_payload = sort(ann, by="payload.value", ascending=False)
+    assert res_payload.payload.value == ["z", "y", "x"]
+
+
+def test_sort_groupings():
+    ann_single = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0, 1.0, 2.0],
+        value=["c", "a", "b"],
+        groupings=[{"name": "section", "ids": [2, 0, 1]}],
+    )
+    res_single = sort(ann_single, by="grouping")
+    assert res_single.groupings[0].ids == [0, 1, 2]
+    assert res_single.payload.value == ["a", "b", "c"]
+
+    res_single_plural = sort(ann_single, by="groupings")
+    assert res_single_plural.groupings[0].ids == [0, 1, 2]
+
+    ann_multi = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[4.0, 3.0, 2.0, 1.0],
+        value=["d", "c", "b", "a"],
+        groupings=[
+            {"name": "layer_a", "ids": [1, 0, 1, 0]},
+            {"name": "layer_b", "ids": [3, 2, 1, 0]},
+        ],
+    )
+    # Ambiguous grouping error
+    with pytest.raises(
+        BoppArgumentError, match="ambiguous because annotation has 2 groupings"
+    ):
+        sort(ann_multi, by="grouping")
+
+    # Index notation
+    res_idx0 = sort(ann_multi, by="grouping.0")
+    assert res_idx0.groupings[0].ids == [0, 0, 1, 1]
+
+    res_group_dot = sort(ann_multi, by="group.1")
+    assert res_group_dot.groupings[1].ids == [0, 1, 2, 3]
+
+    # Name notation
+    res_name = sort(ann_multi, by="grouping.layer_b")
+    assert res_name.groupings[1].ids == [0, 1, 2, 3]
+
+    # Bare grouping name
+    res_bare = sort(ann_multi, by="layer_a")
+    assert res_bare.groupings[0].ids == [0, 0, 1, 1]
+
+
+def test_sort_tie_breaking_multiple_keys():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0, 1.0, 2.0, 4.0],
+        value=["b", "a", "c", "d"],
+        groupings=[{"name": "sec", "ids": [1, 1, 0, 0]}],
+    )
+    # Sort first by grouping ascending, then by time descending
+    res = sort(ann, by=["sec", "extent.time"], ascending=[True, False])
+    assert res.groupings[0].ids == [0, 0, 1, 1]
+    assert res.extent.time == [4.0, 2.0, 3.0, 1.0]
+    assert res.payload.value == ["d", "c", "b", "a"]
+
+
+def test_sort_fractions():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[1, 2], [1, 4], [3, 8]],
+        value=["half", "fourth", "three-eighths"],
+    )
+    res = sort(ann, by="quarter")
+    assert res.extent.quarter == [[1, 4], [3, 8], [1, 2]]
+    assert res.payload.value == ["fourth", "three-eighths", "half"]
+
+    res_desc = sort(ann, by="extent.quarter", ascending=False)
+    assert res_desc.extent.quarter == [[1, 2], [3, 8], [1, 4]]
+
+
+def test_sort_time_uniform_raises():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=0.5,
+        value=["a", "b", "c"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="sort is not supported for 'time_uniform' extents"
+    ):
+        sort(ann, by="value")
+
+
+def test_sort_validation_errors():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0, 2.0],
+        value=["a", "b"],
+    )
+    with pytest.raises(BoppArgumentError, match="'by' must not be an empty sequence"):
+        sort(ann, by=[])
+
+    with pytest.raises(BoppArgumentError, match="must be a str or Sequence"):
+        sort(ann, by=123)  # type: ignore[arg-type]
+
+    with pytest.raises(BoppArgumentError, match="Sort key must be a string"):
+        sort(ann, by=[123])  # type: ignore[list-item]
+
+    with pytest.raises(BoppArgumentError, match="Length of 'ascending'"):
+        sort(ann, by=["value", "time"], ascending=[True])
+
+    with pytest.raises(
+        BoppArgumentError, match="'ascending' elements must be booleans"
+    ):
+        sort(ann, by=["value"], ascending=["yes"])  # type: ignore[list-item]
+
+    with pytest.raises(
+        BoppArgumentError, match="'ascending' must be a bool or Sequence"
+    ):
+        sort(ann, by="value", ascending="true")  # type: ignore[arg-type]
+
+    with pytest.raises(BoppArgumentError, match="Sort key 'unknown' not found"):
+        sort(ann, by="unknown")
+
+    with pytest.raises(
+        BoppArgumentError, match="Field 'missing' not found in payload columns"
+    ):
+        sort(ann, by="payload.missing")
+
+    with pytest.raises(
+        BoppArgumentError, match="Field 'missing' not found in extent columns"
+    ):
+        sort(ann, by="extent.missing")
+
+    with pytest.raises(BoppArgumentError, match="Unrecognized facet prefix"):
+        sort(ann, by="invalid_facet.value")
+
+    with pytest.raises(BoppArgumentError, match="Grouping index 5 out of range"):
+        ann_with_g = create(
+            media_id="track_1",
+            payload_type="tag",
+            extent_type="time",
+            time=[1.0],
+            value=["a"],
+            groupings=[{"name": "g1", "ids": [0]}],
+        )
+        sort(ann_with_g, by="grouping.5")
+
+    with pytest.raises(BoppArgumentError, match="Grouping layer 'missing' not found"):
+        sort(ann_with_g, by="grouping.missing")
+
+    with pytest.raises(BoppArgumentError, match="annotation has no groupings"):
+        sort(ann, by="grouping")
+
+
+def test_sort_empty_and_single_observation():
+    ann_empty = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[],
+        value=[],
+    )
+    res_empty = sort(ann_empty, by="value")
+    assert res_empty.payload.value == []
+    assert res_empty.metadata.transform == "sort"
+
+    ann_single = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["solo"],
+    )
+    res_single = sort(ann_single, by="value")
+    assert res_single.payload.value == ["solo"]
+
+
+# ==============================================================================
+# Tests for shift
+# ==============================================================================
+
+
+def test_shift_1d_time():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0, 2.5, 4.0],
+        value=["a", "b", "c"],
+        min_time=0.0,
+        max_time=10.0,
+    )
+    shifted = shift(ann, 2.0)
+    assert shifted.extent.time == [3.0, 4.5, 6.0]
+    assert shifted.extent.min_time == 2.0
+    assert shifted.extent.max_time == 12.0
+    assert shifted.metadata.transform == "shift"
+    assert shifted.metadata.parameters == {"displacement": 2.0, "target_field": "time"}
+
+    shifted_neg = shift(ann, -1.0)
+    assert shifted_neg.extent.time == [0.0, 1.5, 3.0]
+
+
+def test_shift_time_interval():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 3.0],
+        duration=[2.0, 4.0],
+        value=["verse", "chorus"],
+    )
+    shifted = shift(ann, 1.5)
+    assert shifted.extent.time == [1.5, 4.5]
+    assert shifted.extent.duration == [2.0, 4.0]  # Duration remains invariant
+
+
+def test_shift_time_uniform():
+    ann = create(
+        media_id="track_1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=1.0,
+        sampling_period=0.25,
+        min_time=1.0,
+        max_time=5.0,
+        value=["a", "b", "c"],
+    )
+    shifted = shift(ann, 0.5)
+    assert shifted.extent.start_time == 1.5
+    assert shifted.extent.sampling_period == 0.25
+    assert shifted.extent.min_time == 1.5
+    assert shifted.extent.max_time == 5.5
+
+    with pytest.raises(BoppArgumentError, match="Unsupported target_field 'x'"):
+        shift(ann, 0.5, target_field="x")
+
+
+def test_shift_fraction_extent():
+    ann = create(
+        media_id="score_1",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[0, 1], [1, 2]],
+        value=["a", "b"],
+        min_quarter=[0, 1],
+        max_quarter=[2, 1],
+    )
+    shifted_frac = shift(ann, Fraction(1, 4))
+    assert shifted_frac.extent.quarter == [[1, 4], [3, 4]]
+    assert shifted_frac.extent.min_quarter == [1, 4]
+    assert shifted_frac.extent.max_quarter == [9, 4]
+
+    shifted_pair = shift(ann, [1, 2])
+    assert shifted_pair.extent.quarter == [[1, 2], [1, 1]]
+
+    shifted_int = shift(ann, 1)
+    assert shifted_int.extent.quarter == [[1, 1], [3, 2]]
+
+    # score_interval: duration remains invariant
+    ann_int = create(
+        media_id="score_1",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[1, 4]],
+        duration=[[1, 2]],
+        value=["c"],
+    )
+    shifted_interval = shift(ann_int, [1, 4])
+    assert shifted_interval.extent.quarter == [[1, 2]]
+    assert shifted_interval.extent.duration == [[1, 2]]
+
+
+def test_shift_integer_extent():
+    ann = create(
+        media_id="text_1",
+        payload_type="tag",
+        extent_type="text_interval",
+        offset=[5, 15],
+        length=[3, 4],
+        value=["word1", "word2"],
+        min_offset=0,
+        max_offset=50,
+    )
+    shifted = shift(ann, 10)
+    assert shifted.extent.offset == [15, 25]
+    assert shifted.extent.length == [3, 4]
+    assert shifted.extent.min_offset == 10
+    assert shifted.extent.max_offset == 60
+
+    with pytest.raises(BoppArgumentError, match="must be an int"):
+        shift(ann, 1.5)
+
+    with pytest.raises(BoppArgumentError, match="must be an int"):
+        shift(ann, True)  # bool rejected
+
+
+def test_shift_multi_axis():
+    ann_box = create(
+        media_id="img_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[10.0],
+        width=[20.0],
+        y=[30.0],
+        height=[40.0],
+        value=["car"],
+        min_x=0.0,
+        max_x=100.0,
+        min_y=0.0,
+        max_y=200.0,
+    )
+    # Must specify target_field or dict
+    with pytest.raises(BoppArgumentError, match="does not have a default target field"):
+        shift(ann_box, 5.0)
+
+    # Shift single axis
+    shifted_x = shift(ann_box, 5.0, target_field="x")
+    assert shifted_x.extent.x == [15.0]
+    assert shifted_x.extent.width == [20.0]
+    assert shifted_x.extent.min_x == 5.0
+    assert shifted_x.extent.y == [30.0]
+
+    # Shift multiple axes via dictionary
+    shifted_dict = shift(ann_box, {"x": 5.0, "y": -10.0})
+    assert shifted_dict.extent.x == [15.0]
+    assert shifted_dict.extent.y == [20.0]
+    assert shifted_dict.extent.min_x == 5.0
+    assert shifted_dict.extent.min_y == -10.0
+    assert shifted_dict.extent.max_x == 105.0
+    assert shifted_dict.extent.max_y == 190.0
+
+
+def test_shift_validation_errors():
+    ann_no_extent = create(
+        media_id="global_1",
+        payload_type="tag",
+        value=["scene"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="shift requires an annotation with an extent"
+    ):
+        shift(ann_no_extent, 1.0)
+
+    ann_time = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="Cannot specify both 'target_field' and a dictionary"
+    ):
+        shift(ann_time, {"time": 1.0}, target_field="time")
+
+    with pytest.raises(
+        BoppArgumentError, match="Dictionary 'displacement' must not be empty"
+    ):
+        shift(ann_time, {})
+
+    with pytest.raises(BoppArgumentError, match="must be finite and not NaN"):
+        shift(ann_time, float("nan"))
+
+    with pytest.raises(BoppArgumentError, match="must be finite and not NaN"):
+        shift(ann_time, float("inf"))
+
+    with pytest.raises(
+        BoppArgumentError, match="Unsupported target_field 'nonexistent'"
+    ):
+        shift(ann_time, 1.0, target_field="nonexistent")
+
+
+# ==============================================================================
+# Tests for union
+# ==============================================================================
+
+
+def test_union_two_compatible_annotations():
+    ann1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 2.0],
+        duration=[2.0, 2.0],
+        value=["verse", "chorus"],
+        sandbox={"custom": "keep"},
+    )
+    ann2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[4.0],
+        duration=[3.0],
+        value=["outro"],
+        sandbox={"custom": "ignored", "extra": "added"},
+    )
+    with pytest.warns(UserWarning, match="Sandbox key collision for key 'custom'"):
+        res = union(ann1, ann2)
+    assert res.extent.time == [0.0, 2.0, 4.0]
+    assert res.extent.duration == [2.0, 2.0, 3.0]
+    assert res.payload.value == ["verse", "chorus", "outro"]
+    assert res.sandbox == {"custom": "keep", "extra": "added"}
+    assert res.parents == [ann1.id, ann2.id]
+    assert isinstance(res.metadata, DerivedAnnotationMetadata)
+    assert res.metadata.transform == "union"
+    assert res.metadata.parameters == {}
+
+
+def test_union_sequence_input_and_three_annotations():
+    ann1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    ann2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+    )
+    ann3 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0],
+        value=["c"],
+    )
+    # As list
+    res_list = union([ann1, ann2, ann3])
+    assert res_list.extent.time == [1.0, 2.0, 3.0]
+    assert res_list.parents == [ann1.id, ann2.id, ann3.id]
+
+    # As *args
+    res_args = union(ann1, ann2, ann3)
+    assert res_args.extent.time == [1.0, 2.0, 3.0]
+
+
+def test_union_groupings_and_labels():
+    ann1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        groupings=[{"name": "sec", "ids": [0], "labels": {"verse": 0}}],
+    )
+    ann2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+        groupings=[{"name": "sec", "ids": [1], "labels": {"chorus": 1}}],
+    )
+    res = union(ann1, ann2)
+    assert res.groupings[0].ids == [0, 1]
+    assert res.groupings[0].labels == {"verse": 0, "chorus": 1}
+
+    # Conflict in labels
+    ann_conflict = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0],
+        value=["c"],
+        groupings=[{"name": "sec", "ids": [1], "labels": {"bridge": 1}}],
+    )
+    with pytest.raises(BoppArgumentError, match="Conflicting label mapping"):
+        union(ann2, ann_conflict)
+
+
+def test_union_recomputes_disjoint_and_exhaustive():
+    # Disjoint intervals become non-disjoint
+    ann1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[3.0],
+        value=["a"],
+    )
+    ann2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[2.0],
+        duration=[3.0],
+        value=["b"],
+    )
+    res = union(ann1, ann2)
+    assert res.extent.disjoint is False
+
+
+def test_union_validation_errors():
+    ann1 = create(
+        media_id="media_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="requires at least 2 annotations"):
+        union(ann1)
+
+    with pytest.raises(BoppArgumentError, match="is not an Annotation instance"):
+        union(ann1, "not_an_annotation")  # type: ignore[arg-type]
+
+    # Mismatched media_id
+    ann_diff_media = create(
+        media_id="media_2",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+    )
+    with pytest.raises(BoppArgumentError, match="media_id"):
+        union(ann1, ann_diff_media)
+
+    # Mismatched payload_type
+    ann_diff_payload = create(
+        media_id="media_1",
+        payload_type="chord",
+        extent_type="time",
+        time=[2.0],
+        value=["C:maj"],
+    )
+    with pytest.raises(BoppArgumentError, match="Payload type mismatch"):
+        union(ann1, ann_diff_payload)
+
+    # Mismatched extent_type
+    ann_diff_extent = create(
+        media_id="media_1",
+        payload_type="tag",
+        extent_type="pixel",
+        x=[1.0],
+        y=[2.0],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="Extent type mismatch"):
+        union(ann1, ann_diff_extent)
+
+    # time_uniform extent error
+    ann_tu = create(
+        media_id="media_1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        value=["a"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="union does not support 'time_uniform' extents"
+    ):
+        union(ann_tu, ann_tu)
+
+
+# ==============================================================================
+# Tests for to_uniform_times
+# ==============================================================================
+
+
+def test_to_uniform_times_disjoint_intervals():
+    ann = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 2.0],
+        duration=[2.0, 2.0],
+        value=["verse", "chorus"],
+    )
+    res = to_uniform_times(ann, sampling_period=1.0)
+    assert res.extent.start_time == 0.0
+    assert res.extent.sampling_period == 1.0
+    assert res.payload.value == ["verse", "verse", "chorus", "chorus", "chorus"]
+    assert res.extent.disjoint is True
+    assert res.metadata.transform == "to_uniform_times"
+
+
+def test_to_uniform_times_disjoint_points():
+    ann = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0, 2.0],
+        value=["verse", "chorus"],
+    )
+    res_prev = to_uniform_times(ann, sampling_period=0.5, method="previous")
+    assert res_prev.payload.value == ["verse", "verse", "verse", "verse", "chorus"]
+
+    res_near = to_uniform_times(ann, sampling_period=0.5, method="nearest")
+    assert res_near.payload.value == [
+        "verse",
+        "verse",
+        "verse",
+        "chorus",
+        "chorus",
+    ]
+
+
+def test_to_uniform_times_requires_disjoint_extent():
+    # Overlapping intervals must raise error
+    ann_overlap = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 1.0],
+        duration=[2.0, 2.0],
+        value=["a", "b"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="requires the input extent to be disjoint"
+    ):
+        to_uniform_times(ann_overlap, sampling_period=1.0)
+
+    # Grouping is disjoint, but the overall extent is not -> MUST STILL RAISE!
+    ann_grouped_disjoint = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 1.0],
+        duration=[2.0, 2.0],
+        value=["a", "b"],
+        groupings=[{"name": "track", "ids": [0, 1], "disjoint": True}],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="requires the input extent to be disjoint"
+    ):
+        to_uniform_times(ann_grouped_disjoint, sampling_period=1.0)
+
+
+def test_to_uniform_times_gap_and_fill_value():
+    ann = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[1.0],
+        duration=[1.0],
+        value=["solo"],
+    )
+    res = to_uniform_times(
+        ann,
+        sampling_period=0.5,
+        start_time=0.0,
+        end_time=3.0,
+        fill_value="silence",
+    )
+    assert res.payload.value == [
+        "silence",
+        "silence",
+        "solo",
+        "solo",
+        "solo",
+        "silence",
+        "silence",
+    ]
+
+
+def test_to_uniform_times_validation_errors():
+    ann = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="sampling_period must be positive"):
+        to_uniform_times(ann, sampling_period=0)
+
+    with pytest.raises(
+        BoppArgumentError, match="sampling_period must be a positive number"
+    ):
+        to_uniform_times(ann, sampling_period=True)  # type: ignore[arg-type]
+
+    with pytest.raises(BoppArgumentError, match="Invalid method"):
+        to_uniform_times(ann, sampling_period=1.0, method="invalid")  # type: ignore[arg-type]
+
+    with pytest.raises(BoppArgumentError, match="Invalid overlap strategy"):
+        to_uniform_times(ann, sampling_period=1.0, overlap="multiple")  # type: ignore[arg-type]
+
+    with pytest.raises(BoppArgumentError, match="start_time .* must be <= end_time"):
+        to_uniform_times(ann, sampling_period=1.0, start_time=5.0, end_time=2.0)
+
+
+# ==============================================================================
+# Tests for to_pixels
+# ==============================================================================
+
+
+def test_to_pixels_pixel_box():
+    ann = create(
+        media_id="frame_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[0.0, 100.0],
+        width=[50.0, 50.0],
+        y=[0.0, 100.0],
+        height=[50.0, 50.0],
+        value=["top_left", "bottom_right"],
+    )
+    # Using pixels tuples
+    res = to_pixels(ann, pixels=[(25.0, 25.0), (120.0, 120.0)])
+    assert res.extent.x == [25.0, 120.0]
+    assert res.extent.y == [25.0, 120.0]
+    assert res.payload.value == ["top_left", "bottom_right"]
+    assert res.metadata.transform == "to_pixels"
+
+    # Using x and y sequences
+    res_xy = to_pixels(ann, x=[25.0, 120.0], y=[25.0, 120.0])
+    assert res_xy.payload.value == ["top_left", "bottom_right"]
+
+
+def test_to_pixels_overlap_modes():
+    ann = create(
+        media_id="frame_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[0.0, 10.0],
+        width=[20.0, 20.0],
+        y=[0.0, 10.0],
+        height=[20.0, 20.0],
+        value=["box1", "box2"],
+    )
+    # Point (15, 15) is covered by both box1 [0..20, 0..20] and box2 [10..30, 10..30]
+    res_latest = to_pixels(ann, pixels=[(15.0, 15.0)], overlap="latest")
+    assert res_latest.payload.value == ["box2"]
+
+    res_first = to_pixels(ann, pixels=[(15.0, 15.0)], overlap="first")
+    assert res_first.payload.value == ["box1"]
+
+    res_multiple = to_pixels(ann, pixels=[(15.0, 15.0)], overlap="multiple")
+    assert res_multiple.payload.value == ["box1", "box2"]
+    assert res_multiple.extent.x == [15.0, 15.0]
+
+
+def test_to_pixels_point_pixel():
+    ann = create(
+        media_id="frame_1",
+        payload_type="tag",
+        extent_type="pixel",
+        x=[10.0, 20.0],
+        y=[30.0, 40.0],
+        value=["p1", "p2"],
+    )
+    res = to_pixels(ann, pixels=[(10.0, 30.0), (99.0, 99.0)], fill_value="miss")
+    assert res.payload.value == ["p1", "miss"]
+
+
+def test_to_pixels_validation_errors():
+    ann = create(
+        media_id="frame_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[0.0],
+        width=[10.0],
+        y=[0.0],
+        height=[10.0],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="Cannot specify both 'pixels' and"):
+        to_pixels(ann, pixels=[(1.0, 1.0)], x=[1.0])
+
+    with pytest.raises(
+        BoppArgumentError, match="Lengths of 'x' .* and 'y' .* must match"
+    ):
+        to_pixels(ann, x=[1.0, 2.0], y=[1.0])
+
+    with pytest.raises(BoppArgumentError, match="Must specify either 'pixels'"):
+        to_pixels(ann)
+
+    with pytest.raises(BoppArgumentError, match="Invalid overlap strategy"):
+        to_pixels(ann, pixels=[(1.0, 1.0)], overlap="invalid")  # type: ignore[arg-type]
+
+    # Incompatible extent
+    ann_time = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    with pytest.raises(BoppArgumentError, match="is incompatible with to_pixels"):
+        to_pixels(ann_time, pixels=[(1.0, 1.0)])
+
+
+# ==============================================================================
+# Additional Coverage Tests for sort, shift, union, to_uniform_times, to_pixels
+# ==============================================================================
+
+
+def test_sort_coverage_branches():
+    # 1. Bare non-fraction extent column
+    ann_bare_time = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0, 1.0, 2.0],
+        value=["c", "a", "b"],
+    )
+    res_bare_time = sort(ann_bare_time, by="time")
+    assert res_bare_time.extent.time == [1.0, 2.0, 3.0]
+
+    # 2. Bare confidence column
+    ann_bare_conf = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
+        time=[1.0, 2.0, 3.0],
+        value=["a", "b", "c"],
+        confidence=[0.9, 0.1, 0.5],
+    )
+    res_bare_conf = sort(ann_bare_conf, by="confidence")
+    assert res_bare_conf.confidence.confidence == [0.1, 0.5, 0.9]
+
+    # 3. Missing confidence column in qualified search
+    with pytest.raises(
+        BoppArgumentError, match="Field 'missing' not found in confidence"
+    ):
+        sort(ann_bare_conf, by="confidence.missing")
+
+    # 4. Ambiguous sort key across facets
+    # TagPayload has 'value'; create an extent or confidence that also has 'value'
+    # Or create an annotation with Grouping named 'value'
+    ann_ambig = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0, 2.0],
+        value=["a", "b"],
+        groupings=[{"name": "value", "ids": [1, 0]}],
+    )
+    with pytest.raises(BoppArgumentError, match="Ambiguous sort key 'value'"):
+        sort(ann_ambig, by="value")
+
+    # 5. Bare fraction extent axis sort
+    ann_frac = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[3, 1], [1, 1], [2, 1]],
+        value=["c", "a", "b"],
+    )
+    res_frac = sort(ann_frac, by="quarter")
+    assert res_frac.extent.quarter == [[1, 1], [2, 1], [3, 1]]
+
+    # 6. Unrecognized facet prefix
+    with pytest.raises(BoppArgumentError, match="Unrecognized facet prefix 'invalid'"):
+        sort(ann_bare_time, by="invalid.field")
+
+
+def test_shift_coverage_branches(monkeypatch):
+    # 1. time_frequency_box on 'frequency' axis (kind == 'min_max')
+    ann_tfbox = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_frequency_box",
+        time=[0.0],
+        duration=[1.0],
+        freq_min=[100.0],
+        freq_max=[500.0],
+        value=["tone"],
+        min_freq=50.0,
+        max_freq=1000.0,
+    )
+    shifted_freq = shift(ann_tfbox, 50.0, target_field="frequency")
+    assert shifted_freq.extent.freq_min == [150.0]
+    assert shifted_freq.extent.freq_max == [550.0]
+    assert shifted_freq.extent.min_freq == 100.0
+    assert shifted_freq.extent.max_freq == 1050.0
+
+    # 2. text extent (integer axis, kind == 'point')
+    ann_text = create(
+        media_id="text_1",
+        payload_type="tag",
+        extent_type="text",
+        offset=[5, 15],
+        value=["w1", "w2"],
+        min_offset=0,
+        max_offset=20,
+    )
+    shifted_text = shift(ann_text, 10)
+    assert shifted_text.extent.offset == [15, 25]
+    assert shifted_text.extent.min_offset == 10
+    assert shifted_text.extent.max_offset == 30
+
+    # 3. time_uniform with no min_time / max_time
+    ann_tu_nobounds = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=1.0,
+        sampling_period=0.5,
+        value=["a", "b"],
+    )
+    shifted_tu = shift(ann_tu_nobounds, 2.0)
+    assert shifted_tu.extent.start_time == 3.0
+
+    # 4. time_uniform with invalid displacement
+    with pytest.raises(
+        BoppArgumentError,
+        match="Displacement for 'time_uniform' must be an int or float",
+    ):
+        shift(ann_tu_nobounds, "bad")  # type: ignore[arg-type]
+
+    with pytest.raises(BoppArgumentError, match="must be finite and not NaN"):
+        shift(ann_tu_nobounds, float("nan"))
+
+    # 5. Fraction axis with invalid displacement
+    ann_score = create(
+        media_id="score_1",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[0, 1]],
+        value=["note"],
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="Displacement for fraction axis 'quarter' must be an int",
+    ):
+        shift(ann_score, "invalid")  # type: ignore[arg-type]
+
+    # 6. Extent without valid schema tag
+    with monkeypatch.context() as m:
+        m.setattr("bopp.transforms._get_tag", lambda _: None)
+        with pytest.raises(BoppArgumentError, match="extent has no valid schema tag"):
+            shift(ann_text, 1)
+
+    # 7. Float axis with invalid type
+    ann_time = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="Displacement for axis 'time' must be an int or float"
+    ):
+        shift(ann_time, "bad")  # type: ignore[arg-type]
+
+    # 8. score_interval (origin_span, fraction axis) with bounds
+    ann_score_int = create(
+        media_id="s1",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[1, 2]],
+        duration=[[1, 4]],
+        value=["note"],
+        min_quarter=[0, 1],
+        max_quarter=[2, 1],
+    )
+    shifted_si = shift(ann_score_int, [1, 2])
+    assert shifted_si.extent.quarter == [[1, 1]]
+    assert shifted_si.extent.min_quarter == [1, 2]
+    assert shifted_si.extent.max_quarter == [5, 2]
+
+    # 9. text_interval (origin_span, integer axis) with bounds
+    ann_text_int = create(
+        media_id="txt1",
+        payload_type="tag",
+        extent_type="text_interval",
+        offset=[10],
+        length=[5],
+        value=["word"],
+        min_offset=0,
+        max_offset=20,
+    )
+    shifted_ti = shift(ann_text_int, 5)
+    assert shifted_ti.extent.offset == [15]
+    assert shifted_ti.extent.min_offset == 5
+    assert shifted_ti.extent.max_offset == 25
+
+    # 10. time_interval with bounds
+    ann_tint = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[1.0],
+        duration=[2.0],
+        value=["v"],
+        min_time=0.0,
+        max_time=5.0,
+    )
+    shifted_tint = shift(ann_tint, 1.0)
+    assert shifted_tint.extent.time == [2.0]
+    assert shifted_tint.extent.min_time == 1.0
+    assert shifted_tint.extent.max_time == 6.0
+
+    # 11. text_interval without bounds
+    ann_ti_nobounds = create(
+        media_id="txt1",
+        payload_type="tag",
+        extent_type="text_interval",
+        offset=[10],
+        length=[5],
+        value=["word"],
+    )
+    shifted_ti_nobounds = shift(ann_ti_nobounds, 5)
+    assert shifted_ti_nobounds.extent.offset == [15]
+    assert shifted_ti_nobounds.extent.min_offset is msgspec.UNSET
+    assert shifted_ti_nobounds.extent.max_offset is msgspec.UNSET
+
+
+def test_union_coverage_branches():
+    ann1 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    # 1. Mismatched bopp_version
+    ann_diff_ver = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+    )
+    ann_diff_ver.bopp_version = "0.9"
+    with pytest.raises(BoppArgumentError, match="bopp_version"):
+        union(ann1, ann_diff_ver)
+
+    # 2. Missing payload on first annotation
+    ann_no_payload = Annotation(
+        media_id="m1",
+        bopp_version="1.0",
+        payload=None,  # type: ignore[arg-type]
+        extent=Time(time=[1.0], disjoint=True, exhaustive=False),
+    )
+    with pytest.raises(
+        BoppArgumentError, match="First annotation has no valid payload"
+    ):
+        union(ann_no_payload, ann1)
+
+    # 3. Second operand has time_uniform
+    ann_tu = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        value=["x"],
+    )
+    with pytest.raises(BoppArgumentError, match="is unsupported in union"):
+        union(ann1, ann_tu)
+
+    # 4. Confidence mismatch: one has confidence, other does not
+    ann_conf = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
+        time=[2.0],
+        value=["b"],
+        confidence=[0.8],
+    )
+    with pytest.raises(BoppArgumentError, match="Confidence type mismatch"):
+        union(ann1, ann_conf)
+    with pytest.raises(BoppArgumentError, match="Confidence type mismatch"):
+        union(ann_conf, ann1)
+
+    # 5. Groupings mismatch: one has groupings, other does not
+    ann_group = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+        groupings=[{"name": "layer1", "ids": [0]}],
+    )
+    with pytest.raises(BoppArgumentError, match="Groupings mismatch"):
+        union(ann1, ann_group)
+    with pytest.raises(BoppArgumentError, match="Groupings mismatch"):
+        union(ann_group, ann1)
+
+    # 6. Groupings count mismatch
+    ann_group_2 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0],
+        value=["c"],
+        groupings=[
+            {"name": "layer1", "ids": [0]},
+            {"name": "layer2", "ids": [1]},
+        ],
+    )
+    with pytest.raises(BoppArgumentError, match="Groupings count mismatch"):
+        union(ann_group, ann_group_2)
+
+    # 7. Groupings layer name mismatch
+    ann_group_diffname = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0],
+        value=["c"],
+        groupings=[{"name": "other_name", "ids": [0]}],
+    )
+    with pytest.raises(BoppArgumentError, match="Grouping layer name mismatch"):
+        union(ann_group, ann_group_diffname)
+
+    # 8. Conflicting label mapping: label assigned to two different IDs
+    ann_lbl1 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        groupings=[{"name": "g", "ids": [0], "labels": {"verse": 0}}],
+    )
+    ann_lbl2 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+        groupings=[{"name": "g", "ids": [1], "labels": {"verse": 1}}],
+    )
+    with pytest.raises(BoppArgumentError, match="Conflicting label mapping"):
+        union(ann_lbl1, ann_lbl2)
+
+    # 9. Confidence facet concatenation and bounds combination
+    ann_c1 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
+        time=[1.0],
+        value=["a"],
+        confidence=[0.5],
+        min_time=1.0,
+        max_time=1.0,
+    )
+    ann_c2 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
+        time=[2.0],
+        value=["b"],
+        confidence=[0.8],
+        min_time=2.0,
+        max_time=2.0,
+    )
+    res_conf_union = union(ann_c1, ann_c2)
+    assert res_conf_union.confidence.confidence == [0.5, 0.8]
+    assert res_conf_union.extent.min_time == 1.0
+    assert res_conf_union.extent.max_time == 2.0
+
+    # 10. Fraction extent min/max bounds combination
+    ann_sq1 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[1, 4]],
+        value=["a"],
+        min_quarter=[1, 4],
+        max_quarter=[1, 4],
+    )
+    ann_sq2 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[1, 2]],
+        value=["b"],
+        min_quarter=[1, 2],
+        max_quarter=[1, 2],
+    )
+    res_sq = union(ann_sq1, ann_sq2)
+    assert res_sq.extent.min_quarter == [1, 4]
+    assert res_sq.extent.max_quarter == [1, 2]
+
+    # 11. Parents lineage: operand with existing parents and operand with no ID
+    ann_with_parents = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        parents=["parent_123"],
+    )
+    ann_no_id = Annotation(
+        media_id="m1",
+        bopp_version="1.0",
+        payload=TagPayload(value=["b"]),
+        extent=Time(time=[2.0], disjoint=True, exhaustive=False),
+    )
+    with pytest.warns(UserWarning, match="Unioning an annotation with no ID"):
+        res_parents = union(ann_with_parents, ann_no_id)
+    assert "parent_123" in res_parents.parents
+    assert ann_with_parents.id in res_parents.parents
+
+    # 12. Pure payload annotations without extent (extent is UNSET)
+    ann_pure1 = create(media_id="m1", payload_type="tag", value=["a"])
+    ann_pure2 = create(media_id="m1", payload_type="tag", value=["b"])
+    res_pure = union(ann_pure1, ann_pure2)
+    assert res_pure.payload.value == ["a", "b"]
+    assert res_pure.extent is msgspec.UNSET
+
+    # 13. Union with repeated operand (ID already in parents)
+    res_dup = union(ann1, ann1)
+    assert len(res_dup.parents) == 1
+
+    # 14. Conflicting label-to-id mapping in grouping
+    ann_lid1 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        groupings=[{"name": "g", "ids": [0], "labels": {"lbl_a": 0}}],
+    )
+    ann_lid2 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+        groupings=[{"name": "g", "ids": [0], "labels": {"lbl_b": 0}}],
+    )
+    with pytest.raises(BoppArgumentError, match="Conflicting label mapping"):
+        union(ann_lid1, ann_lid2)
+
+    # 15. Groupings without labels
+    ann_nolbl1 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        groupings=[{"name": "g", "ids": [0]}],
+    )
+    ann_nolbl2 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+        groupings=[{"name": "g", "ids": [1]}],
+    )
+    res_nolbl = union(ann_nolbl1, ann_nolbl2)
+    assert res_nolbl.groupings[0].ids == [0, 1]
+    assert res_nolbl.groupings[0].labels is msgspec.UNSET
+
+    # 16. Operands sharing a parent ID
+    ann_p1 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        parents=["common_parent"],
+    )
+    ann_p2 = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+        parents=["common_parent"],
+    )
+    res_shared_p = union(ann_p1, ann_p2)
+    assert res_shared_p.parents.count("common_parent") == 1
+
+
+def test_to_uniform_times_coverage_branches():
+    # 1. Missing extent
+    ann_no_extent = create(
+        media_id="m1",
+        payload_type="tag",
+        value=["a"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="requires an annotation with a temporal extent"
+    ):
+        to_uniform_times(ann_no_extent, sampling_period=1.0)
+
+    # 2. Incompatible extent (pixel)
+    ann_pixel = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="pixel",
+        x=[1.0],
+        y=[1.0],
+        value=["a"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="is incompatible with to_uniform_times"
+    ):
+        to_uniform_times(ann_pixel, sampling_period=1.0)
+
+    # 3. Conversion from time_uniform to time_uniform
+    ann_tu = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        value=["a", "b", "c"],
+    )
+    res_tu = to_uniform_times(ann_tu, sampling_period=0.5)
+    assert res_tu.extent.sampling_period == 0.5
+    assert len(res_tu.payload.value) == 5
+
+    # 4. Empty annotation with explicit start/end time, and without them
+    ann_empty = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[],
+        value=[],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="Cannot infer temporal bounds from empty annotation"
+    ):
+        to_uniform_times(ann_empty, sampling_period=1.0)
+
+    res_empty = to_uniform_times(
+        ann_empty, sampling_period=1.0, start_time=0.0, end_time=2.0, fill_value="gap"
+    )
+    assert res_empty.payload.value == ["gap", "gap", "gap"]
+
+    # 5. Multi-column payload with dict fill_value and scalar fill_value error
+    ann_mood = create(
+        media_id="m1",
+        payload_type="mood_thayer",
+        extent_type="time",
+        time=[1.0],
+        valence=[0.5],
+        arousal=[0.5],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="Multi-column payload requires fill_value to be a dict"
+    ):
+        to_uniform_times(
+            ann_mood, sampling_period=0.5, start_time=0.0, end_time=2.0, fill_value=0.0
+        )
+
+    # Missing fill value in dict
+    with pytest.raises(
+        BoppArgumentError, match="Missing fill value for payload field 'arousal'"
+    ):
+        to_uniform_times(
+            ann_mood,
+            sampling_period=0.5,
+            start_time=0.0,
+            end_time=2.0,
+            fill_value={"valence": 0.0},
+        )
+
+    # Valid dict fill value for mood
+    res_mood = to_uniform_times(
+        ann_mood,
+        sampling_period=1.0,
+        start_time=0.0,
+        end_time=2.0,
+        fill_value={"valence": 0.0, "arousal": 0.0},
+    )
+    assert res_mood.payload.valence == [0.0, 0.5, 0.5]
+
+    # 6. Invalid grouping fill value in dict
+    ann_with_g = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        groupings=[{"name": "sec", "ids": [0]}],
+    )
+    with pytest.raises(
+        BoppValidationError, match="Fill value for grouping 'sec' must be an integer"
+    ):
+        to_uniform_times(
+            ann_with_g,
+            sampling_period=1.0,
+            start_time=0.0,
+            end_time=2.0,
+            fill_value={"value": "gap", "sec": "not_an_int"},  # type: ignore[dict-item]
+        )
+
+    # 7. Interval extent with overlap='first'
+    ann_int = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0, 1.0],
+        duration=[1.0, 1.0],
+        value=["first_int", "second_int"],
+    )
+    # Touching at t=1.0: overlap='first' should pick 'first_int'
+    res_first = to_uniform_times(ann_int, sampling_period=1.0, overlap="first")
+    assert res_first.payload.value[1] == "first_int"
+
+    # 8. Point extent method='previous' with timestamp before first point (gap)
+    ann_pt = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["solo"],
+    )
+    res_prev_gap = to_uniform_times(
+        ann_pt,
+        sampling_period=1.0,
+        start_time=0.0,
+        end_time=3.0,
+        fill_value="gap",
+        method="previous",
+    )
+    assert res_prev_gap.payload.value == ["gap", "gap", "solo", "solo"]
+
+    # 9. Confidence facet resampling with gap (and validation)
+    ann_conf = create(
+        media_id="m1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="likelihood",
+        time=[1.0],
+        value=["a"],
+        confidence=[0.9],
+    )
+    res_conf_tu = to_uniform_times(
+        ann_conf,
+        sampling_period=1.0,
+        start_time=0.0,
+        end_time=2.0,
+        fill_value={"value": "gap", "confidence": 0.1},
+    )
+    assert res_conf_tu.confidence.confidence == [0.1, 0.9, 0.9]
+
+    # 10. Single column payload with dict fill_value using "value"
+    res_val_only = to_uniform_times(
+        ann_pt,
+        sampling_period=1.0,
+        start_time=0.0,
+        end_time=3.0,
+        fill_value={"value": "gap"},
+        method="previous",
+    )
+    assert res_val_only.payload.value == ["gap", "gap", "solo", "solo"]
+
+    # 11. Valid grouping fill value in dict
+    res_g_val = to_uniform_times(
+        ann_with_g,
+        sampling_period=1.0,
+        start_time=0.0,
+        end_time=2.0,
+        fill_value={"value": "gap", "sec": 99},
+    )
+    assert res_g_val.groupings[0].ids == [99, 0, 0]
+
+    # 12. Interval extent with overlap='latest'
+    res_latest = to_uniform_times(ann_int, sampling_period=1.0, overlap="latest")
+    assert res_latest.payload.value[1] == "second_int"
+
+    # 13. Confidence not specified in dict fill_value (defaults to 0.0)
+    res_conf_def = to_uniform_times(
+        ann_conf,
+        sampling_period=1.0,
+        start_time=0.0,
+        end_time=2.0,
+        fill_value={"value": "gap"},
+    )
+    assert res_conf_def.confidence.confidence == [0.0, 0.9, 0.9]
+
+    # 14. Grouping not specified in dict fill_value (defaults to -1)
+    res_g_unfilled = to_uniform_times(
+        ann_with_g,
+        sampling_period=1.0,
+        start_time=0.0,
+        end_time=2.0,
+        fill_value={"value": "gap"},
+    )
+    assert res_g_unfilled.groupings[0].ids == [-1, 0, 0]
+
+
+def test_to_pixels_coverage_branches():
+    # 1. Empty query points
+    ann_box = create(
+        media_id="img_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[0.0],
+        width=[10.0],
+        y=[0.0],
+        height=[10.0],
+        value=["box"],
+    )
+    res_empty_query = to_pixels(ann_box, pixels=[])
+    assert res_empty_query.extent.x == []
+    assert res_empty_query.extent.y == []
+    assert res_empty_query.payload.value == []
+
+    # 2. Empty source annotation
+    ann_empty_src = create(
+        media_id="img_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[],
+        width=[],
+        y=[],
+        height=[],
+        value=[],
+    )
+    res_empty_src = to_pixels(ann_empty_src, pixels=[(5.0, 5.0)], fill_value="gap")
+    assert res_empty_src.payload.value == ["gap"]
+
+    # 3. Global annotation without extent (broadcast)
+    ann_global = create(
+        media_id="img_1",
+        payload_type="tag",
+        value=["global_tag"],
+    )
+    res_global = to_pixels(ann_global, pixels=[(1.0, 2.0), (3.0, 4.0)])
+    assert res_global.payload.value == ["global_tag", "global_tag"]
+    assert res_global.extent.x == [1.0, 3.0]
+    assert res_global.extent.y == [2.0, 4.0]
+
+    # 4. Point pixel extent with overlap='multiple', 'first', 'latest'
+    ann_px_dup = create(
+        media_id="img_1",
+        payload_type="tag",
+        extent_type="pixel",
+        x=[5.0, 5.0],
+        y=[5.0, 5.0],
+        value=["first_val", "second_val"],
+    )
+    res_px_first = to_pixels(ann_px_dup, pixels=[(5.0, 5.0)], overlap="first")
+    assert res_px_first.payload.value == ["first_val"]
+
+    res_px_latest = to_pixels(ann_px_dup, pixels=[(5.0, 5.0)], overlap="latest")
+    assert res_px_latest.payload.value == ["second_val"]
+
+    res_px_mult = to_pixels(ann_px_dup, pixels=[(5.0, 5.0)], overlap="multiple")
+    assert res_px_mult.payload.value == ["first_val", "second_val"]
+
+    # 5. Multi-column payload with dict fill_value and scalar fill_value error
+    ann_mood_box = create(
+        media_id="img_1",
+        payload_type="mood_thayer",
+        extent_type="pixel_box",
+        x=[0.0],
+        width=[10.0],
+        y=[0.0],
+        height=[10.0],
+        valence=[0.8],
+        arousal=[0.4],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="Multi-column payload requires fill_value to be a dict"
+    ):
+        to_pixels(ann_mood_box, pixels=[(20.0, 20.0)], fill_value=0.0)
+
+    with pytest.raises(
+        BoppArgumentError, match="Missing fill value for payload field 'arousal'"
+    ):
+        to_pixels(
+            ann_mood_box,
+            pixels=[(20.0, 20.0)],
+            fill_value={"valence": 0.0},
+        )
+
+    res_mood_box = to_pixels(
+        ann_mood_box,
+        pixels=[(5.0, 5.0), (20.0, 20.0)],
+        fill_value={"valence": 0.0, "arousal": 0.0},
+    )
+    assert res_mood_box.payload.valence == [0.8, 0.0]
+
+    # 6. Invalid grouping fill value in dict
+    ann_box_g = create(
+        media_id="img_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[0.0],
+        width=[10.0],
+        y=[0.0],
+        height=[10.0],
+        value=["a"],
+        groupings=[{"name": "obj", "ids": [1]}],
+    )
+    with pytest.raises(
+        BoppValidationError, match="Fill value for grouping 'obj' must be an integer"
+    ):
+        to_pixels(
+            ann_box_g,
+            pixels=[(50.0, 50.0)],
+            fill_value={"value": "gap", "obj": "not_an_int"},  # type: ignore[dict-item]
+        )
+
+    # 7. Confidence facet resampling with gap in to_pixels
+    ann_box_conf = create(
+        media_id="img_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        confidence_type="likelihood",
+        x=[0.0],
+        width=[10.0],
+        y=[0.0],
+        height=[10.0],
+        value=["a"],
+        confidence=[0.95],
+    )
+    res_box_conf = to_pixels(
+        ann_box_conf,
+        pixels=[(5.0, 5.0), (50.0, 50.0)],
+        fill_value={"value": "gap", "confidence": 0.05},
+    )
+    assert res_box_conf.confidence.confidence == [0.95, 0.05]
+
+    # 8. Single-column payload with dict fill_value using 'value'
+    res_box_val = to_pixels(ann_box, pixels=[(50.0, 50.0)], fill_value={"value": "gap"})
+    assert res_box_val.payload.value == ["gap"]
+
+    # 9. Valid grouping fill value in dict
+    res_box_g_val = to_pixels(
+        ann_box_g,
+        pixels=[(50.0, 50.0)],
+        fill_value={"value": "gap", "obj": 99},
+    )
+    assert res_box_g_val.groupings[0].ids == [99]
+
+    # 10. Pixel box extent with overlap='first'
+    ann_boxes_overlap = create(
+        media_id="img_1",
+        payload_type="tag",
+        extent_type="pixel_box",
+        x=[0.0, 0.0],
+        width=[10.0, 10.0],
+        y=[0.0, 0.0],
+        height=[10.0, 10.0],
+        value=["first_box", "second_box"],
+    )
+    res_box_first = to_pixels(ann_boxes_overlap, pixels=[(5.0, 5.0)], overlap="first")
+    assert res_box_first.payload.value == ["first_box"]
+
+    # 11. Confidence not specified in dict fill_value (defaults to 0.0)
+    res_box_conf_def = to_pixels(
+        ann_box_conf,
+        pixels=[(50.0, 50.0)],
+        fill_value={"value": "gap"},
+    )
+    assert res_box_conf_def.confidence.confidence == [0.0]
+
+    # 12. Grouping not specified in dict fill_value (defaults to -1)
+    res_px_g_unfilled = to_pixels(
+        ann_box_g,
+        pixels=[(50.0, 50.0)],
+        fill_value={"value": "gap"},
+    )
+    assert res_px_g_unfilled.groupings[0].ids == [-1]
+
+
+def test_copilot_union_and_resampling_coverage(monkeypatch):
+    from bopp.core import create
+    from bopp.exceptions import BoppArgumentError
+    from bopp.transforms import to_pixels, to_times, to_uniform_times, union
+
+    # 1. Union payload column mismatch (optional column voiced)
+    ann_freq1 = create(
+        media_id="t1",
+        payload_type="frequency_hz",
+        extent_type="time",
+        time=[1.0],
+        value=[440.0],
+        voiced=[True],
+    )
+    ann_freq2 = create(
+        media_id="t1",
+        payload_type="frequency_hz",
+        extent_type="time",
+        time=[2.0],
+        value=[880.0],
+    )
+    with pytest.raises(BoppArgumentError, match="Payload column mismatch"):
+        union(ann_freq1, ann_freq2)
+
+    # 2. Union payload scalar mismatch (ext_schema)
+    ann_ext1 = create(
+        media_id="t1",
+        payload_type="ext",
+        ext_schema="schema_a",
+        extent_type="time",
+        time=[1.0],
+        value=["v1"],
+    )
+    ann_ext2 = create(
+        media_id="t1",
+        payload_type="ext",
+        ext_schema="schema_b",
+        extent_type="time",
+        time=[2.0],
+        value=["v2"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="Scalar payload field 'ext_schema' must match"
+    ):
+        union(ann_ext1, ann_ext2)
+
+    # 3. Union confidence column mismatch
+    ann_conf1 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[1.0],
+        value=["a"],
+        confidence=[0.9],
+        num_annotators=[5],
+    )
+    ann_conf2 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[2.0],
+        value=["b"],
+        confidence=[0.8],
+    )
+    with pytest.raises(BoppArgumentError, match="Confidence column mismatch"):
+        union(ann_conf1, ann_conf2)
+
+    # 4. Union confidence scalar mismatch
+    ann_conf_s1 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[1.0],
+        value=["a"],
+        confidence=[0.9],
+        num_annotators_common=5,
+    )
+    ann_conf_s2 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[2.0],
+        value=["b"],
+        confidence=[0.8],
+        num_annotators_common=10,
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="Scalar confidence field 'num_annotators_common' must match",
+    ):
+        union(ann_conf_s1, ann_conf_s2)
+
+    # 5. Fallback observation count via groupings when source_cols is empty
+    ann_global = create(
+        media_id="t1",
+        payload_type="tag",
+        value=["g1"],
+        groupings=[{"name": "layer1", "ids": [0]}],
+    )
+    with monkeypatch.context() as m:
+        # Simulate payload and confidence having no list columns
+        m.setattr("bopp.transforms._get_facet_list_fields", lambda s: {})
+        res_t = to_times(ann_global, times=[0.0])
+        assert len(res_t.groupings[0].ids) == 1
+
+        ann_tu = create(
+            media_id="t1",
+            payload_type="tag",
+            extent_type="time_uniform",
+            sampling_period=1.0,
+            start_time=0.0,
+            value=["g1"],
+            groupings=[{"name": "layer1", "ids": [0]}],
+        )
+        res_ut = to_uniform_times(
+            ann_tu, sampling_period=1.0, start_time=0.0, end_time=0.0
+        )
+        assert len(res_ut.groupings[0].ids) == 1
+
+        res_px = to_pixels(ann_global, pixels=[(0.0, 0.0)])
+        assert len(res_px.groupings[0].ids) == 1
+
+
+def test_more_coverage_remaining_branches():
+    from bopp.core import create
+    from bopp.exceptions import BoppArgumentError
+    from bopp.transforms import filter_by, to_times, trim
+
+    # 1. trim invalid target field on time_uniform
+    ann_tu = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        sampling_period=1.0,
+        start_time=0.0,
+        value=["a", "b", "c"],
+    )
+    with pytest.raises(BoppArgumentError, match="Unsupported target_field"):
+        trim(ann_tu, start=1.0, target_field="pitch")
+
+    # 2. trim on time_uniform with only max_time set
+    ann_tu_max = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        sampling_period=1.0,
+        start_time=0.0,
+        max_time=10.0,
+        value=["a", "b"],
+    )
+    trimmed_max = trim(ann_tu_max, end=5.0)
+    assert getattr(trimmed_max.extent, "max_time", None) == 5.0
+
+    # trim on time_uniform without min_time or max_time set
+    trimmed_tu = trim(ann_tu, end=1.5)
+    assert len(trimmed_tu.payload.value) == 2
+
+    # 3. filter_by on time_uniform
+    with pytest.raises(
+        BoppArgumentError, match="filter_by is not supported for 'time_uniform'"
+    ):
+        filter_by(ann_tu, predicate=lambda obs: True)
+
+    # 4. to_times on time_uniform with sample_rate
+    res_sr = to_times(ann_tu, sample_rate=2.0)
+    assert len(res_sr.payload.value) == 5
+
+    # 5. to_times on time_uniform with times and method previous
+    res_prev = to_times(ann_tu, times=[0.5, 1.5], method="previous")
+    assert res_prev.payload.value == ["a", "b"]
+
+
+def test_copilot_bounds_and_drift_fixes():
+    from bopp.core import create
+    from bopp.exceptions import BoppArgumentError
+    from bopp.transforms import to_pixels, to_times, to_uniform_times, union
+
+    # 1. Union aggregating effective bounds from unbounded operands
+    ann1 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        min_time=0.0,
+        max_time=1.0,
+        exhaustive=True,
+        disjoint=True,
+        value=["a"],
+    )
+    assert ann1.extent.exhaustive is True
+
+    ann2 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[10.0],
+        duration=[1.0],
+        value=["b"],
+    )
+    u_ann = union(ann1, ann2)
+    assert getattr(u_ann.extent, "min_time", None) == 0.0
+    assert getattr(u_ann.extent, "max_time", None) == 11.0
+    assert u_ann.extent.exhaustive is False
+
+    # 2. Recomputing grouping disjointedness after resampling in to_pixels and to_times
+    ann_group = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="pixel",
+        x=[0.0, 1.0],
+        y=[0.0, 1.0],
+        value=["a", "b"],
+        groupings=[{"name": "layer1", "ids": [0, 0], "disjoint": True}],
+    )
+    res_px_dup = to_pixels(ann_group, pixels=[(0.0, 0.0), (0.0, 0.0)])
+    assert res_px_dup.extent.disjoint is False
+    assert res_px_dup.groupings[0].disjoint is False
+
+    ann_t_group = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0, 1.0],
+        value=["a", "b"],
+        groupings=[{"name": "layer1", "ids": [0, 0], "disjoint": True}],
+    )
+    res_t_dup = to_times(ann_t_group, times=[0.0, 0.0])
+    assert res_t_dup.extent.disjoint is False
+    assert res_t_dup.groupings[0].disjoint is False
+
+    # 3. Marker resampling without column carriers rejected
+    ann_marker = create(
+        media_id="t1",
+        payload_type="marker",
+        extent_type="time",
+        time=[0.0, 2.0],
+        description="label",
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="to_uniform_times requires at least one columnar field",
+    ):
+        to_uniform_times(ann_marker, sampling_period=1.0)
+
+    # 4. Reject non-finite bounds in to_uniform_times
+    ann_time = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0, 1.0],
+        value=["a", "b"],
+    )
+    with pytest.raises(BoppArgumentError, match="must be finite numbers"):
+        to_uniform_times(ann_time, sampling_period=1.0, start_time=float("nan"))
+    with pytest.raises(BoppArgumentError, match="must be finite numbers"):
+        to_uniform_times(ann_time, sampling_period=1.0, end_time=float("inf"))
+
+    # 5. Floating point endpoint drift in to_uniform_times
+    ann_drift = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[0.3],
+        value=["drift"],
+    )
+    res_drift = to_uniform_times(ann_drift, sampling_period=0.1)
+    # 0.0, 0.1, 0.2, 0.3 should all be matched to "drift" without gap/fill_value
+    assert res_drift.payload.value == ["drift", "drift", "drift", "drift"]
+
+    # 6. Global resampling with multiple rows under overlap strategies
+    ann_global_multi = create(
+        media_id="t1",
+        payload_type="tag",
+        value=["a", "b"],
+    )
+    # to_times
+    res_gt_first = to_times(ann_global_multi, times=[1.0, 2.0], overlap="first")
+    assert res_gt_first.payload.value == ["a", "a"]
+    res_gt_latest = to_times(ann_global_multi, times=[1.0, 2.0], overlap="latest")
+    assert res_gt_latest.payload.value == ["b", "b"]
+    res_gt_multi = to_times(ann_global_multi, times=[1.0, 2.0], overlap="multiple")
+    assert res_gt_multi.payload.value == ["a", "b", "a", "b"]
+    assert res_gt_multi.extent.time == [1.0, 1.0, 2.0, 2.0]
+
+    # to_pixels
+    res_gp_first = to_pixels(
+        ann_global_multi, pixels=[(0.0, 0.0), (1.0, 1.0)], overlap="first"
+    )
+    assert res_gp_first.payload.value == ["a", "a"]
+    res_gp_latest = to_pixels(
+        ann_global_multi, pixels=[(0.0, 0.0), (1.0, 1.0)], overlap="latest"
+    )
+    assert res_gp_latest.payload.value == ["b", "b"]
+    res_gp_multi = to_pixels(
+        ann_global_multi, pixels=[(0.0, 0.0), (1.0, 1.0)], overlap="multiple"
+    )
+    assert res_gp_multi.payload.value == ["a", "b", "a", "b"]
+    assert res_gp_multi.extent.x == [0.0, 0.0, 1.0, 1.0]
+    assert res_gp_multi.extent.y == [0.0, 0.0, 1.0, 1.0]
+
+
+def test_union_sandbox_and_metadata_behavior():
+    ann1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        sandbox={"foo": "bar", "shared": 1},
+    )
+    ann2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+    )
+    ann3 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0],
+        value=["c"],
+        sandbox={"shared": 2, "baz": 42},
+    )
+    with pytest.warns(UserWarning, match="Sandbox key collision for key 'shared'"):
+        res = union(ann1, ann2, ann3)
+
+    assert res.sandbox == {"foo": "bar", "shared": 1, "baz": 42}
+    assert isinstance(res.metadata, DerivedAnnotationMetadata)
+    assert res.metadata.transform == "union"
+    assert res.metadata.parameters == {}
+
+    # Verify union with no sandboxes on any operand
+    ann_no_s1 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+    )
+    ann_no_s2 = create(
+        media_id="song_1",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+    )
+    res_no_s = union(ann_no_s1, ann_no_s2)
+    assert res_no_s.sandbox is msgspec.UNSET
+    assert isinstance(res_no_s.metadata, DerivedAnnotationMetadata)
+    assert res_no_s.metadata.transform == "union"
