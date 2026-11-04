@@ -680,7 +680,9 @@ def trim(
         tu_period = float(getattr(extent, "sampling_period", 0.0))
 
         payload_cols = _get_facet_list_fields(payload)
-        confidence_cols = _get_facet_list_fields(confidence)
+        confidence_cols = _get_facet_list_fields(
+            confidence if confidence is not msgspec.UNSET else None
+        )
         n_obs = len(next(iter((payload_cols or confidence_cols).values()), []))
 
         tu_shift = float(new_start) if (reset and new_start is not None) else 0.0
@@ -2437,19 +2439,20 @@ def union(
     p_updates: dict[str, list[Any]] = {}
     payload_fields = _get_facet_list_fields(first_payload_struct)
     for idx, a in enumerate(anns[1:], start=1):
-        incoming_fields = _get_facet_list_fields(a.payload)
+        incoming_fields = _get_facet_list_fields(getattr(a, "payload", None))
         if incoming_fields.keys() != payload_fields.keys():
             raise BoppArgumentError(
                 f"Payload column mismatch at index {idx}: optional columns must have matching presence."
             )
     for fname in payload_fields:
         p_updates[fname] = [
-            x for a in anns for x in getattr(a.payload, fname)
+            x for a in anns for x in getattr(getattr(a, "payload", None), fname)
         ]
     for a in anns[1:]:
+        a_payload = getattr(a, "payload", None)
         for fname in first_payload_struct.__struct_fields__:
             original = getattr(first_payload_struct, fname)
-            incoming = getattr(a.payload, fname)
+            incoming = getattr(a_payload, fname)
             if (
                 not isinstance(original, list)
                 and not isinstance(incoming, list)
@@ -2468,19 +2471,20 @@ def union(
         c_updates: dict[str, list[Any]] = {}
         confidence_fields = _get_facet_list_fields(first_conf_struct)
         for idx, a in enumerate(anns[1:], start=1):
-            incoming_fields = _get_facet_list_fields(a.confidence)
+            incoming_fields = _get_facet_list_fields(getattr(a, "confidence", None))
             if incoming_fields.keys() != confidence_fields.keys():
                 raise BoppArgumentError(
                     f"Confidence column mismatch at index {idx}: optional columns must have matching presence."
                 )
         for fname in confidence_fields:
             c_updates[fname] = [
-                x for a in anns for x in getattr(a.confidence, fname)
+                x for a in anns for x in getattr(getattr(a, "confidence", None), fname)
             ]
         for a in anns[1:]:
+            a_conf = getattr(a, "confidence", None)
             for fname in first_conf_struct.__struct_fields__:
                 original = getattr(first_conf_struct, fname)
-                incoming = getattr(a.confidence, fname)
+                incoming = getattr(a_conf, fname)
                 if (
                     not isinstance(original, list)
                     and not isinstance(incoming, list)

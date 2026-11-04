@@ -4401,3 +4401,179 @@ def test_to_pixels_coverage_branches():
         fill_value={"value": "gap"},
     )
     assert res_px_g_unfilled.groupings[0].ids == [-1]
+
+
+def test_copilot_union_and_resampling_coverage(monkeypatch):
+    from bopp.core import create
+    from bopp.exceptions import BoppArgumentError
+    from bopp.transforms import to_pixels, to_times, to_uniform_times, union
+
+    # 1. Union payload column mismatch (optional column voiced)
+    ann_freq1 = create(
+        media_id="t1",
+        payload_type="frequency_hz",
+        extent_type="time",
+        time=[1.0],
+        value=[440.0],
+        voiced=[True],
+    )
+    ann_freq2 = create(
+        media_id="t1",
+        payload_type="frequency_hz",
+        extent_type="time",
+        time=[2.0],
+        value=[880.0],
+    )
+    with pytest.raises(BoppArgumentError, match="Payload column mismatch"):
+        union(ann_freq1, ann_freq2)
+
+    # 2. Union payload scalar mismatch (ext_schema)
+    ann_ext1 = create(
+        media_id="t1",
+        payload_type="ext",
+        ext_schema="schema_a",
+        extent_type="time",
+        time=[1.0],
+        value=["v1"],
+    )
+    ann_ext2 = create(
+        media_id="t1",
+        payload_type="ext",
+        ext_schema="schema_b",
+        extent_type="time",
+        time=[2.0],
+        value=["v2"],
+    )
+    with pytest.raises(
+        BoppArgumentError, match="Scalar payload field 'ext_schema' must match"
+    ):
+        union(ann_ext1, ann_ext2)
+
+    # 3. Union confidence column mismatch
+    ann_conf1 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[1.0],
+        value=["a"],
+        confidence=[0.9],
+        num_annotators=[5],
+    )
+    ann_conf2 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[2.0],
+        value=["b"],
+        confidence=[0.8],
+    )
+    with pytest.raises(BoppArgumentError, match="Confidence column mismatch"):
+        union(ann_conf1, ann_conf2)
+
+    # 4. Union confidence scalar mismatch
+    ann_conf_s1 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[1.0],
+        value=["a"],
+        confidence=[0.9],
+        num_annotators_common=5,
+    )
+    ann_conf_s2 = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[2.0],
+        value=["b"],
+        confidence=[0.8],
+        num_annotators_common=10,
+    )
+    with pytest.raises(
+        BoppArgumentError,
+        match="Scalar confidence field 'num_annotators_common' must match",
+    ):
+        union(ann_conf_s1, ann_conf_s2)
+
+    # 5. Fallback observation count via groupings when source_cols is empty
+    ann_global = create(
+        media_id="t1",
+        payload_type="tag",
+        value=["g1"],
+        groupings=[{"name": "layer1", "ids": [0]}],
+    )
+    with monkeypatch.context() as m:
+        # Simulate payload and confidence having no list columns
+        m.setattr("bopp.transforms._get_facet_list_fields", lambda s: {})
+        res_t = to_times(ann_global, times=[0.0])
+        assert len(res_t.groupings[0].ids) == 1
+
+        ann_tu = create(
+            media_id="t1",
+            payload_type="tag",
+            extent_type="time_uniform",
+            sampling_period=1.0,
+            start_time=0.0,
+            value=["g1"],
+            groupings=[{"name": "layer1", "ids": [0]}],
+        )
+        res_ut = to_uniform_times(
+            ann_tu, sampling_period=1.0, start_time=0.0, end_time=0.0
+        )
+        assert len(res_ut.groupings[0].ids) == 1
+
+        res_px = to_pixels(ann_global, pixels=[(0.0, 0.0)])
+        assert len(res_px.groupings[0].ids) == 1
+
+
+def test_more_coverage_remaining_branches():
+    from bopp.core import create
+    from bopp.exceptions import BoppArgumentError
+    from bopp.transforms import filter_by, to_times, trim
+
+    # 1. trim invalid target field on time_uniform
+    ann_tu = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        sampling_period=1.0,
+        start_time=0.0,
+        value=["a", "b", "c"],
+    )
+    with pytest.raises(BoppArgumentError, match="Unsupported target_field"):
+        trim(ann_tu, start=1.0, target_field="pitch")
+
+    # 2. trim on time_uniform with only max_time set
+    ann_tu_max = create(
+        media_id="t1",
+        payload_type="tag",
+        extent_type="time_uniform",
+        sampling_period=1.0,
+        start_time=0.0,
+        max_time=10.0,
+        value=["a", "b"],
+    )
+    trimmed_max = trim(ann_tu_max, end=5.0)
+    assert getattr(trimmed_max.extent, "max_time", None) == 5.0
+
+    # trim on time_uniform without min_time or max_time set
+    trimmed_tu = trim(ann_tu, end=1.5)
+    assert len(trimmed_tu.payload.value) == 2
+
+    # 3. filter_by on time_uniform
+    with pytest.raises(
+        BoppArgumentError, match="filter_by is not supported for 'time_uniform'"
+    ):
+        filter_by(ann_tu, predicate=lambda obs: True)
+
+    # 4. to_times on time_uniform with sample_rate
+    res_sr = to_times(ann_tu, sample_rate=2.0)
+    assert len(res_sr.payload.value) == 5
+
+    # 5. to_times on time_uniform with times and method previous
+    res_prev = to_times(ann_tu, times=[0.5, 1.5], method="previous")
+    assert res_prev.payload.value == ["a", "b"]
