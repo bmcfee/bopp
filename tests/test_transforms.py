@@ -4612,7 +4612,7 @@ def test_copilot_bounds_and_drift_fixes():
     assert getattr(u_ann.extent, "max_time", None) == 11.0
     assert u_ann.extent.exhaustive is False
 
-    # 2. Recomputing grouping disjointness after resampling in to_pixels and to_times
+    # 2. Recomputing grouping disjointedness after resampling in to_pixels and to_times
     ann_group = create(
         media_id="t1",
         payload_type="tag",
