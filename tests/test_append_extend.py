@@ -665,8 +665,18 @@ def test_append_groupings_arguments_and_error_handling():
     assert ann.groupings[0].labels == {"label1": 0}
 
     # Non-integer grouping ID
-    with pytest.raises(bopp.BoppArgumentError, match="must be an integer"):
+    with pytest.raises(bopp.BoppArgumentError, match="expected integer or string"):
         ann.append(time=4.0, value="e", groupings={"sec": object()})
+
+    with pytest.raises(bopp.BoppArgumentError, match="expected integer or string"):
+        ann.append(time=4.0, value="e", groupings={"sec": 1.9})
+
+    with pytest.raises(bopp.BoppArgumentError, match="expected integer or string"):
+        ann.append(time=4.0, value="e", groupings={"sec": True})
+
+    # Unknown grouping layer in dict
+    with pytest.raises(bopp.BoppArgumentError, match="Unknown grouping layer"):
+        ann.append(time=4.0, value="e", groupings={"sec": 0, "typo_layer": 1})
 
 
 def test_append_with_confidence_facet():
@@ -697,7 +707,7 @@ def test_append_with_confidence_facet():
     assert derived.groupings[0].ids == [0, 0, 0]
 
 
-def test_extend_edge_cases_and_coverage():
+def test_extend_edge_cases_and_coverage(monkeypatch):
     a1 = bopp.create(
         media_id="m", payload_type="tag", extent_type="time", time=[0.0], value=["a"]
     )
@@ -933,7 +943,7 @@ def test_extend_edge_cases_and_coverage():
         media_id="track:base",
         payload_type="tag",
         extent_type="time_uniform",
-        start_time=10.0,
+        start_time=1.0,
         sampling_period=1.0,
         value=["b", "c"],
     )
@@ -995,6 +1005,678 @@ def test_extend_edge_cases_and_coverage():
     ext_within = ann_b1.extend(ann_b2, inplace=False)
     assert ext_within.extent.min_time == 0.0
     assert ext_within.extent.max_time == 10.0
+
+    # Non-columnar settings mismatch tests
+    # Scalar payload field mismatch
+    ann_p_scalar1 = bopp.create(
+        media_id="m",
+        payload_type="lyrics",
+        extent_type="time",
+        time=[0.0],
+        value=["hello"],
+        language="en",
+    )
+    ann_p_scalar2 = bopp.create(
+        media_id="m",
+        payload_type="lyrics",
+        extent_type="time",
+        time=[1.0],
+        value=["bonjour"],
+        language="fr",
+    )
+    with pytest.raises(
+        bopp.BoppArgumentError, match="Scalar payload field 'language' mismatch"
+    ):
+        ann_p_scalar1.extend(ann_p_scalar2)
+
+    # Scalar confidence field mismatch
+    ann_c_scalar1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[0.0],
+        value=["a"],
+        confidence=[1.0],
+        num_annotators_common=5,
+    )
+    ann_c_scalar2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[1.0],
+        value=["b"],
+        confidence=[0.8],
+        num_annotators_common=3,
+    )
+    with pytest.raises(
+        bopp.BoppArgumentError,
+        match="Scalar confidence field 'num_annotators_common' mismatch",
+    ):
+        ann_c_scalar1.extend(ann_c_scalar2)
+
+    # Uniform extent sampling_period and start_time mismatch
+    ann_u_sp1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        value=["a"],
+    )
+    ann_u_sp2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=1.0,
+        sampling_period=2.0,
+        value=["b"],
+    )
+    with pytest.raises(bopp.BoppArgumentError, match="sampling_period mismatch"):
+        ann_u_sp1.extend(ann_u_sp2)
+
+    ann_u_st_bad = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=5.0,
+        sampling_period=1.0,
+        value=["b"],
+    )
+    with pytest.raises(bopp.BoppArgumentError, match="start_time mismatch"):
+        ann_u_sp1.extend(ann_u_st_bad)
+
+    # Extent disjoint & exhaustive settings mismatch
+    ann_disj1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        value=["a"],
+        disjoint=True,
+    )
+    ann_disj2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[1.0],
+        duration=[1.0],
+        value=["b"],
+        disjoint=False,
+    )
+    with pytest.raises(
+        bopp.BoppArgumentError, match="Extent disjoint setting mismatch"
+    ):
+        ann_disj1.extend(ann_disj2)
+
+    ann_exh1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        value=["a"],
+        exhaustive=True,
+    )
+    ann_exh2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[1.0],
+        duration=[1.0],
+        value=["b"],
+        exhaustive=False,
+    )
+    with pytest.raises(
+        bopp.BoppArgumentError, match="Extent exhaustive setting mismatch"
+    ):
+        ann_exh1.extend(ann_exh2)
+
+    # Grouping disjoint & exhaustive settings mismatch
+    ann_grp_d1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0],
+        value=["a"],
+        groupings=[bopp.create_grouping("layer", [0], disjoint=True)],
+    )
+    ann_grp_d2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["b"],
+        groupings=[bopp.create_grouping("layer", [0], disjoint=False)],
+    )
+    with pytest.raises(
+        bopp.BoppArgumentError, match="Grouping 'layer' disjoint setting mismatch"
+    ):
+        ann_grp_d1.extend(ann_grp_d2)
+
+    ann_grp_e1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0],
+        value=["a"],
+        groupings=[bopp.create_grouping("layer", [0], exhaustive=True)],
+    )
+    ann_grp_e2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["b"],
+        groupings=[bopp.create_grouping("layer", [0], exhaustive=False)],
+    )
+    with pytest.raises(
+        bopp.BoppArgumentError, match="Grouping 'layer' exhaustive setting mismatch"
+    ):
+        ann_grp_e1.extend(ann_grp_e2)
+
+    # Optional column mismatch when n_obs_target > 0
+    ann_opt1 = bopp.create(
+        media_id="m",
+        payload_type="relation",
+        extent_type="time",
+        time=[0.0],
+        performance_id="perf1",
+        value=["a"],
+    )
+    ann_opt2 = bopp.create(
+        media_id="m",
+        payload_type="relation",
+        extent_type="time",
+        time=[1.0],
+        performance_id="perf1",
+        value=["b"],
+        relation=["r1"],
+    )
+    with pytest.raises(bopp.BoppArgumentError, match="Payload column mismatch"):
+        ann_opt1.extend(ann_opt2)
+
+    # Empty target adopting optional columns and non-columnar settings
+    ann_empty_rel = bopp.create(
+        media_id="m",
+        payload_type="relation",
+        extent_type="time_interval",
+        performance_id="perf1",
+        empty=True,
+    )
+    ann_full_rel = bopp.create(
+        media_id="m",
+        payload_type="relation",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        performance_id="perf1",
+        value=["a"],
+        relation=["r1"],
+        disjoint=True,
+        exhaustive=True,
+    )
+    ext_from_empty = ann_empty_rel.extend(ann_full_rel, inplace=False)
+    assert ext_from_empty.payload.relation == ["r1"]
+    assert ext_from_empty.extent.disjoint is True
+    assert ext_from_empty.extent.exhaustive is True
+
+    # Sanity checks warning: disjoint violation when extending from another annotation
+    ann_dj_a = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[2.0],
+        value=["a"],
+        disjoint=True,
+    )
+    ann_dj_b = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[1.0],
+        duration=[2.0],
+        value=["b"],
+        disjoint=True,
+    )
+    with pytest.warns(UserWarning, match="violating disjoint=True"):
+        ann_dj_a.extend(ann_dj_b)
+
+    # Sanity checks warning: point time disjoint violation
+    ann_pt_a = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["a"],
+        disjoint=True,
+    )
+    ann_pt_b = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["b"],
+        disjoint=True,
+    )
+    with pytest.warns(UserWarning, match="violating disjoint=True"):
+        ann_pt_a.extend(ann_pt_b)
+
+    # Sanity checks warning: score_interval disjoint violation
+    ann_si_a = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[0, 1]],
+        duration=[[2, 1]],
+        value=["a"],
+        disjoint=True,
+    )
+    ann_si_b = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[1, 1]],
+        duration=[[1, 1]],
+        value=["b"],
+        disjoint=True,
+    )
+    with pytest.warns(UserWarning, match="violating disjoint=True"):
+        ann_si_a.extend(ann_si_b)
+
+    # Sanity checks warning: score_quarter disjoint violation
+    ann_sq_a = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[2, 1]],
+        value=["a"],
+        disjoint=True,
+    )
+    ann_sq_b = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[1, 1]],
+        value=["b"],
+        disjoint=True,
+    )
+    with pytest.warns(UserWarning, match="violating disjoint=True"):
+        ann_sq_a.extend(ann_sq_b)
+
+    # Sanity checks warning: exhaustive gap violation
+    ann_ex_a = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        value=["a"],
+        exhaustive=True,
+    )
+    ann_ex_b = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[2.0],
+        duration=[1.0],
+        value=["b"],
+        exhaustive=True,
+    )
+    with pytest.warns(UserWarning, match="violating exhaustive=True"):
+        ann_ex_a.extend(ann_ex_b)
+
+    # Sanity checks warning: score_interval exhaustive gap violation
+    ann_siex_a = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[0, 1]],
+        duration=[[1, 1]],
+        value=["a"],
+        exhaustive=True,
+    )
+    ann_siex_b = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[3, 1]],
+        duration=[[1, 1]],
+        value=["b"],
+        exhaustive=True,
+    )
+    with pytest.warns(UserWarning, match="violating exhaustive=True"):
+        ann_siex_a.extend(ann_siex_b)
+
+    # Sanity checks warning: grouping layer disjoint violation
+    ann_gdj_a = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[2.0],
+        value=["a"],
+        groupings=[bopp.create_grouping("layer", [0], disjoint=True)],
+    )
+    ann_gdj_b = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[1.0],
+        duration=[2.0],
+        value=["b"],
+        groupings=[bopp.create_grouping("layer", [0], disjoint=True)],
+    )
+    with pytest.warns(UserWarning, match="overlaps with previous group member"):
+        ann_gdj_a.extend(ann_gdj_b)
+
+    # Clean non-violating extensions for disjoint, exhaustive, and grouping disjoint
+    ann_clean1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[2.0],
+        value=["a"],
+        disjoint=True,
+        exhaustive=True,
+        groupings=[bopp.create_grouping("layer", [0], disjoint=True)],
+    )
+    ann_clean2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[2.0],
+        duration=[2.0],
+        value=["b"],
+        disjoint=True,
+        exhaustive=True,
+        groupings=[bopp.create_grouping("layer", [0], disjoint=True)],
+    )
+    ext_clean = ann_clean1.extend(ann_clean2, inplace=False)
+    assert ext_clean.extent.time == [0.0, 2.0]
+
+    # Clean score_interval extension
+    ann_si_c1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[0, 1]],
+        duration=[[2, 1]],
+        value=["a"],
+        disjoint=True,
+        exhaustive=True,
+    )
+    ann_si_c2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[2, 1]],
+        duration=[[2, 1]],
+        value=["b"],
+        disjoint=True,
+        exhaustive=True,
+    )
+    ext_si_clean = ann_si_c1.extend(ann_si_c2, inplace=False)
+    assert len(ext_si_clean.extent.quarter) == 2
+
+    # Clean score_quarter and point time extensions
+    ann_sq_c1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[1, 1]],
+        value=["a"],
+        disjoint=True,
+    )
+    ann_sq_c2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_quarter",
+        quarter=[[2, 1]],
+        value=["b"],
+        disjoint=True,
+    )
+    ann_sq_c1.extend(ann_sq_c2, inplace=False)
+
+    ann_pt_c1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["a"],
+        disjoint=True,
+    )
+    ann_pt_c2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[2.0],
+        value=["b"],
+        disjoint=True,
+    )
+    ann_pt_c1.extend(ann_pt_c2, inplace=False)
+
+    # Empty uniform extent adopting settings
+    ann_empty_u = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=0.5,
+        empty=True,
+        groupings=[bopp.create_grouping("layer", ids=[], disjoint=True)],
+    )
+    ann_src_u = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=0.5,
+        value=["a", "b"],
+        groupings=[bopp.create_grouping("layer", [0, 0], disjoint=True)],
+    )
+    ext_u = ann_empty_u.extend(ann_src_u, inplace=False)
+    assert ext_u.extent.start_time == 0.0
+    assert ext_u.extent.sampling_period == 0.5
+
+    # Scalar confidence match and optional confidence reconciliation on empty
+    ann_empty_c = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        empty=True,
+    )
+    ann_full_c = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[0.0],
+        value=["a"],
+        confidence=[0.9],
+        num_annotators_common=10,
+        num_annotators=[5],
+    )
+    ext_c = ann_empty_c.extend(ann_full_c, inplace=False)
+    assert ext_c.confidence.num_annotators == [5]
+    assert ext_c.confidence.num_annotators_common == 10
+
+    # Confidence optional column mismatch when n_obs_target > 0
+    ann_c_mismatch1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[0.0],
+        value=["a"],
+        confidence=[0.9],
+        num_annotators_common=10,
+    )
+    with pytest.raises(bopp.BoppArgumentError, match="Confidence column mismatch"):
+        ann_c_mismatch1.extend(ann_full_c)
+
+    # Empty target adopting grouping disjoint/exhaustive
+    ann_empty_lyr = bopp.create(
+        media_id="m",
+        payload_type="lyrics",
+        extent_type="time",
+        language="en",
+        empty=True,
+        groupings=[
+            bopp.create_grouping("layer", ids=[], disjoint=False, exhaustive=False)
+        ],
+    )
+    ann_full_lyr = bopp.create(
+        media_id="m",
+        payload_type="lyrics",
+        extent_type="time",
+        time=[0.0],
+        value=["hello"],
+        language="en",
+        groupings=[bopp.create_grouping("layer", [0], disjoint=True, exhaustive=True)],
+    )
+    ext_lyr = ann_empty_lyr.extend(ann_full_lyr, inplace=False)
+    assert ext_lyr.payload.language == "en"
+    assert ext_lyr.groupings[0].disjoint is True
+    assert ext_lyr.groupings[0].exhaustive is True
+
+    # Empty target with conflicting explicit scalar payload
+    ann_empty_lyr_conflict = bopp.create(
+        media_id="m",
+        payload_type="lyrics",
+        extent_type="time",
+        language="fr",
+        empty=True,
+        groupings=[bopp.create_grouping("layer", ids=[])],
+    )
+    with pytest.raises(
+        bopp.BoppArgumentError, match="Scalar payload field 'language' mismatch"
+    ):
+        ann_empty_lyr_conflict.extend(ann_full_lyr)
+
+    # Empty target reconciling optional payload column
+    ann_empty_rel = bopp.create(
+        media_id="m",
+        payload_type="relation",
+        extent_type="time",
+        performance_id="p1",
+        empty=True,
+    )
+    ann_empty_rel.payload.relation = msgspec.UNSET
+    ann_full_rel = bopp.create(
+        media_id="m",
+        payload_type="relation",
+        extent_type="time",
+        performance_id="p1",
+        time=[0.0],
+        value=["w1"],
+        relation=["cover"],
+    )
+    ext_rel = ann_empty_rel.extend(ann_full_rel, inplace=False)
+    assert ext_rel.payload.relation == ["cover"]
+
+    # Empty target reconciling optional confidence column
+    ann_empty_agree = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        empty=True,
+    )
+    ann_empty_agree.confidence.num_annotators = msgspec.UNSET
+    ann_full_agree = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        confidence_type="agreement",
+        time=[0.0],
+        value=["a"],
+        confidence=[0.9],
+        num_annotators=[5],
+    )
+    ext_agree = ann_empty_agree.extend(ann_full_agree, inplace=False)
+    assert ext_agree.confidence.num_annotators == [5]
+
+    # Empty target extending another empty annotation
+    ext_both_empty = ann_empty_rel.extend(ann_empty_rel, inplace=False)
+    assert len(ext_both_empty.extent.time) == 0
+
+    # Exhaustive check on score_interval with consecutive observations
+    ann_score1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[0, 1]],
+        duration=[[1, 1]],
+        value=["a"],
+        exhaustive=True,
+    )
+    ann_score2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[1, 1]],
+        duration=[[1, 1]],
+        value=["b"],
+        exhaustive=True,
+    )
+    ext_score = ann_score1.extend(ann_score2, inplace=False)
+    assert len(ext_score.extent.quarter) == 2
+
+    # Exhaustive check on time extent (tag != time_interval and tag != score_interval)
+    ann_t_ex1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0],
+        value=["a"],
+        exhaustive=True,
+    )
+    ann_t_ex2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["b"],
+        exhaustive=True,
+    )
+    ext_t_ex = ann_t_ex1.extend(ann_t_ex2, inplace=False)
+    assert len(ext_t_ex.extent.time) == 2
+
+    # Extent column mismatch test (line 1127)
+    orig_get_cols = bopp.core._get_annotation_columns
+
+    def fake_get_cols(ann):
+        p, e, c, g = orig_get_cols(ann)
+        if ann is a_ext_col_src:
+            e = dict(e)
+            e["extra_col"] = []
+        return p, e, c, g
+
+    a_ext_col_src = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0],
+        value=["b"],
+    )
+    monkeypatch.setattr(bopp.core, "_get_annotation_columns", fake_get_cols)
+    with pytest.raises(bopp.BoppArgumentError, match="Extent column mismatch"):
+        a1.extend(a_ext_col_src)
+    monkeypatch.undo()
+
+    # Annotation with no payload (branch 1042->1052)
+    fake_ann1 = bopp.create(media_id="m", payload_type="tag", empty=True)
+    fake_ann2 = bopp.create(media_id="m", payload_type="tag", empty=True)
+    fake_ann1.payload = None
+    fake_ann2.payload = None
+    ext_no_payload = bopp.extend(fake_ann1, fake_ann2, inplace=False)
+    assert ext_no_payload.payload is None
 
     # Unsupported observations type (line 1135)
     with pytest.raises(bopp.BoppArgumentError, match="Unsupported observations type"):

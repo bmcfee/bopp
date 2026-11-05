@@ -129,6 +129,31 @@ def test_create_grouping_string_labels_with_explicit_mapping():
     assert g.ids == [20, 10]
     assert g.labels == {"verse": 10, "chorus": 20}
 
+    # Sequence-valued labels with explicit IDs
+    g_seq = bopp.create_grouping("sections", [0, 1], labels=["verse", "chorus"])
+    assert g_seq.ids == [0, 1]
+    assert g_seq.labels == {"verse": 0, "chorus": 1}
+
+    # Empty grouping with sequence-valued labels
+    g_seq_empty = bopp.create_grouping("sections", ids=[], labels=["verse", "chorus"])
+    assert g_seq_empty.ids == []
+    assert g_seq_empty.labels == {"verse": 0, "chorus": 1}
+
+    # Sequence-valued labels with string observation IDs
+    g_seq_str = bopp.create_grouping(
+        "sections", ["chorus", "verse"], labels=["verse", "chorus"]
+    )
+    assert g_seq_str.ids == [1, 0]
+    assert g_seq_str.labels == {"verse": 0, "chorus": 1}
+
+    # Duplicate labels in sequence
+    with pytest.raises(bopp.BoppArgumentError, match="Duplicate labels"):
+        bopp.create_grouping("sections", [0, 1], labels=["verse", "verse"])
+
+    # Non-string labels in sequence
+    with pytest.raises(bopp.BoppArgumentError, match="must contain strings"):
+        bopp.create_grouping("sections", [0, 1], labels=[1, 2])
+
     with pytest.raises(
         bopp.BoppArgumentError, match="not found in the provided labels"
     ):
@@ -316,14 +341,89 @@ def test_create_edge_cases_and_errors():
         )
     assert ann_ext.payload.value == [{"name": "item1", "score": 1.0}]
 
+    # 7. Unrecognized facet types
+    with pytest.raises(bopp.BoppRegistryError, match="Unrecognized payload type"):
+        bopp.create(media_id="m", payload_type="invalid_payload")
+
+    with pytest.raises(bopp.BoppRegistryError, match="Unrecognized extent type"):
+        bopp.create(
+            media_id="m", payload_type="tag", extent_type="invalid_extent", empty=True
+        )
+
+    with pytest.raises(bopp.BoppRegistryError, match="Unrecognized confidence type"):
+        bopp.create(
+            media_id="m",
+            payload_type="tag",
+            confidence_type="invalid_confidence",
+            empty=True,
+        )
+
+    with pytest.raises(bopp.BoppRegistryError, match="Unrecognized metadata type"):
+        bopp.create(
+            media_id="m",
+            payload_type="tag",
+            metadata_type="invalid_metadata",
+            empty=True,
+        )
+
+    # 8. Cannot specify both metadata and metadata_type (non-dict metadata)
+    meta_obj = bopp.create_metadata("human", annotator_id="alice", tool="audacity")
+    with pytest.raises(
+        bopp.BoppArgumentError,
+        match="Cannot specify both 'metadata' and 'metadata_type'",
+    ):
+        bopp.create(
+            media_id="m",
+            payload_type="tag",
+            metadata_type="human",
+            metadata=meta_obj,
+            empty=True,
+        )
+
+    # 9. metadata_type without dict metadata passed as kwargs
+    ann_meta_kwargs = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        metadata_type="human",
+        annotator_id="bob",
+        tool="audacity",
+        empty=True,
+    )
+    assert ann_meta_kwargs.metadata.annotator_id == "bob"
+
+    # 10. metadata as dict without metadata_type
+    ann_meta_dict = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        metadata={
+            "metadata_type": "human",
+            "annotator_id": "charlie",
+            "tool": "audacity",
+        },
+        empty=True,
+    )
+    assert ann_meta_dict.metadata.annotator_id == "charlie"
+
+    # 11. Unconsumed keyword arguments
+    with pytest.raises(bopp.BoppArgumentError, match="Unconsumed keyword arguments"):
+        bopp.create(media_id="m", payload_type="tag", empty=True, unexpected_field=123)
+
 
 def test_validate_variants():
     # Target type validation with non-struct, non-dict object
     assert bopp.validate("hello", target_type=str) is True
     assert bopp.validate(42, target_type=int) is True
 
-    # Raw dict containing msgspec.UNSET filtered out
+    # Error when target_type is None and obj is not a Struct
+    with pytest.raises(bopp.BoppArgumentError, match="target_type must be provided"):
+        bopp.validate(123)
+
+    # Validation failure raises BoppValidationError
     tag_cls = bopp.get_payload_class("tag")
+    with pytest.raises(bopp.BoppValidationError, match="Validation failed"):
+        bopp.validate({"value": 123}, target_type=tag_cls)
+
+    # Raw dict containing msgspec.UNSET filtered out
     assert (
         bopp.validate(
             {"value": ["a"], "confidence": msgspec.UNSET}, target_type=tag_cls

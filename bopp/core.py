@@ -262,7 +262,7 @@ def create_grouping(
     """
     Grouping_cls = get_grouping_class(version=bopp_version)
 
-    # Case: labels is a sequence of strings and ids is None
+    # Case 1: labels is a sequence of strings and ids is None
     if (
         ids is None
         and isinstance(labels, Sequence)
@@ -270,6 +270,19 @@ def create_grouping(
     ):
         ids = labels
         labels = None
+
+    # Case 2: labels is a sequence of strings and ids is provided
+    if isinstance(labels, Sequence) and not isinstance(labels, (dict, str, bytes)):
+        for lbl in labels:
+            if not isinstance(lbl, str):
+                raise BoppArgumentError(
+                    f"Grouping labels sequence must contain strings; found {type(lbl).__name__} ({lbl!r})."
+                )
+        if len(set(labels)) != len(labels):
+            raise BoppArgumentError(
+                f"Duplicate labels found in grouping labels sequence: {list(labels)}."
+            )
+        labels = {lbl: idx for idx, lbl in enumerate(labels)}
 
     int_ids: list[int]
     labels_val: dict[str, int] | msgspec.UnsetType
@@ -681,6 +694,12 @@ def append(
     group_assignments: dict[str, Any] = {}
     if groupings is not None:
         if isinstance(groupings, dict):
+            registered_grouping_names = {g.name for g in groupings_list}
+            unknown_groupings = set(groupings.keys()) - registered_grouping_names
+            if unknown_groupings:
+                raise BoppArgumentError(
+                    f"Unknown grouping layer(s) for append: {sorted(unknown_groupings)}."
+                )
             group_assignments.update(groupings)
         elif isinstance(groupings, Sequence) and not isinstance(
             groupings, (str, bytes)
@@ -741,12 +760,11 @@ def append(
                 g.labels = {val: 0}
                 gid = 0
         else:
-            try:
-                gid = int(val)
-            except (ValueError, TypeError) as err:
+            if not isinstance(val, int) or isinstance(val, bool):
                 raise BoppArgumentError(
-                    f"Grouping '{g.name}' group ID must be an integer: {err}"
-                ) from err
+                    f"Invalid group ID for grouping '{g.name}': expected integer or string, got {type(val).__name__} ({val!r})."
+                )
+            gid = val
         resolved_gids.append((g, gid))
 
     # Cheap Sanity Checks
@@ -1021,6 +1039,97 @@ def extend(
         src_len = len(next(iter(p_cols_src.values()), []))
         n_obs_target = len(next(iter(p_cols_target.values()), []))
 
+        if p1 is not None and p1 is not msgspec.UNSET:
+            for fname in p1.__struct_fields__:
+                v1 = getattr(p1, fname)
+                v2 = getattr(p2, fname)
+                if not isinstance(v1, list) and not isinstance(v2, list) and v1 != v2:
+                    raise BoppArgumentError(
+                        f"Scalar payload field '{fname}' mismatch: {v1!r} != {v2!r}."
+                    )
+
+        if c1 is not None and c1 is not msgspec.UNSET:
+            for fname in c1.__struct_fields__:
+                v1 = getattr(c1, fname)
+                v2 = getattr(c2, fname)
+                if not isinstance(v1, list) and not isinstance(v2, list):
+                    if n_obs_target == 0 and v1 is msgspec.UNSET:
+                        setattr(target.confidence, fname, v2)
+                    elif v1 != v2:
+                        raise BoppArgumentError(
+                            f"Scalar confidence field '{fname}' mismatch: {v1!r} != {v2!r}."
+                        )
+
+        if e1 is not None and e1 is not msgspec.UNSET:
+            if t1 == "time_uniform":
+                if e1.sampling_period != e2.sampling_period:
+                    raise BoppArgumentError(
+                        f"Uniform extent sampling_period mismatch: {e1.sampling_period} != {e2.sampling_period}."
+                    )
+                if n_obs_target > 0 and src_len > 0:
+                    expected_start = float(e1.start_time) + n_obs_target * float(
+                        e1.sampling_period
+                    )
+                    if abs(float(e2.start_time) - expected_start) > 1e-9:
+                        raise BoppArgumentError(
+                            f"Uniform extent start_time mismatch: expected continuation at {expected_start}, got {e2.start_time}."
+                        )
+            if n_obs_target > 0:
+                if e1.disjoint != e2.disjoint:
+                    raise BoppArgumentError(
+                        f"Extent disjoint setting mismatch: {e1.disjoint} != {e2.disjoint}."
+                    )
+                if e1.exhaustive != e2.exhaustive:
+                    raise BoppArgumentError(
+                        f"Extent exhaustive setting mismatch: {e1.exhaustive} != {e2.exhaustive}."
+                    )
+            elif src_len > 0:
+                if t1 == "time_uniform":
+                    target.extent.start_time = e2.start_time
+                    target.extent.sampling_period = e2.sampling_period
+                target.extent.disjoint = e2.disjoint
+                target.extent.exhaustive = e2.exhaustive
+
+        if n_obs_target > 0:
+            for idx in range(len(g1)):
+                if g1[idx].disjoint != g2[idx].disjoint:
+                    raise BoppArgumentError(
+                        f"Grouping '{g1[idx].name}' disjoint setting mismatch: {g1[idx].disjoint} != {g2[idx].disjoint}."
+                    )
+                if g1[idx].exhaustive != g2[idx].exhaustive:
+                    raise BoppArgumentError(
+                        f"Grouping '{g1[idx].name}' exhaustive setting mismatch: {g1[idx].exhaustive} != {g2[idx].exhaustive}."
+                    )
+        elif src_len > 0:
+            for idx in range(len(g_target)):
+                g_target[idx].disjoint = g2[idx].disjoint
+                g_target[idx].exhaustive = g2[idx].exhaustive
+
+        # Reconcile optional columns for empty target
+        if n_obs_target == 0:
+            for fname in p_cols_src:
+                if fname not in p_cols_target:
+                    setattr(target.payload, fname, [])
+                    p_cols_target[fname] = getattr(target.payload, fname)
+            if target.confidence is not None and target.confidence is not msgspec.UNSET:
+                for fname in c_cols_src:
+                    if fname not in c_cols_target:
+                        setattr(target.confidence, fname, [])
+                        c_cols_target[fname] = getattr(target.confidence, fname)
+
+        if p_cols_target.keys() != p_cols_src.keys():
+            raise BoppArgumentError(
+                f"Payload column mismatch: target columns {sorted(p_cols_target.keys())} != source columns {sorted(p_cols_src.keys())}."
+            )
+        if e_cols_target.keys() != e_cols_src.keys():
+            raise BoppArgumentError(
+                f"Extent column mismatch: target columns {sorted(e_cols_target.keys())} != source columns {sorted(e_cols_src.keys())}."
+            )
+        if c_cols_target.keys() != c_cols_src.keys():
+            raise BoppArgumentError(
+                f"Confidence column mismatch: target columns {sorted(c_cols_target.keys())} != source columns {sorted(c_cols_src.keys())}."
+            )
+
         # Validate and prepare grouping label merge and ID remapping before mutating arrays
         merged_groupings_data: list[
             tuple[dict[str, int] | msgspec.UnsetType, list[int]]
@@ -1126,6 +1235,96 @@ def extend(
                                 UserWarning,
                                 stacklevel=2,
                             )
+
+            # Disjoint sanity check
+            if n_obs_target > 0 and getattr(target_extent, "disjoint", False) is True:
+                if target_extent_tag == "time_interval":
+                    prev_end = target_extent.time[-1] + target_extent.duration[-1]
+                    cur_start = observations.extent.time[0]
+                    if cur_start < prev_end:
+                        warnings.warn(
+                            f"Extended observation (time={cur_start}) overlaps with preceding observation (end={prev_end}), violating disjoint=True.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                elif target_extent_tag == "time":
+                    prev_time = target_extent.time[-1]
+                    cur_time = observations.extent.time[0]
+                    if cur_time <= prev_time:
+                        warnings.warn(
+                            f"Extended observation (time={cur_time}) is not strictly after preceding observation (time={prev_time}), violating disjoint=True.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                elif target_extent_tag == "score_interval":
+                    prev_end = _to_coord(target_extent.quarter[-1]) + _to_coord(
+                        target_extent.duration[-1]
+                    )
+                    cur_start = _to_coord(observations.extent.quarter[0])
+                    if cur_start < prev_end:
+                        warnings.warn(
+                            f"Extended observation (quarter={cur_start}) overlaps with preceding observation (end={prev_end}), violating disjoint=True.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                elif target_extent_tag == "score_quarter":
+                    prev_start = _to_coord(target_extent.quarter[-1])
+                    cur_start = _to_coord(observations.extent.quarter[0])
+                    if cur_start <= prev_start:
+                        warnings.warn(
+                            f"Extended observation (quarter={cur_start}) is not strictly after preceding observation (quarter={prev_start}), violating disjoint=True.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+
+            # Exhaustiveness check
+            if n_obs_target > 0 and getattr(target_extent, "exhaustive", False) is True:
+                if target_extent_tag == "time_interval":
+                    prev_end = target_extent.time[-1] + target_extent.duration[-1]
+                    cur_start = observations.extent.time[0]
+                    if cur_start > prev_end:
+                        warnings.warn(
+                            f"Gap detected before extended observation (prev_end={prev_end}, cur_start={cur_start}), violating exhaustive=True.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                elif target_extent_tag == "score_interval":
+                    prev_end = _to_coord(target_extent.quarter[-1]) + _to_coord(
+                        target_extent.duration[-1]
+                    )
+                    cur_start = _to_coord(observations.extent.quarter[0])
+                    if cur_start > prev_end:
+                        warnings.warn(
+                            f"Gap detected before extended observation (prev_end={prev_end}, cur_start={cur_start}), violating exhaustive=True.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+
+            # Grouping layer disjoint check
+            if n_obs_target > 0:
+                for idx in range(len(g_target)):
+                    gt = g_target[idx]
+                    if (
+                        getattr(gt, "disjoint", False) is True
+                        and target_extent_tag == "time_interval"
+                    ):
+                        last_end: dict[int, float] = {}
+                        for k in range(n_obs_target):
+                            gid_k = gt.ids[k]
+                            end_k = target_extent.time[k] + target_extent.duration[k]
+                            last_end[gid_k] = end_k
+                        remap_ids = merged_groupings_data[idx][1]
+                        for j in range(src_len):
+                            gid_j = remap_ids[j]
+                            cur_t = observations.extent.time[j]
+                            if gid_j in last_end and cur_t < last_end[gid_j]:
+                                warnings.warn(
+                                    f"Extended observation in grouping '{gt.name}' (group {gid_j}) overlaps with previous group member (end={last_end[gid_j]}), violating disjoint=True.",
+                                    UserWarning,
+                                    stacklevel=2,
+                                )
+                                break
+                            last_end[gid_j] = cur_t + observations.extent.duration[j]
 
         # Commit observation rows to target arrays
         for fname in p_cols_target:
