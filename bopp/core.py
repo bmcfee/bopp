@@ -4,6 +4,7 @@ import copy
 import uuid
 import warnings
 from collections.abc import Sequence
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import msgspec
@@ -303,9 +304,10 @@ def create_grouping(
             unique_map: dict[str, int] = {}
             int_ids = []
             for s in ids:
-                if s not in unique_map:
-                    unique_map[s] = len(unique_map)
-                int_ids.append(unique_map[s])
+                str_s = str(s)
+                if str_s not in unique_map:
+                    unique_map[str_s] = len(unique_map)
+                int_ids.append(unique_map[str_s])
             labels_val = unique_map
     elif ids is not None:
         int_ids = []
@@ -672,7 +674,8 @@ def append(
         If required facet fields are missing, unconsumed fields are passed, or grouping
         values cannot be resolved.
     """
-    target = annotation if inplace else copy.deepcopy(annotation)
+    target: Any = annotation if inplace else copy.deepcopy(annotation)
+    ann: Any = annotation
     (
         payload_cols,
         extent_cols,
@@ -770,7 +773,7 @@ def append(
     # Cheap Sanity Checks
     extent = getattr(target, "extent", None)
     extent_tag = _get_tag(extent) if extent is not None else None
-    if extent is not None and extent is not msgspec.UNSET:
+    if extent is not None and extent is not msgspec.UNSET and extent_tag is not None:
         is_fraction = extent_tag in FRACTION_EXTENT_TAGS
         specs = EXTENT_AXES_METADATA.get(extent_tag, [])
         for spec in specs:
@@ -918,7 +921,7 @@ def append(
         g.ids.append(gid)
 
     if inplace:
-        annotation.id = msgspec.UNSET
+        ann.id = msgspec.UNSET
         return annotation
 
     # Out-of-place derivation
@@ -927,7 +930,7 @@ def append(
     target.sandbox = new_sandbox
 
     if derive:
-        Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
+        Derived_cls = get_metadata_class("derived", version=ann.bopp_version)
         target.metadata = Derived_cls(
             transform="append",
             parameters={"observation_index": n_obs},
@@ -936,7 +939,7 @@ def append(
 
     target.id = msgspec.UNSET
     ensure_annotation_id(target)
-    return target
+    return cast("BoppBase", target)
 
 
 def extend(
@@ -980,23 +983,26 @@ def extend(
     BoppArrayError
         If columnar observation dictionaries contain mismatched lengths.
     """
+    ann: Any = annotation
+
     # 1. Compatibility check if observations is another Annotation
     if isinstance(observations, msgspec.Struct) and hasattr(observations, "media_id"):
-        if observations.media_id != annotation.media_id:
+        obs: Any = observations
+        if obs.media_id != ann.media_id:
             raise BoppArgumentError(
-                f"media_id mismatch: '{observations.media_id}' != '{annotation.media_id}'."
+                f"media_id mismatch: '{obs.media_id}' != '{ann.media_id}'."
             )
-        if observations.bopp_version != annotation.bopp_version:
+        if obs.bopp_version != ann.bopp_version:
             raise BoppArgumentError(
-                f"bopp_version mismatch: '{observations.bopp_version}' != '{annotation.bopp_version}'."
+                f"bopp_version mismatch: '{obs.bopp_version}' != '{ann.bopp_version}'."
             )
 
         p1 = getattr(annotation, "payload", None)
         p2 = getattr(observations, "payload", None)
-        if _get_tag(p1) != _get_tag(p2):
-            raise BoppArgumentError(
-                f"Payload type mismatch: '{_get_tag(p1)}' != '{_get_tag(p2)}'."
-            )
+        pt1 = _get_tag(p1) if p1 is not None else None
+        pt2 = _get_tag(p2) if p2 is not None else None
+        if pt1 != pt2:
+            raise BoppArgumentError(f"Payload type mismatch: '{pt1}' != '{pt2}'.")
 
         e1 = getattr(annotation, "extent", None)
         e2 = getattr(observations, "extent", None)
@@ -1026,7 +1032,7 @@ def extend(
                     f"Grouping name mismatch at index {idx}: '{g1[idx].name}' != '{g2[idx].name}'."
                 )
 
-        target = annotation if inplace else copy.deepcopy(annotation)
+        target: Any = annotation if inplace else copy.deepcopy(annotation)
         (
             p_cols_target,
             e_cols_target,
@@ -1061,6 +1067,7 @@ def extend(
                         )
 
         if e1 is not None and e1 is not msgspec.UNSET:
+            assert e2 is not None
             if t1 == "time_uniform":
                 if e1.sampling_period != e2.sampling_period:
                     raise BoppArgumentError(
@@ -1182,7 +1189,6 @@ def extend(
             and src_len > 0
         ):
             specs = EXTENT_AXES_METADATA.get(target_extent_tag or "", [])
-            is_fraction = target_extent_tag in FRACTION_EXTENT_TAGS
             if target_extent_tag == "time_uniform":
                 st = float(target_extent.start_time)
                 sp = float(target_extent.sampling_period)
@@ -1193,7 +1199,7 @@ def extend(
                     )
                 }
             else:
-                obs_bounds = infer_extent_bounds(observations.extent, N=src_len)
+                obs_bounds = infer_extent_bounds(obs.extent, N=src_len)
 
             for spec in specs:
                 dim = spec["dim"]
@@ -1207,7 +1213,7 @@ def extend(
                         if update_bounds:
                             new_val = (
                                 [inf_min.numerator, inf_min.denominator]
-                                if is_fraction
+                                if isinstance(inf_min, Fraction)
                                 else inf_min
                             )
                             setattr(target_extent, min_attr, new_val)
@@ -1225,7 +1231,7 @@ def extend(
                         if update_bounds:
                             new_val = (
                                 [inf_max.numerator, inf_max.denominator]
-                                if is_fraction
+                                if isinstance(inf_max, Fraction)
                                 else inf_max
                             )
                             setattr(target_extent, max_attr, new_val)
@@ -1240,7 +1246,7 @@ def extend(
             if n_obs_target > 0 and getattr(target_extent, "disjoint", False) is True:
                 if target_extent_tag == "time_interval":
                     prev_end = target_extent.time[-1] + target_extent.duration[-1]
-                    cur_start = observations.extent.time[0]
+                    cur_start = obs.extent.time[0]
                     if cur_start < prev_end:
                         warnings.warn(
                             f"Extended observation (time={cur_start}) overlaps with preceding observation (end={prev_end}), violating disjoint=True.",
@@ -1249,7 +1255,7 @@ def extend(
                         )
                 elif target_extent_tag == "time":
                     prev_time = target_extent.time[-1]
-                    cur_time = observations.extent.time[0]
+                    cur_time = obs.extent.time[0]
                     if cur_time <= prev_time:
                         warnings.warn(
                             f"Extended observation (time={cur_time}) is not strictly after preceding observation (time={prev_time}), violating disjoint=True.",
@@ -1260,7 +1266,7 @@ def extend(
                     prev_end = _to_coord(target_extent.quarter[-1]) + _to_coord(
                         target_extent.duration[-1]
                     )
-                    cur_start = _to_coord(observations.extent.quarter[0])
+                    cur_start = _to_coord(obs.extent.quarter[0])
                     if cur_start < prev_end:
                         warnings.warn(
                             f"Extended observation (quarter={cur_start}) overlaps with preceding observation (end={prev_end}), violating disjoint=True.",
@@ -1269,7 +1275,7 @@ def extend(
                         )
                 elif target_extent_tag == "score_quarter":
                     prev_start = _to_coord(target_extent.quarter[-1])
-                    cur_start = _to_coord(observations.extent.quarter[0])
+                    cur_start = _to_coord(obs.extent.quarter[0])
                     if cur_start <= prev_start:
                         warnings.warn(
                             f"Extended observation (quarter={cur_start}) is not strictly after preceding observation (quarter={prev_start}), violating disjoint=True.",
@@ -1281,7 +1287,7 @@ def extend(
             if n_obs_target > 0 and getattr(target_extent, "exhaustive", False) is True:
                 if target_extent_tag == "time_interval":
                     prev_end = target_extent.time[-1] + target_extent.duration[-1]
-                    cur_start = observations.extent.time[0]
+                    cur_start = obs.extent.time[0]
                     if cur_start > prev_end:
                         warnings.warn(
                             f"Gap detected before extended observation (prev_end={prev_end}, cur_start={cur_start}), violating exhaustive=True.",
@@ -1292,7 +1298,7 @@ def extend(
                     prev_end = _to_coord(target_extent.quarter[-1]) + _to_coord(
                         target_extent.duration[-1]
                     )
-                    cur_start = _to_coord(observations.extent.quarter[0])
+                    cur_start = _to_coord(obs.extent.quarter[0])
                     if cur_start > prev_end:
                         warnings.warn(
                             f"Gap detected before extended observation (prev_end={prev_end}, cur_start={cur_start}), violating exhaustive=True.",
@@ -1316,7 +1322,7 @@ def extend(
                         remap_ids = merged_groupings_data[idx][1]
                         for j in range(src_len):
                             gid_j = remap_ids[j]
-                            cur_t = observations.extent.time[j]
+                            cur_t = obs.extent.time[j]
                             if gid_j in last_end and cur_t < last_end[gid_j]:
                                 warnings.warn(
                                     f"Extended observation in grouping '{gt.name}' (group {gid_j}) overlaps with previous group member (end={last_end[gid_j]}), violating disjoint=True.",
@@ -1324,7 +1330,7 @@ def extend(
                                     stacklevel=2,
                                 )
                                 break
-                            last_end[gid_j] = cur_t + observations.extent.duration[j]
+                            last_end[gid_j] = cur_t + obs.extent.duration[j]
 
         # Commit observation rows to target arrays
         for fname in p_cols_target:
@@ -1339,16 +1345,16 @@ def extend(
             g_target[idx].ids.extend(remap_ids)
 
         if inplace:
-            annotation.id = msgspec.UNSET
+            ann.id = msgspec.UNSET
             return annotation
 
         new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Extending")
-        if getattr(observations, "id", msgspec.UNSET) not in (None, msgspec.UNSET):
-            new_parents.append(observations.id)
+        if getattr(obs, "id", msgspec.UNSET) not in (None, msgspec.UNSET):
+            new_parents.append(obs.id)
         target.parents = new_parents
         target.sandbox = new_sandbox
         if derive:
-            Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
+            Derived_cls = get_metadata_class("derived", version=ann.bopp_version)
             target.metadata = Derived_cls(
                 transform="extend",
                 parameters={"count": src_len},
@@ -1356,7 +1362,7 @@ def extend(
             )
         target.id = msgspec.UNSET
         ensure_annotation_id(target)
-        return target
+        return cast("BoppBase", target)
 
     # 2. DataFrame conversion
     if hasattr(observations, "to_dict"):
@@ -1389,22 +1395,22 @@ def extend(
                 append(annotation, obs_item, inplace=True, update_bounds=update_bounds)
             return annotation
 
-        target = copy.deepcopy(annotation)
+        target_seq: Any = copy.deepcopy(annotation)
         for obs_item in observations:
-            append(target, obs_item, inplace=True, update_bounds=update_bounds)
+            append(target_seq, obs_item, inplace=True, update_bounds=update_bounds)
         new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Extending")
-        target.parents = new_parents
-        target.sandbox = new_sandbox
+        target_seq.parents = new_parents
+        target_seq.sandbox = new_sandbox
         if derive:
-            Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
-            target.metadata = Derived_cls(
+            Derived_cls = get_metadata_class("derived", version=ann.bopp_version)
+            target_seq.metadata = Derived_cls(
                 transform="extend",
                 parameters={"count": len(observations)},
                 software=f"bopp=={__version__}",
             )
-        target.id = msgspec.UNSET
-        ensure_annotation_id(target)
-        return target
+        target_seq.id = msgspec.UNSET
+        ensure_annotation_id(target_seq)
+        return cast("BoppBase", target_seq)
 
     raise BoppArgumentError(
         f"Unsupported observations type for extend: {type(observations).__name__}."
