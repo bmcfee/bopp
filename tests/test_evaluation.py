@@ -612,7 +612,7 @@ def test_evaluate_hierarchy_valid_multilevel():
     ]
     est_l = [["A", "B"], ["a", "a", "b", "b"]]
 
-    expected = mir_eval.hierarchy.evaluate(ref_i, ref_l, est_i, est_l)
+    expected = mir_eval.hierarchy.evaluate(ref_i, ref_l, est_i, est_l, frame_size=1)
 
     ref = create(
         media_id="audio:1",
@@ -652,12 +652,12 @@ def test_evaluate_hierarchy_valid_multilevel():
         ],
     )
 
-    actual_explicit = evaluate(ref, est, task="hierarchy")
+    actual_explicit = evaluate(ref, est, task="hierarchy", frame_size=1)
     assert actual_explicit == expected
     assert actual_explicit["T-Measure full"] > 0.9
 
     # Inferred task: extent is non-disjoint, but single grouping is disjoint+exhaustive
-    actual_inferred = evaluate(ref, est)
+    actual_inferred = evaluate(ref, est, frame_size=1)
     assert actual_inferred == expected
 
 
@@ -670,7 +670,7 @@ def test_evaluate_hierarchy_upcast_single_level():
     est_i = [np.array([[0.0, 30.0], [30.0, 60.0]])]
     est_l = [["A", "B"]]
 
-    expected = mir_eval.hierarchy.evaluate(ref_i, ref_l, est_i, est_l)
+    expected = mir_eval.hierarchy.evaluate(ref_i, ref_l, est_i, est_l, frame_size=1)
 
     ref = create(
         media_id="audio:1",
@@ -703,7 +703,7 @@ def test_evaluate_hierarchy_upcast_single_level():
         exhaustive=True,
     )
 
-    actual = evaluate(ref, est, task="hierarchy")
+    actual = evaluate(ref, est, task="hierarchy", frame_size=1)
     assert actual == expected
 
 
@@ -728,7 +728,7 @@ def test_evaluate_hierarchy_both_single_level():
         disjoint=True,
         exhaustive=True,
     )
-    actual = evaluate(ref, est, task="hierarchy")
+    actual = evaluate(ref, est, task="hierarchy", frame_size=1)
     assert "T-Measure full" in actual
     assert actual["T-Measure full"] == 1.0
 
