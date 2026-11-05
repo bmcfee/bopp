@@ -153,6 +153,15 @@ def test_create_grouping_errors():
     with pytest.raises(bopp.BoppArgumentError, match="must be integers or strings"):
         bopp.create_grouping("invalid", [object()])
 
+    with pytest.raises(bopp.BoppArgumentError, match="must be integers or strings"):
+        bopp.create_grouping("invalid_float", [1.9])
+
+    with pytest.raises(bopp.BoppArgumentError, match="must be integers or strings"):
+        bopp.create_grouping("invalid_bool", [True])
+
+    with pytest.raises(bopp.BoppArgumentError, match="must be integers or strings"):
+        bopp.create_grouping("invalid_mixed", [0, "1"])
+
     with pytest.raises(
         bopp.BoppValidationError, match="Failed to create Grouping 'sec'"
     ):

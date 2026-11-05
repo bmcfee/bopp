@@ -74,7 +74,7 @@ import bopp
 
 # 1. Create helper components through registry factories
 metadata = bopp.create_metadata("human", annotator_id="Alice", tool="SonicVisualiser")
-grouping = bopp.create_grouping("sections", labels=["verse", "chorus"])
+grouping = bopp.create_grouping("sections", labels={"verse": 0, "chorus": 1})
 sandbox = bopp.create_sandbox(session_id="session_01")
 
 # 2. Initialize an empty annotation

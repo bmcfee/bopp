@@ -29,6 +29,7 @@ from .util import (
     _get_facet_list_fields,
     _get_tag,
     _to_coord,
+    infer_extent_bounds,
 )
 
 if TYPE_CHECKING:
@@ -294,12 +295,13 @@ def create_grouping(
                 int_ids.append(unique_map[s])
             labels_val = unique_map
     elif ids is not None:
-        try:
-            int_ids = [int(x) for x in ids]
-        except (ValueError, TypeError) as err:
-            raise BoppArgumentError(
-                f"Grouping ids must be integers or strings: {err}"
-            ) from err
+        int_ids = []
+        for x in ids:
+            if not isinstance(x, int) or isinstance(x, bool):
+                raise BoppArgumentError(
+                    f"Grouping IDs must be integers or strings; found {type(x).__name__} ({x!r})."
+                )
+            int_ids.append(x)
         labels_val = labels if isinstance(labels, dict) else msgspec.UNSET
     else:
         int_ids = []
@@ -657,12 +659,13 @@ def append(
         If required facet fields are missing, unconsumed fields are passed, or grouping
         values cannot be resolved.
     """
+    target = annotation if inplace else copy.deepcopy(annotation)
     (
         payload_cols,
         extent_cols,
         confidence_cols,
         groupings_list,
-    ) = _get_annotation_columns(annotation)
+    ) = _get_annotation_columns(target)
 
     all_cols = (
         list(payload_cols.values())
@@ -747,13 +750,9 @@ def append(
         resolved_gids.append((g, gid))
 
     # Cheap Sanity Checks
-    extent = getattr(annotation, "extent", None)
+    extent = getattr(target, "extent", None)
     extent_tag = _get_tag(extent) if extent is not None else None
-    if (
-        extent is not None
-        and extent is not msgspec.UNSET
-        and extent_tag != "time_uniform"
-    ):
+    if extent is not None and extent is not msgspec.UNSET:
         is_fraction = extent_tag in FRACTION_EXTENT_TAGS
         specs = EXTENT_AXES_METADATA.get(extent_tag, [])
         for spec in specs:
@@ -768,9 +767,14 @@ def append(
                 orig = _to_coord(obs[spec["origin"]])
                 span = _to_coord(obs[spec["span"]])
                 obs_min, obs_max = orig, orig + span
-            else:  # kind == "min_max"
+            elif kind == "min_max":
                 obs_min = _to_coord(obs[spec["min_field"]])
                 obs_max = _to_coord(obs[spec["max_field"]])
+            else:  # kind == "uniform"
+                st = float(extent.start_time)
+                sp = float(extent.sampling_period)
+                t = st + n_obs * sp
+                obs_min, obs_max = t, t
 
             curr_min = getattr(extent, min_attr, msgspec.UNSET)
             if curr_min not in (None, msgspec.UNSET):
@@ -886,50 +890,35 @@ def append(
                         )
                     break
 
+    for fname in payload_cols:
+        payload_cols[fname].append(obs[fname])
+    for fname in extent_cols:
+        extent_cols[fname].append(obs[fname])
+    for fname in confidence_cols:
+        confidence_cols[fname].append(obs[fname])
+    for g, gid in resolved_gids:
+        g.ids.append(gid)
+
     if inplace:
-        for fname in payload_cols:
-            payload_cols[fname].append(obs[fname])
-        for fname in extent_cols:
-            extent_cols[fname].append(obs[fname])
-        for fname in confidence_cols:
-            confidence_cols[fname].append(obs[fname])
-        for g, gid in resolved_gids:
-            g.ids.append(gid)
         annotation.id = msgspec.UNSET
         return annotation
 
     # Out-of-place derivation
-    new_ann = copy.deepcopy(annotation)
-    (
-        p_cols,
-        e_cols,
-        c_cols,
-        g_list,
-    ) = _get_annotation_columns(new_ann)
-    for fname in p_cols:
-        p_cols[fname].append(obs[fname])
-    for fname in e_cols:
-        e_cols[fname].append(obs[fname])
-    for fname in c_cols:
-        c_cols[fname].append(obs[fname])
-    for idx, (_, gid) in enumerate(resolved_gids):
-        g_list[idx].ids.append(gid)
-
     new_parents, new_sandbox = _derive_parents_and_sandbox(annotation, "Appending to")
-    new_ann.parents = new_parents
-    new_ann.sandbox = new_sandbox
+    target.parents = new_parents
+    target.sandbox = new_sandbox
 
     if derive:
         Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
-        new_ann.metadata = Derived_cls(
+        target.metadata = Derived_cls(
             transform="append",
             parameters={"observation_index": n_obs},
             software=f"bopp=={__version__}",
         )
 
-    new_ann.id = msgspec.UNSET
-    ensure_annotation_id(new_ann)
-    return new_ann
+    target.id = msgspec.UNSET
+    ensure_annotation_id(target)
+    return target
 
 
 def extend(
@@ -1029,7 +1018,116 @@ def extend(
         p_cols_src, e_cols_src, c_cols_src, g_src = _get_annotation_columns(
             observations
         )
+        src_len = len(next(iter(p_cols_src.values()), []))
+        n_obs_target = len(next(iter(p_cols_target.values()), []))
 
+        # Validate and prepare grouping label merge and ID remapping before mutating arrays
+        merged_groupings_data: list[
+            tuple[dict[str, int] | msgspec.UnsetType, list[int]]
+        ] = []
+        for idx in range(len(g_target)):
+            gt = g_target[idx]
+            gs = g_src[idx]
+            lbls_t = getattr(gt, "labels", msgspec.UNSET)
+            lbls_s = getattr(gs, "labels", msgspec.UNSET)
+
+            if lbls_s not in (None, msgspec.UNSET) and isinstance(lbls_s, dict):
+                if lbls_t in (None, msgspec.UNSET):
+                    merged_labels: dict[str, int] | msgspec.UnsetType = dict(lbls_s)
+                    remapped_ids = list(gs.ids)
+                else:
+                    merged_labels = dict(lbls_t)
+                    used_ids = set(merged_labels.values()) | {
+                        i for i in gt.ids if i >= 0
+                    }
+                    id_remap: dict[int, int] = {}
+                    for label_name, src_id in lbls_s.items():
+                        if label_name in merged_labels:
+                            tgt_id = merged_labels[label_name]
+                            if src_id != tgt_id:
+                                id_remap[src_id] = tgt_id
+                        else:
+                            if src_id not in used_ids:
+                                merged_labels[label_name] = src_id
+                                used_ids.add(src_id)
+                            else:
+                                new_id = max(used_ids, default=-1) + 1
+                                merged_labels[label_name] = new_id
+                                used_ids.add(new_id)
+                                id_remap[src_id] = new_id
+                    remapped_ids = [id_remap.get(x, x) for x in gs.ids]
+            else:
+                merged_labels = dict(lbls_t) if isinstance(lbls_t, dict) else lbls_t
+                remapped_ids = list(gs.ids)
+
+            merged_groupings_data.append((merged_labels, remapped_ids))
+
+        # Bounds check / update on target extent
+        target_extent = getattr(target, "extent", None)
+        target_extent_tag = (
+            _get_tag(target_extent) if target_extent is not None else None
+        )
+        if (
+            target_extent is not None
+            and target_extent is not msgspec.UNSET
+            and src_len > 0
+        ):
+            specs = EXTENT_AXES_METADATA.get(target_extent_tag or "", [])
+            is_fraction = target_extent_tag in FRACTION_EXTENT_TAGS
+            if target_extent_tag == "time_uniform":
+                st = float(target_extent.start_time)
+                sp = float(target_extent.sampling_period)
+                obs_bounds = {
+                    "time": (
+                        st + n_obs_target * sp,
+                        st + (n_obs_target + src_len - 1) * sp,
+                    )
+                }
+            else:
+                obs_bounds = infer_extent_bounds(observations.extent, N=src_len)
+
+            for spec in specs:
+                dim = spec["dim"]
+                min_attr = spec["min_attr"]
+                max_attr = spec["max_attr"]
+                inf_min, inf_max = obs_bounds[dim]
+                curr_min = getattr(target_extent, min_attr, msgspec.UNSET)
+                if curr_min not in (None, msgspec.UNSET):
+                    min_coord = _to_coord(curr_min)
+                    if inf_min < min_coord:
+                        if update_bounds:
+                            new_val = (
+                                [inf_min.numerator, inf_min.denominator]
+                                if is_fraction
+                                else inf_min
+                            )
+                            setattr(target_extent, min_attr, new_val)
+                        else:
+                            warnings.warn(
+                                f"Extended observation on dimension '{dim}' ({inf_min}) is below explicit {min_attr} ({min_coord}).",
+                                UserWarning,
+                                stacklevel=2,
+                            )
+
+                curr_max = getattr(target_extent, max_attr, msgspec.UNSET)
+                if curr_max not in (None, msgspec.UNSET):
+                    max_coord = _to_coord(curr_max)
+                    if inf_max > max_coord:
+                        if update_bounds:
+                            new_val = (
+                                [inf_max.numerator, inf_max.denominator]
+                                if is_fraction
+                                else inf_max
+                            )
+                            setattr(target_extent, max_attr, new_val)
+                        else:
+                            warnings.warn(
+                                f"Extended observation on dimension '{dim}' ({inf_max}) exceeds explicit {max_attr} ({max_coord}).",
+                                UserWarning,
+                                stacklevel=2,
+                            )
+
+        # Commit observation rows to target arrays
         for fname in p_cols_target:
             p_cols_target[fname].extend(p_cols_src[fname])
         for fname in e_cols_target:
@@ -1037,22 +1135,9 @@ def extend(
         for fname in c_cols_target:
             c_cols_target[fname].extend(c_cols_src[fname])
 
-        for idx in range(len(g_target)):
-            gt = g_target[idx]
-            gs = g_src[idx]
-            lbls_t = getattr(gt, "labels", msgspec.UNSET)
-            lbls_s = getattr(gs, "labels", msgspec.UNSET)
-            if lbls_s not in (None, msgspec.UNSET) and isinstance(lbls_s, dict):
-                if lbls_t in (None, msgspec.UNSET):
-                    gt.labels = dict(lbls_s)
-                else:
-                    for k, v in lbls_s.items():
-                        if k in lbls_t and lbls_t[k] != v:
-                            raise BoppArgumentError(
-                                f"Conflicting label mapping for '{k}' in grouping '{gt.name}': {lbls_t[k]} vs {v}."
-                            )
-                        lbls_t[k] = v
-            gt.ids.extend(gs.ids)
+        for idx, (m_labels, remap_ids) in enumerate(merged_groupings_data):
+            g_target[idx].labels = m_labels
+            g_target[idx].ids.extend(remap_ids)
 
         if inplace:
             annotation.id = msgspec.UNSET
@@ -1065,7 +1150,6 @@ def extend(
         target.sandbox = new_sandbox
         if derive:
             Derived_cls = get_metadata_class("derived", version=annotation.bopp_version)
-            src_len = len(next(iter(p_cols_src.values()), []))
             target.metadata = Derived_cls(
                 transform="extend",
                 parameters={"count": src_len},

@@ -160,6 +160,24 @@ def test_append_with_groupings():
     ):
         ann.append(time=4.0, duration=1.0, value="E", inplace=True)
 
+    # 6. Out-of-place append does not mutate original grouping labels
+    ann_orig = bopp.create(
+        media_id="track:orig_grp",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[0.0],
+        duration=[1.0],
+        value=["A"],
+        groupings=[bopp.create_grouping("layer", [0], labels={"intro": 0})],
+    )
+    derived = ann_orig.append(
+        time=1.0, duration=1.0, value="B", layer="bridge", inplace=False
+    )
+    assert "bridge" not in ann_orig.groupings[0].labels
+    assert ann_orig.groupings[0].labels == {"intro": 0}
+    assert derived.groupings[0].labels == {"intro": 0, "bridge": 1}
+    assert derived.groupings[0].ids == [0, 1]
+
 
 def test_append_time_uniform_extent():
     ann = bopp.create(
@@ -210,6 +228,63 @@ def test_append_bounds_sanity_check_and_update():
         update_bounds=True,
     )
     assert ann.extent.max_time == 15.0
+
+    # Out-of-place append with update_bounds=True does not mutate original annotation
+    ann_orig_bound = bopp.create(
+        media_id="track:orig_bound",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0],
+        value=["a"],
+        max_time=1.0,
+    )
+    orig_id = ann_orig_bound.id
+    der_bound = ann_orig_bound.append(
+        time=5.0, value="b", inplace=False, update_bounds=True
+    )
+    assert ann_orig_bound.extent.max_time == 1.0
+    assert ann_orig_bound.id == orig_id
+    assert der_bound.extent.max_time == 5.0
+    assert der_bound.id != orig_id
+
+    # Time uniform extent bounds checking and updating in append
+    ann_u = bopp.create(
+        media_id="track:u_bounds",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        max_time=1.0,
+        value=["a", "b"],
+    )
+    with pytest.warns(UserWarning, match="exceeds explicit max_time"):
+        ann_u.append(value="c", inplace=False)
+    der_u = ann_u.append(value="c", inplace=False, update_bounds=True)
+    assert ann_u.extent.max_time == 1.0
+    assert der_u.extent.max_time == 2.0
+
+    ann_empty_u = bopp.create(
+        media_id="track:empty_u",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        min_time=1.0,
+        empty=True,
+    )
+    with pytest.warns(UserWarning, match="is below explicit min_time"):
+        ann_empty_u.append(value="a", inplace=False)
+    der_min_u = ann_empty_u.append(value="a", inplace=False, update_bounds=True)
+    assert der_min_u.extent.min_time == 0.0
+
+    # Global annotation (no extent) append and extend
+    ann_global = bopp.create(media_id="track:g", payload_type="tag", value=["a"])
+    ann_global.append(value="b", inplace=True)
+    assert ann_global.payload.value == ["a", "b"]
+    ann_global_2 = bopp.create(media_id="track:g", payload_type="tag", value=["c"])
+    ext_g = ann_global.extend(ann_global_2, inplace=False)
+    assert ext_g.payload.value == ["a", "b", "c"]
+    assert ext_g.extent is msgspec.UNSET
 
     # Point extent (time) bounds
     ann_pt = bopp.create(
@@ -444,7 +519,8 @@ def test_extend_with_another_annotation_inplace_and_out_of_place():
     assert derived is not ann1
     assert derived.payload.value == ["intro", "verse", "chorus"]
     assert derived.extent.time == [0.0, 2.0, 4.0]
-    assert derived.groupings[0].ids == [0, 1, 0]
+    assert derived.groupings[0].ids == [0, 1, 2]
+    assert derived.groupings[0].labels == {"A": 0, "B": 1, "C": 2}
     assert derived.parents == [ann1.id, ann2.id]
     assert derived.metadata.__struct_config__.tag == "derived"
     assert derived.metadata.transform == "extend"
@@ -453,6 +529,8 @@ def test_extend_with_another_annotation_inplace_and_out_of_place():
     res = ann1.extend(ann2, inplace=True)
     assert res is ann1
     assert ann1.payload.value == ["intro", "verse", "chorus"]
+    assert ann1.groupings[0].ids == [0, 1, 2]
+    assert ann1.groupings[0].labels == {"A": 0, "B": 1, "C": 2}
     assert ann1.id is msgspec.UNSET
 
 
@@ -733,17 +811,136 @@ def test_extend_edge_cases_and_coverage():
     ext_lbl = a_unlbl.extend(a_lbl, inplace=False)
     assert ext_lbl.groupings[0].labels == {"x": 1}
 
-    # Conflicting label mapping (line 1060)
-    a_lbl_conflict = bopp.create(
-        media_id="m",
+    # Remapping disjoint and conflicting IDs when merging labels
+    g_base = bopp.create_grouping("g", [0], labels={"A": 0})
+    a_base = bopp.create(
+        media_id="track:base",
         payload_type="tag",
         extent_type="time",
-        time=[1.0],
-        value=["b"],
-        groupings=[bopp.create_grouping("g", [0], labels={"x": 2})],
+        time=[0.0],
+        value=["a"],
+        groupings=[g_base],
     )
-    with pytest.raises(bopp.BoppArgumentError, match="Conflicting label mapping"):
-        a_lbl.extend(a_lbl_conflict)
+    g_other = bopp.create_grouping("g", [0, 1], labels={"B": 0, "A": 1})
+    a_other = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="time",
+        time=[1.0, 2.0],
+        value=["b", "c"],
+        groupings=[g_other],
+    )
+    ext_remap = a_base.extend(a_other, inplace=False)
+    assert ext_remap.groupings[0].labels == {"A": 0, "B": 1}
+    assert ext_remap.groupings[0].ids == [0, 1, 0]
+    assert bopp.validate(ext_remap) is True
+
+    # Same IDs in target and source for the same label: no remap needed
+    g_same = bopp.create_grouping("g", [0], labels={"A": 0})
+    a_same = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="time",
+        time=[3.0],
+        value=["d"],
+        groupings=[g_same],
+    )
+    ext_same = a_base.extend(a_same, inplace=False)
+    assert ext_same.groupings[0].labels == {"A": 0}
+    assert ext_same.groupings[0].ids == [0, 0]
+
+    # Source label ID not in used_ids: adopted directly
+    g_unused = bopp.create_grouping("g", [5], labels={"C": 5})
+    a_unused = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="time",
+        time=[4.0],
+        value=["e"],
+        groupings=[g_unused],
+    )
+    ext_unused = a_base.extend(a_unused, inplace=False)
+    assert ext_unused.groupings[0].labels == {"A": 0, "C": 5}
+    assert ext_unused.groupings[0].ids == [0, 5]
+
+    # Inplace extend with another annotation
+    ext_inplace = a_base.extend(a_same, inplace=True)
+    assert ext_inplace is a_base
+    assert a_base.id is msgspec.UNSET
+
+    # Annotation-to-annotation bounds checking and update_bounds
+    a_b1 = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.0],
+        value=["a"],
+        min_time=1.0,
+        max_time=2.0,
+    )
+    a_b2 = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="time",
+        time=[0.5, 3.0],
+        value=["b", "c"],
+    )
+    with pytest.warns(UserWarning, match="is below explicit min_time"):
+        a_b1.extend(a_b2, inplace=False)
+    with pytest.warns(UserWarning, match="exceeds explicit max_time"):
+        a_b1.extend(a_b2, inplace=False)
+
+    der_ext_b = a_b1.extend(a_b2, inplace=False, update_bounds=True)
+    assert a_b1.extent.min_time == 1.0
+    assert a_b1.extent.max_time == 2.0
+    assert der_ext_b.extent.min_time == 0.5
+    assert der_ext_b.extent.max_time == 3.0
+
+    # Fraction extent bounds in extend
+    a_frac1 = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="score_interval",
+        min_quarter=[1, 1],
+        max_quarter=[3, 1],
+        quarter=[[1, 1]],
+        duration=[[1, 1]],
+        value=["a"],
+    )
+    a_frac2 = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="score_interval",
+        quarter=[[0, 1], [3, 1]],
+        duration=[[1, 1], [2, 1]],
+        value=["b", "c"],
+    )
+    der_frac_ext = a_frac1.extend(a_frac2, inplace=False, update_bounds=True)
+    assert der_frac_ext.extent.min_quarter == [0, 1]
+    assert der_frac_ext.extent.max_quarter == [5, 1]
+
+    # Time uniform extent in extend
+    ann_u1 = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=0.0,
+        sampling_period=1.0,
+        max_time=1.0,
+        value=["a"],
+    )
+    ann_u2 = bopp.create(
+        media_id="track:base",
+        payload_type="tag",
+        extent_type="time_uniform",
+        start_time=10.0,
+        sampling_period=1.0,
+        value=["b", "c"],
+    )
+    with pytest.warns(UserWarning, match="exceeds explicit max_time"):
+        ann_u1.extend(ann_u2, inplace=False)
+    der_u_ext = ann_u1.extend(ann_u2, inplace=False, update_bounds=True)
+    assert der_u_ext.extent.max_time == 2.0
 
     # Source grouping has UNSET labels (branch 1054->1064)
     ext_lbl2 = a_lbl.extend(a_unlbl, inplace=False)
@@ -775,6 +972,29 @@ def test_extend_edge_cases_and_coverage():
         [{"time": 2.0, "value": "c"}], inplace=False, derive=False
     )
     assert ext_seq_noderive.metadata == meta
+
+    # Extend within explicit bounds (branches 1097->1112 and 1115->1089)
+    ann_b1 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[1.0],
+        duration=[1.0],
+        value=["a"],
+        min_time=0.0,
+        max_time=10.0,
+    )
+    ann_b2 = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        extent_type="time_interval",
+        time=[2.0],
+        duration=[1.0],
+        value=["b"],
+    )
+    ext_within = ann_b1.extend(ann_b2, inplace=False)
+    assert ext_within.extent.min_time == 0.0
+    assert ext_within.extent.max_time == 10.0
 
     # Unsupported observations type (line 1135)
     with pytest.raises(bopp.BoppArgumentError, match="Unsupported observations type"):
