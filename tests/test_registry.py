@@ -128,3 +128,59 @@ def test_score_interval_csv_roundtrip(tmp_path):
     assert [list(x) for x in loaded.extent.duration] == [
         list(x) for x in ann.extent.duration
     ]
+
+
+def test_registry_accessors_and_errors(monkeypatch):
+    """Test registry accessor functions, version lookups, and error handling."""
+    from bopp.registries import (
+        get_annotation_class,
+        get_confidence_class,
+        get_extent_class,
+        get_grouping_class,
+        get_payload_class,
+        get_registry,
+    )
+
+    # 1. Version 'v1' direct lookup
+    reg_v1 = get_registry("v1")
+    assert "Annotation" in reg_v1
+    assert "Grouping" in reg_v1
+
+    # 1b. Default version lookup (None)
+    reg_def = get_registry()
+    assert "Annotation" in reg_def
+    assert "Grouping" in reg_def
+
+    # 2. Unknown registry version (line 71)
+    monkeypatch.setattr("bopp.registries.get_registry_version", lambda v: "v99")
+    with pytest.raises(ValueError, match="Unknown registry version 'v99'"):
+        get_registry("99.0")
+    monkeypatch.undo()
+
+    # 3. Missing Grouping class (line 124)
+    monkeypatch.setattr(
+        "bopp.registries.get_registry", lambda v=None: {"Grouping": None}
+    )
+    with pytest.raises(bopp.BoppRegistryError, match="No Grouping class registered"):
+        get_grouping_class()
+    monkeypatch.undo()
+
+    # 4. Unrecognized payload type (lines 156-157)
+    with pytest.raises(bopp.BoppRegistryError, match="Unrecognized payload type"):
+        get_payload_class("nonexistent_payload")
+
+    # 5. Unrecognized extent type (lines 188-189)
+    with pytest.raises(bopp.BoppRegistryError, match="Unrecognized extent type"):
+        get_extent_class("nonexistent_extent")
+
+    # 6. Unrecognized confidence type (lines 220-221)
+    with pytest.raises(bopp.BoppRegistryError, match="Unrecognized confidence type"):
+        get_confidence_class("nonexistent_confidence")
+
+    # 7. Missing Annotation class (line 242)
+    monkeypatch.setattr(
+        "bopp.registries.get_registry", lambda v=None: {"Annotation": None}
+    )
+    with pytest.raises(bopp.BoppRegistryError, match="No Annotation class registered"):
+        get_annotation_class()
+    monkeypatch.undo()

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import copy
 import functools
 import types
 import typing
+import warnings
 from collections import defaultdict
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple, get_args, get_origin
@@ -81,6 +83,46 @@ def _get_struct_fields(
 ) -> tuple[msgspec.structs.FieldInfo, ...]:
     """Return cached msgspec struct field metadata for a Struct class."""
     return msgspec.structs.fields(cls)
+
+
+def _get_facet_list_fields(struct: msgspec.Struct | None) -> dict[str, list[Any]]:
+    """Return dictionary of field name -> list value for all list fields in a struct."""
+    if struct is None or struct is msgspec.UNSET:
+        return {}
+    result = {}
+    for field_name in struct.__struct_fields__:
+        if field_name.startswith(("min_", "max_")) or field_name in (
+            "disjoint",
+            "exhaustive",
+        ):
+            continue
+        val = getattr(struct, field_name)
+        if isinstance(val, list):
+            result[field_name] = val
+    return result
+
+
+def _derive_parents_and_sandbox(
+    annotation: BoppBase, action_name: str
+) -> tuple[list[str], Any]:
+    """Extract parent lineage and deep copy sandbox for a derived annotation."""
+    existing_parents = getattr(annotation, "parents", None)
+    if existing_parents is None or existing_parents is msgspec.UNSET:
+        new_parents = []
+    else:
+        new_parents = list(existing_parents)
+
+    if getattr(annotation, "id", msgspec.UNSET) is msgspec.UNSET:
+        warnings.warn(
+            f"{action_name} an annotation with no ID. The resulting annotation will have no parent lineage.",
+            UserWarning,
+            stacklevel=2,
+        )
+    else:
+        new_parents.append(annotation.id)  # type: ignore[attr-defined]
+
+    new_sandbox = copy.deepcopy(getattr(annotation, "sandbox", msgspec.UNSET))
+    return new_parents, new_sandbox
 
 
 def _validate_dataframe_columns(

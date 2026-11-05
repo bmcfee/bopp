@@ -65,6 +65,49 @@ correspond to hierarchical depth), collecting logically related annotation data 
 Each grouping may optionally include a label mapping to provide string-valued descriptors for each numerical identifier.
 
 
+### Authoring and Incremental Extension
+
+BOPP provides a simple and schema-agnostic interface for authoring and expanding annotations without importing versioned schema modules:
+
+```python
+import bopp
+
+# 1. Create helper components through registry factories
+metadata = bopp.create_metadata("human", annotator_id="Alice", tool="SonicVisualiser")
+grouping = bopp.create_grouping("sections", labels={"verse": 0, "chorus": 1})
+sandbox = bopp.create_sandbox(session_id="session_01")
+
+# 2. Initialize an empty annotation
+ann = bopp.create(
+    media_id="track:song_01",
+    payload_type="tag",
+    extent_type="time_interval",
+    metadata=metadata,
+    grouping=grouping,
+    sandbox=sandbox,
+    empty=True,
+)
+
+# 3. Append observations incrementally
+# In-place authoring mutates arrays and voids `ann.id` until sealed
+ann.append(time=0.0, duration=15.0, value="verse", sections="verse", inplace=True)
+ann.append(time=15.0, duration=20.0, value="chorus", sections="chorus", inplace=True)
+
+# Seal deterministic annotation ID
+bopp.ensure_annotation_id(ann)
+
+# 4. Out-of-place derivation preserves parentage and tracks lineage
+derived = ann.append(
+    time=35.0, duration=15.0, value="verse", sections="verse", inplace=False
+)
+assert derived.parents == [ann.id]
+
+# 5. Extend with another annotation, DataFrames, columnar dicts, or lists of dicts
+records = [{"time": 50.0, "duration": 25.0, "value": "outro", "sections": "outro"}]
+ann.extend(records, inplace=True)
+```
+
+
 ### Python implementation
 
 The `bopp` python package provides a reference implementation of the schema and an API for working with annotations.
