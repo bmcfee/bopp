@@ -176,7 +176,42 @@ class BoppBase(msgspec.Struct):
     ) -> BoppBase:
         """Append a single observation to this Annotation.
 
-        See :func:`bopp.core.append` for detailed parameter documentation.
+        Parameters
+        ----------
+        observation : dict of str to Any or None, default=None
+            Key-value mapping of observation values for payload, extent, and
+            confidence facets.
+        inplace : bool, default=False
+            If True, mutates the annotation's columnar lists in place and voids
+            ``annotation.id`` (setting it to UNSET). Preserves original metadata
+            and parents.
+            If False, returns a new derived annotation with updated parents,
+            derived metadata, and a recomputed UUIDv5 id.
+        groupings : dict or sequence or None, default=None
+            Group assignments for each grouping layer in the annotation.
+            Can be a dict mapping ``{layer_name: group_id_or_label}`` or a sequence
+            of IDs matching the order of ``annotation.groupings``.
+        update_bounds : bool, default=False
+            If True, updates explicit min/max bounds on the extent if the new
+            observation falls outside them. If False and bounds are exceeded, emits
+            a UserWarning.
+        derive : bool, default=True
+            Used when inplace=False. If True, sets metadata to DerivedAnnotationMetadata;
+            if False, preserves a copy of the parent metadata.
+        **kwargs : Any
+            Observation fields passed as keyword arguments. Grouping layer names
+            can also be passed directly as kwargs if they do not collide with facet
+            column names.
+
+        Returns
+        -------
+        BoppBase
+            The mutated annotation if inplace=True, or a new derived annotation if
+            inplace=False.
+
+        See Also
+        --------
+        bopp.core.append : Standalone append function.
         """
         from .core import append
 
@@ -200,7 +235,29 @@ class BoppBase(msgspec.Struct):
     ) -> BoppBase:
         """Extend this Annotation with multiple observations.
 
-        See :func:`bopp.core.extend` for detailed parameter documentation.
+        Parameters
+        ----------
+        observations : BoppBase, sequence of dict, dict of sequences, or DataFrame
+            Observations to append. Can be another compatible Annotation instance,
+            a sequence of observation dictionaries, a dictionary of column lists,
+            or a pandas or polars DataFrame.
+        inplace : bool, default=False
+            If True, mutates arrays in place and voids ``annotation.id``.
+            If False, returns a new derived Annotation with recomputed ID.
+        update_bounds : bool, default=False
+            Whether to expand explicit extent bounds to encompass new observations.
+        derive : bool, default=True
+            Whether to set metadata to DerivedAnnotationMetadata when inplace=False.
+
+        Returns
+        -------
+        BoppBase
+            The mutated annotation if inplace=True, or a new derived annotation if
+            inplace=False.
+
+        See Also
+        --------
+        bopp.core.extend : Standalone extend function.
         """
         from .core import extend
 
