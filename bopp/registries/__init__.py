@@ -1,3 +1,4 @@
+import importlib
 from typing import Any
 
 import msgspec
@@ -49,28 +50,24 @@ def get_registry(version: str | None = None) -> dict[str, Any]:
     >>> "Annotation" in reg
     True
     """
-    if version == "v1":
-        registry_key = "v1"
-    else:
-        registry_key = get_registry_version(version)
+    registry_key = get_registry_version(version)
+    try:
+        mod = importlib.import_module(f".{registry_key}", package=__name__)
+    except ModuleNotFoundError:
+        raise ValueError(
+            f"Unknown registry version '{registry_key}' for schema '{version}'."
+        ) from None
 
-    if registry_key == "v1":
-        from . import v1
-
-        return {
-            "PAYLOAD_TYPE_REGISTRY": v1.PAYLOAD_TYPE_REGISTRY,
-            "EXTENT_TYPE_REGISTRY": v1.EXTENT_TYPE_REGISTRY,
-            "CONFIDENCE_TYPE_REGISTRY": v1.CONFIDENCE_TYPE_REGISTRY,
-            "METADATA_TYPE_REGISTRY": getattr(v1, "METADATA_TYPE_REGISTRY", {}),
-            "COMPLEX_FIELDS_REGISTRY": getattr(v1, "COMPLEX_FIELDS_REGISTRY", {}),
-            "STRING_FIELDS_REGISTRY": getattr(v1, "STRING_FIELDS_REGISTRY", {}),
-            "Annotation": v1.ANNOTATION_CLASS,
-            "Grouping": getattr(v1, "GROUPING_CLASS", None),
-        }
-
-    raise ValueError(
-        f"Unknown registry version '{registry_key}' for schema '{version}'."
-    )
+    return {
+        "PAYLOAD_TYPE_REGISTRY": getattr(mod, "PAYLOAD_TYPE_REGISTRY", {}),
+        "EXTENT_TYPE_REGISTRY": getattr(mod, "EXTENT_TYPE_REGISTRY", {}),
+        "CONFIDENCE_TYPE_REGISTRY": getattr(mod, "CONFIDENCE_TYPE_REGISTRY", {}),
+        "METADATA_TYPE_REGISTRY": getattr(mod, "METADATA_TYPE_REGISTRY", {}),
+        "COMPLEX_FIELDS_REGISTRY": getattr(mod, "COMPLEX_FIELDS_REGISTRY", {}),
+        "STRING_FIELDS_REGISTRY": getattr(mod, "STRING_FIELDS_REGISTRY", {}),
+        "Annotation": getattr(mod, "ANNOTATION_CLASS", None),
+        "Grouping": getattr(mod, "GROUPING_CLASS", None),
+    }
 
 
 def get_metadata_class(

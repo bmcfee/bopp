@@ -404,6 +404,18 @@ def test_create_edge_cases_and_errors():
     )
     assert ann_meta_dict.metadata.annotator_id == "charlie"
 
+    # 10b. metadata as dict without metadata_type merging kwargs
+    ann_meta_dict_kwargs = bopp.create(
+        media_id="m",
+        payload_type="tag",
+        metadata={"metadata_type": "human"},
+        annotator_id="dave",
+        tool="sonic-visualiser",
+        empty=True,
+    )
+    assert ann_meta_dict_kwargs.metadata.annotator_id == "dave"
+    assert ann_meta_dict_kwargs.metadata.tool == "sonic-visualiser"
+
     # 11. Unconsumed keyword arguments
     with pytest.raises(bopp.BoppArgumentError, match="Unconsumed keyword arguments"):
         bopp.create(media_id="m", payload_type="tag", empty=True, unexpected_field=123)

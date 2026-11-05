@@ -548,7 +548,15 @@ def create(
             metadata_args = _extract_kwargs(metadata_cls, kwargs)
             metadata_obj = metadata_cls(**metadata_args)
     elif isinstance(metadata, dict):
-        metadata_obj = create_metadata(metadata, bopp_version=bopp_version)
+        meta_tag = metadata.get("metadata_type")
+        if meta_tag is not None and meta_tag in METADATA_TYPE_REGISTRY:
+            metadata_cls = METADATA_TYPE_REGISTRY[meta_tag]
+            metadata_args = _extract_kwargs(metadata_cls, kwargs)
+            metadata_obj = create_metadata(
+                metadata, bopp_version=bopp_version, **metadata_args
+            )
+        else:
+            metadata_obj = create_metadata(metadata, bopp_version=bopp_version)
 
     groupings_obj = groupings
     if (
@@ -1049,10 +1057,13 @@ def extend(
             for fname in p1.__struct_fields__:
                 v1 = getattr(p1, fname)
                 v2 = getattr(p2, fname)
-                if not isinstance(v1, list) and not isinstance(v2, list) and v1 != v2:
-                    raise BoppArgumentError(
-                        f"Scalar payload field '{fname}' mismatch: {v1!r} != {v2!r}."
-                    )
+                if not isinstance(v1, list) and not isinstance(v2, list):
+                    if n_obs_target == 0 and v1 is msgspec.UNSET:
+                        setattr(target.payload, fname, v2)
+                    elif v1 != v2:
+                        raise BoppArgumentError(
+                            f"Scalar payload field '{fname}' mismatch: {v1!r} != {v2!r}."
+                        )
 
         if c1 is not None and c1 is not msgspec.UNSET:
             for fname in c1.__struct_fields__:

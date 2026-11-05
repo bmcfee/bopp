@@ -1559,6 +1559,25 @@ def test_extend_edge_cases_and_coverage(monkeypatch):
     ):
         ann_empty_lyr_conflict.extend(ann_full_lyr)
 
+    # Empty target adopting optional scalar payload field (e.g. object.description)
+    ann_empty_obj = bopp.create(
+        media_id="m",
+        payload_type="object",
+        extent_type="time",
+        empty=True,
+    )
+    assert ann_empty_obj.payload.description is msgspec.UNSET
+    ann_full_obj = bopp.create(
+        media_id="m",
+        payload_type="object",
+        extent_type="time",
+        time=[0.0],
+        value=[{"track": 1}],
+        description="my object description",
+    )
+    ext_obj = ann_empty_obj.extend(ann_full_obj, inplace=False)
+    assert ext_obj.payload.description == "my object description"
+
     # Empty target reconciling optional payload column
     ann_empty_rel = bopp.create(
         media_id="m",

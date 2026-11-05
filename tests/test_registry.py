@@ -141,10 +141,15 @@ def test_registry_accessors_and_errors(monkeypatch):
         get_registry,
     )
 
-    # 1. Version 'v1' direct lookup (line 53)
+    # 1. Version 'v1' direct lookup
     reg_v1 = get_registry("v1")
     assert "Annotation" in reg_v1
     assert "Grouping" in reg_v1
+
+    # 1b. Default version lookup (None)
+    reg_def = get_registry()
+    assert "Annotation" in reg_def
+    assert "Grouping" in reg_def
 
     # 2. Unknown registry version (line 71)
     monkeypatch.setattr("bopp.registries.get_registry_version", lambda v: "v99")
