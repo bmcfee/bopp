@@ -34,7 +34,7 @@ test = [
     "pytest-cov>=6.0.0",
     "pandas>=2.2.3",
     "pyarrow>=18.0.0",
-    "hatch>=1.14.0",
+    "hatch>=1.18.0",
 ]
 benchmark = [
     "pytest-benchmark>=5.0.0",
