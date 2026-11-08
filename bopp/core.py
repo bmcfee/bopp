@@ -458,9 +458,12 @@ def create(
         if groupings is not msgspec.UNSET and groupings is not None:
             raise BoppArgumentError("Cannot specify both 'grouping' and 'groupings'.")
         groupings = [grouping]
-    elif groupings is not msgspec.UNSET and groupings is not None:
-        if isinstance(groupings, (dict, msgspec.Struct)):
-            groupings = [groupings]
+    elif (
+        groupings is not msgspec.UNSET
+        and groupings is not None
+        and isinstance(groupings, (dict, msgspec.Struct))
+    ):
+        groupings = [groupings]
 
     registry = get_registry(bopp_version)
 

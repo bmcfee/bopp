@@ -13,7 +13,7 @@ dependencies = [
     "polars>=2.0.0",
     "tomli-w>=1.0.0",
 ]
-python_requires = "3.13"
+requires-python = ">=3.13"
 
 [project.optional-dependencies]
 dataframe = [
@@ -21,23 +21,45 @@ dataframe = [
     "pyarrow>=18.0.0",
 ]
 docs = [
-    "sphinx",
-    "numpydoc",
-    "pydata-sphinx-theme",
-    "json-schema-for-humans",
-    "myst-parser",
+    "sphinx>=8.1.0",
+    "numpydoc>=1.8.0",
+    "pydata-sphinx-theme>=0.16.0",
+    "json-schema-for-humans>=1.0.0",
+    "myst-parser>=2.0.0",
+    "linkify-it-py>=2.0.0",
 ]
 test = [
-    "check-jsonschema",
-    "pytest",
-    "pytest-cov",
+    "check-jsonschema>=0.31.0",
+    "pytest>=9.0.0",
+    "pytest-cov>=6.0.0",
+    "pandas>=2.2.3",
+    "pyarrow>=18.0.0",
+    "hatch>=1.18.0",
+]
+benchmark = [
+    "pytest-benchmark>=5.0.0",
+    "jams>=0.3.4",
+    "tabulate>=0.9.0",
+]
+
+[dependency-groups]
+lint = [
+    "codespell>=2.4.0",
+    "mypy>=1.15.0",
+    "ruff>=0.17.0",
+    "numpydoc>=1.8.0",
+    "sphinx>=5.1.0",
+    "pandas-stubs>=2.2.0",
+    "pyarrow-stubs>=10.0.0",
+    "pytest>=9.0.0",
     "pandas>=2.2.3",
     "pyarrow>=18.0.0",
 ]
-benchmark = [
-    "pytest-benchmark",
-    "jams",
-    "tabulate",
+
+[tool.ruff.lint]
+ignore = [
+    "UP040", # Type alias using TypeAliasType is tested specifically in test_registry
+    "UP047", # Generic function TypeVar syntax
 ]
 
 [tool.hatch.version]
