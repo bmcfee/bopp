@@ -85,9 +85,9 @@ jobs:
       - name: Install bopp and test dependencies
         run: |
           if [ "${{ matrix.variant }}" == "minimal" ]; then
-            uv pip install --prefix "$CONDA_PREFIX" --resolution=lowest-direct -e ".[test]"
+            uv pip install --prefix "$CONDA_PREFIX" --resolution=lowest-direct --group test -e .
           else
-            uv pip install --prefix "$CONDA_PREFIX" -e ".[test]"
+            uv pip install --prefix "$CONDA_PREFIX" --group test -e .
           fi
 
       - name: Environment info

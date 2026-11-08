@@ -20,6 +20,8 @@ dataframe = [
     "pandas>=2.3.0",
     "pyarrow>=18.1.0",
 ]
+
+[dependency-groups]
 docs = [
     "sphinx>=8.2.0",
     "numpydoc>=1.9.0",
@@ -41,19 +43,14 @@ benchmark = [
     "jams>=0.3.5",
     "tabulate>=0.10.0",
 ]
-
-[dependency-groups]
 lint = [
+    { include-group = "test" },
+    { include-group = "docs" },
     "codespell>=2.4.0",
     "mypy>=1.15.0",
     "ruff>=0.17.0",
-    "numpydoc>=1.9.0",
-    "sphinx>=8.2.0",
     "pandas-stubs>=2.2.3.241126",
     "pyarrow-stubs>=17.12",
-    "pytest>=9.0.0",
-    "pandas>=2.3.0",
-    "pyarrow>=18.1.0",
 ]
 
 [tool.ruff.lint]
@@ -101,7 +98,7 @@ exclude_files = [
 ]
 
 [tool.hatch.envs.default]
-features = [
+dependency-groups = [
     "test",
     "benchmark",
 ]
