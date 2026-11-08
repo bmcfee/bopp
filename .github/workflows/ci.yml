@@ -6,14 +6,13 @@ on:
   pull_request:
     branches: [ "main" ]
 
-concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: True
-
 permissions:
   contents: read
-  pull-requests: write
-  statuses: write
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: True
 
 jobs:
   test:
@@ -31,40 +30,70 @@ jobs:
         include:
           - os: ubuntu-latest
             python-version: "3.13"
-            envfile: ".github/environment-min.yml"
-            channel-priority: "strict"
             variant: "minimal"
+
+          - os: ubuntu-latest
+            python-version: "3.13"
+
+          - os: ubuntu-latest
+            python-version: "3.14"
 
           - os: ubuntu-24.04-arm
             python-version: "3.15"
-            channel-priority: "strict"
-            envfile: ".github/environment-test.yml"
 
           - os: ubuntu-latest
             python-version: "3.15"
-            channel-priority: "strict"
-            envfile: ".github/environment-test.yml"
 
           - os: macos-latest
             python-version: "3.15"
-            channel-priority: "flexible"
-            envfile: ".github/environment-test.yml"
 
           - os: windows-latest
             python-version: "3.15"
-            channel-priority: "flexible"
-            envfile: ".github/environment-test.yml"
-
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Create short temp directory (Windows only)
+        if: runner.os == 'Windows'
+        run: mkdir C:\tmp
+        shell: cmd
+
+      - name: Set environment variables (Windows only)
+        if: runner.os == 'Windows'
+        run: |
+          echo "TMP=C:\tmp" >> $env:GITHUB_ENV
+          echo "TEMP=C:\tmp" >> $env:GITHUB_ENV
+        shell: pwsh
 
       - name: Setup Micromamba
-        uses: mamba-org/setup-micromamba@v3
+        uses: mamba-org/setup-micromamba@f457c30a868e4760d3a6fcea5f25dc655b8edf39 # v3
         with:
-          environment-file: ${{ matrix.envfile }}
-          environment-name: bopp-test
-          cache-environment: true
+          environment-name: test
+          condarc: |
+            channels:
+              - conda-forge
+          create-args: >-
+            python=${{ matrix.python-version }}
+          cache-downloads: true
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install bopp and test dependencies
+        run: |
+          if [ "${{ matrix.variant }}" == "minimal" ]; then
+            uv pip install --prefix "$CONDA_PREFIX" --resolution=lowest-direct -e ".[test]"
+          else
+            uv pip install --prefix "$CONDA_PREFIX" -e ".[test]"
+          fi
+
+      - name: Environment info
+        run: |
+          micromamba info
+          uv pip list --prefix "$CONDA_PREFIX"
 
       - name: Verify json schema
         run: |
@@ -76,19 +105,17 @@ jobs:
           hatch run codegen:build
           git diff --exit-code
 
-      - name: Install package
-        run: |
-          pip install --no-deps -e .
-
       - name: Run tests
         run: |
           pytest
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
+          use_oidc: ${{ !github.event.pull_request.head.repo.fork }}
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: bmcfee/bopp
+          files: ./coverage.xml
           flags: unittests
           fail_ci_if_error: true
           verbose: true
