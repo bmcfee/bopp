@@ -21,37 +21,37 @@ dataframe = [
     "pyarrow>=18.0.0",
 ]
 docs = [
-    "sphinx",
-    "numpydoc",
-    "pydata-sphinx-theme",
-    "json-schema-for-humans",
-    "myst-parser",
-    "linkify-it-py",
+    "sphinx>=8.1.0",
+    "numpydoc>=1.8.0",
+    "pydata-sphinx-theme>=0.16.0",
+    "json-schema-for-humans>=1.0.0",
+    "myst-parser>=2.0.0",
+    "linkify-it-py>=2.0.0",
 ]
 test = [
-    "check-jsonschema",
-    "pytest",
-    "pytest-cov",
+    "check-jsonschema>=0.31.0",
+    "pytest>=9.0.0",
+    "pytest-cov>=6.0.0",
     "pandas>=2.2.3",
     "pyarrow>=18.0.0",
-    "hatch",
+    "hatch>=1.14.0",
 ]
 benchmark = [
-    "pytest-benchmark",
-    "jams",
-    "tabulate",
+    "pytest-benchmark>=5.0.0",
+    "jams>=0.3.4",
+    "tabulate>=0.9.0",
 ]
 
 [dependency-groups]
 lint = [
-    "codespell",
-    "mypy",
-    "ruff",
+    "codespell>=2.4.0",
+    "mypy>=1.15.0",
+    "ruff>=0.17.0",
     "numpydoc>=1.8.0",
     "sphinx>=5.1.0",
-    "pandas-stubs",
-    "pyarrow-stubs",
-    "pytest",
+    "pandas-stubs>=2.2.0",
+    "pyarrow-stubs>=10.0.0",
+    "pytest>=9.0.0",
     "pandas>=2.2.3",
     "pyarrow>=18.0.0",
 ]
