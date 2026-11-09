@@ -3,6 +3,8 @@
 [![CI Tests](https://github.com/bmcfee/bopp/actions/workflows/ci.yml/badge.svg)](https://github.com/bmcfee/bopp/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/bmcfee/bopp/graph/badge.svg?token=48VE7PS20G)](https://codecov.io/gh/bmcfee/bopp)
 [![Documentation Status](https://readthedocs.org/projects/bopp/badge/?version=latest)](http://bopp.readthedocs.io/en/latest/?badge=latest)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+[![SPEC 0 — Minimum Supported Dependencies](https://img.shields.io/badge/SPEC-0-green?labelColor=%23004811&color=%235CA038)](https://scientific-python.org/specs/spec-0000/)
 
 ## Overview
 
